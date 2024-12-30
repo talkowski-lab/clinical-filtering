@@ -26,7 +26,7 @@ workflow filterClinicalCompHets {
 
         Int ad_alt_threshold=3
 
-        String filter_comphets_xlr_hom_var_script
+        String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_v0.1.py"
 
         String hail_docker
         String sv_base_mini_docker

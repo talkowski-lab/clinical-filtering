@@ -22,8 +22,8 @@ workflow filterClinicalVariants {
         File ref_fasta
 
         String cohort_prefix
-        String filter_clinical_variants_script
-        String filter_clinical_variants_omim_script
+        String filter_clinical_variants_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_v0.1.py"
+        String filter_clinical_variants_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_v0.1.py"
 
         String hail_docker
         String sv_base_mini_docker

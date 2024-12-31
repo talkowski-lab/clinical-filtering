@@ -661,7 +661,7 @@ merged_comphets_xlr_hom_var = merged_comphets_xlr_hom_var.annotate(in_non_par=~(
 merged_comphets_xlr_hom_var = get_transmission(merged_comphets_xlr_hom_var)
 
 output_filename = f"{prefix}_{variant_types}_comp_hets_xlr_hom_var.tsv.gz"
-if len(output_filename)>255:  # filename too long
+if len(output_filename)>os.pathconf('/', 'PC_NAME_MAX')-1:  # filename too long
     output_filename = f"{variant_types}_comp_hets_xlr_hom_var.tsv.gz"
 
 merged_comphets_xlr_hom_var.flatten().export(output_filename)

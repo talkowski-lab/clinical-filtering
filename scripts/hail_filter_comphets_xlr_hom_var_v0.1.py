@@ -660,4 +660,9 @@ merged_comphets_xlr_hom_var = merged_comphets_xlr_hom_var.filter(merged_comphets
 merged_comphets_xlr_hom_var = merged_comphets_xlr_hom_var.annotate(in_non_par=~(merged_comphets_xlr_hom_var.locus.in_autosome_or_par()))
 merged_comphets_xlr_hom_var = get_transmission(merged_comphets_xlr_hom_var)
 
-merged_comphets_xlr_hom_var.flatten().export(f"{variant_types}_comp_hets_xlr_hom_var.tsv.gz")
+output_filename = f"{prefix}_{variant_types}_comp_hets_xlr_hom_var.tsv.gz"
+if len(output_filename)>255:  # filename too long
+    output_filename = f"{variant_types}_comp_hets_xlr_hom_var.tsv.gz"
+
+merged_comphets_xlr_hom_var.flatten().export(output_filename)
+pd.Series([output_filename]).to_csv('output_filename.txt', header=None, index=False)

@@ -665,4 +665,3 @@ if len(output_filename)>(os.pathconf('/', 'PC_NAME_MAX')-len('/cromwell_root/.')
     output_filename = f"{variant_types}_comp_hets_xlr_hom_var.tsv.gz"
 
 merged_comphets_xlr_hom_var.flatten().export(output_filename)
-pd.Series([output_filename]).to_csv('output_filename.txt', header=None, index=False)

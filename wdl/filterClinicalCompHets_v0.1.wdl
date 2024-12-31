@@ -276,6 +276,6 @@ task filterCompHetsXLRHomVar {
     }
 
     output {
-        File comphet_xlr_hom_var_tsv = glob('_comp_hets_xlr_hom_var.tsv.gz')[0]
+        File comphet_xlr_hom_var_tsv = glob('*_comp_hets_xlr_hom_var.tsv.gz')[0]
     }
 }

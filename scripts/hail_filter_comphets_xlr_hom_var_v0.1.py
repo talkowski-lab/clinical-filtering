@@ -216,7 +216,7 @@ if gene_list_tsv!='NA':
                 for gene_list_name, uri in gene_list_uris.items()}
 
     merged_mt = merged_mt.annotate_rows(
-        gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(merged_mt.vep.transcript_consequences.SYMBOL), gene_list_name) 
+        gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(merged_mt.gene), gene_list_name) 
             for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
     
     in_omim = (merged_mt.vep.transcript_consequences.OMIM_inheritance_code!='')
@@ -515,6 +515,9 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
 def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
     subset_mt = mt.filter_cols(hl.array(samples).contains(mt.s), keep=keep)
 
+    # filter by AD of alternate allele in proband
+    subset_mt = subset_mt.filter_entries(subset_mt.proband_entry.AD[1]>=ad_alt_threshold)
+
     # remove variants missing in subset samples
     subset_mt = hl.variant_qc(subset_mt)
     subset_mt = subset_mt.filter_rows(subset_mt.variant_qc.AC[1]>0)
@@ -605,9 +608,11 @@ non_trio_pedigree = pedigree.filter_to(non_trio_samples)
 ## Get CompHets 
 # Filter to only in autosomes or PAR
 comphet_mt = merged_mt.filter_rows(merged_mt.locus.in_autosome_or_par())
+# TODO: THIS FILTER WILL MESS UP GENE LIST FILTER
+# TODO: double check OMIM_inheritance_code missing in SVs?
 # Filter only OMIM recessive or missing (for SVs)
-comphet_mt = comphet_mt.filter_rows((comphet_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('2')) | 
-                                    (comphet_mt.vep.transcript_consequences.OMIM_inheritance_code==''))
+# comphet_mt = comphet_mt.filter_rows((comphet_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('2')) | 
+#                                     (comphet_mt.vep.transcript_consequences.OMIM_inheritance_code==''))
 
 if len(trio_samples)>0:
     merged_trio_comphets = get_trio_comphets(comphet_mt)
@@ -629,6 +634,10 @@ if len(trio_samples)==0:
 
 # Trio matrix
 merged_tm = hl.trio_matrix(merged_mt, pedigree, complete_trios=False)
+
+# filter by AD of alternate allele in proband
+merged_tm = merged_tm.filter_entries(merged_tm.proband_entry.AD[1]>=ad_alt_threshold)
+
 gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(merged_tm, merged_mt, pedigree)
 gene_phased_tm = gene_phased_tm.annotate_cols(trio_status=hl.if_else(gene_phased_tm.fam_id=='-9', 'not_in_pedigree', 
                                                    hl.if_else(hl.array(trio_samples).contains(gene_phased_tm.id), 'trio', 'non_trio')))
@@ -652,9 +661,6 @@ phased_hom_var = phased_hom_var.annotate(variant_category='hom_var')
 merged_comphets = merged_comphets.annotate(variant_category='comphet')
 
 merged_comphets_xlr_hom_var = merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set').union(xlr_phased).union(phased_hom_var)
-
-# filter by AD of alternate allele 
-merged_comphets_xlr_hom_var = merged_comphets_xlr_hom_var.filter(merged_comphets_xlr_hom_var.proband_entry.AD[1]>=ad_alt_threshold)
 
 # Annotate PAR status
 merged_comphets_xlr_hom_var = merged_comphets_xlr_hom_var.annotate(in_non_par=~(merged_comphets_xlr_hom_var.locus.in_autosome_or_par()))

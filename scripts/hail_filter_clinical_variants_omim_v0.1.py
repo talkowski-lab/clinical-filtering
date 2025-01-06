@@ -232,10 +232,15 @@ omim_dom = omim_dom.filter_entries((omim_dom.proband_entry.GT.is_non_ref()) |
                                    (omim_dom.mother_entry.GT.is_non_ref()) |
                                    (omim_dom.father_entry.GT.is_non_ref()))
 
-# filter by AD of alternate allele 
-omim_dom = omim_dom.filter_entries(omim_dom.proband_entry.AD[1]>=ad_alt_threshold)
+# filter by AD of alternate allele in trio
+omim_dom = omim_dom.filter_entries((omim_dom.proband_entry.AD[1]>=ad_alt_threshold) |
+                                   (omim_dom.mother_entry.AD[1]>=ad_alt_threshold) |
+                                   (omim_dom.father_entry.AD[1]>=ad_alt_threshold))
 
-omim_dom = omim_dom.filter_rows((hl.agg.count_where(hl.is_defined(omim_dom.proband_entry.GT))>0))
+# variant must be in at least 1 trio
+omim_dom = omim_dom.filter_rows((hl.agg.count_where((hl.is_defined(omim_dom.proband_entry.GT)) |
+                                                    (hl.is_defined(omim_dom.mother_entry.GT)) |
+                                                    (hl.is_defined(omim_dom.father_entry.GT)))>0))
 omim_dom = omim_dom.annotate_rows(variant_category='OMIM_dominant')
 
 omim_dom = get_transmission(omim_dom)

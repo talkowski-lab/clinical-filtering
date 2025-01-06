@@ -515,15 +515,14 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
 def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
     subset_mt = mt.filter_cols(hl.array(samples).contains(mt.s), keep=keep)
 
-    # filter by AD of alternate allele in proband
-    subset_mt = subset_mt.filter_entries(subset_mt.proband_entry.AD[1]>=ad_alt_threshold)
-
     # remove variants missing in subset samples
     subset_mt = hl.variant_qc(subset_mt)
     subset_mt = subset_mt.filter_rows(subset_mt.variant_qc.AC[1]>0)
     subset_mt = subset_mt.drop('variant_qc')
 
     subset_tm = hl.trio_matrix(subset_mt, pedigree, complete_trios=complete_trios)
+    # filter by AD of alternate allele in proband
+    subset_tm = subset_tm.filter_entries(subset_tm.proband_entry.AD[1]>=ad_alt_threshold)
     return subset_mt, subset_tm
 
 def get_non_trio_comphets(mt):

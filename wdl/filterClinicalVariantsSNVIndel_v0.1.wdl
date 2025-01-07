@@ -6,7 +6,6 @@ import "helpers.wdl" as helpers
 struct RuntimeAttr {
     Float? mem_gb
     Int? cpu_cores
-    Int? gpu_cores
     Int? disk_gb
     Int? boot_disk_gb
     Int? preemptible_tries
@@ -48,6 +47,8 @@ workflow filterClinicalVariants {
 
         Boolean sort_after_merge=false
 
+        RuntimeAttr? runtime_attr_override_filter
+        RuntimeAttr? runtime_attr_override_filter_omim
         RuntimeAttr? runtime_attr_merge_clinvar
         RuntimeAttr? runtime_attr_merge_omim_rec_vcfs
         RuntimeAttr? runtime_attr_merge_clinvar_vcfs
@@ -65,7 +66,8 @@ workflow filterClinicalVariants {
             af_threshold=af_threshold,
             gnomad_af_threshold=gnomad_af_threshold,
             genome_build=genome_build,
-            pass_filter=pass_filter
+            pass_filter=pass_filter,
+            runtime_attr_override=runtime_attr_override_filter
         }
 
         call runClinicalFilteringOMIM {
@@ -86,7 +88,8 @@ workflow filterClinicalVariants {
             loeuf_v4_threshold=loeuf_v4_threshold,
             genome_build=genome_build,
             include_not_omim=include_not_omim,
-            gene_list_tsv=gene_list_tsv
+            gene_list_tsv=gene_list_tsv,
+            runtime_attr_override=runtime_attr_override_filter_omim
         }
     }   
 

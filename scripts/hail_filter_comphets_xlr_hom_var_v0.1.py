@@ -102,6 +102,17 @@ if snv_indel_vcf!='NA':
     snv_mt = snv_mt.annotate_rows(variant_type='SNV/Indel', 
                                   gene_source=['vep'])
     
+    # NEW 1/7/2025
+    # Annotate by gene list(s)
+    if gene_list_tsv!='NA':
+        gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
+        gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
+                    for gene_list_name, uri in gene_list_uris.items()}
+
+        snv_mt = snv_mt.annotate_rows(
+            gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(snv_mt.gene), gene_list_name) 
+                for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
+    
 # Load SV VCF
 if sv_vcf!='NA':
     locus_expr = 'locus_interval'
@@ -143,7 +154,7 @@ if sv_vcf!='NA':
     sv_mt = sv_mt.key_rows_by('locus', 'alleles')
 
     # NEW 1/7/2025 
-    # Filter by gene list(s) (only for SVs, SNV/Indels already filtered)
+    # Annotate and filter by gene list(s)
     if gene_list_tsv!='NA':
         gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
         gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 

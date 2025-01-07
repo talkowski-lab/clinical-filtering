@@ -64,7 +64,7 @@ workflow filterClinicalCompHets {
     } 
 
     scatter (sample_file in splitFamilies.family_shard_files) {
-        if (defined(omim_recessive_vcf)) {
+        if (omim_recessive_vcf!='NA') {
             call helpers.subsetVCFSamplesHail as subsetVCFSamplesSNVIndels {
                 input:
                     samples_file=sample_file,
@@ -114,8 +114,8 @@ workflow filterClinicalCompHets {
         }
     }
 
-    String variant_types_ = if defined(omim_recessive_vcf) then 'SV_SNV_Indel' else 'SV'
-    String variant_types = if defined(sv_filtered_vcf) then variant_types_ else 'SNV_Indel'
+    String variant_types_ = if omim_recessive_vcf!='NA' then 'SV_SNV_Indel' else 'SV'
+    String variant_types = if sv_filtered_vcf!='NA' then variant_types_ else 'SNV_Indel'
     call helpers.mergeResultsPython as mergeCompHetsXLRHomVar {
         input:
             tsvs=filterCompHetsXLRHomVar.comphet_xlr_hom_var_tsv,

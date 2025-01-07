@@ -537,7 +537,8 @@ def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
 
     subset_tm = hl.trio_matrix(subset_mt, pedigree, complete_trios=complete_trios)
     # filter by AD of alternate allele in proband
-    subset_tm = subset_tm.filter_entries(subset_tm.proband_entry.AD[1]>=ad_alt_threshold)
+    if 'AD' in list(subset_mt.entry):
+        subset_tm = subset_tm.filter_entries(subset_tm.proband_entry.AD[1]>=ad_alt_threshold)
     return subset_mt, subset_tm
 
 def get_non_trio_comphets(mt):
@@ -645,7 +646,9 @@ if len(trio_samples)==0:
 merged_tm = hl.trio_matrix(merged_mt, pedigree, complete_trios=False)
 
 # filter by AD of alternate allele in proband
-merged_tm = merged_tm.filter_entries(merged_tm.proband_entry.AD[1]>=ad_alt_threshold)
+# TODO: might filter out all if AD is empty (e.g. all SVs after merging)
+if 'AD' in list(merged_mt.entry):
+    merged_tm = merged_tm.filter_entries(merged_tm.proband_entry.AD[1]>=ad_alt_threshold)
 
 gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(merged_tm, merged_mt, pedigree)
 gene_phased_tm = gene_phased_tm.annotate_cols(trio_status=hl.if_else(gene_phased_tm.fam_id=='-9', 'not_in_pedigree', 

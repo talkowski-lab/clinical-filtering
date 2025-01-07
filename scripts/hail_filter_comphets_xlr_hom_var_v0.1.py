@@ -142,6 +142,25 @@ if sv_vcf!='NA':
         OMIM_inheritance_code=hl.if_else(hl.is_defined(omim[sv_mt.row_key]), omim[sv_mt.row_key].inheritance_code, ''))))
     sv_mt = sv_mt.key_rows_by('locus', 'alleles')
 
+    # NEW 1/7/2025 
+    # Filter by gene list(s) (only for SVs, SNV/Indels already filtered)
+    if gene_list_tsv!='NA':
+        gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
+        gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
+                    for gene_list_name, uri in gene_list_uris.items()}
+
+        sv_mt = sv_mt.annotate_rows(
+            gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(sv_mt.gene), gene_list_name) 
+                for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
+
+        # OMIM recessive code
+        omim_rec_code = (sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('2'))
+        # OMIM XLR code OR in chrX
+        omim_xlr_code_or_in_chrX = ((sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('4')) |  
+            ((sv_mt.locus.in_x_nonpar()) | (sv_mt.locus.in_x_par())))
+        in_gene_list = (sv_mt.gene_lists.size()>0)
+        sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code_or_in_chrX | in_gene_list)
+
 if (snv_indel_vcf!='NA') and (sv_vcf!='NA'):
     sv_info_fields, sv_entry_fields = list(sv_mt.row.info), list(sv_mt.entry)
     snv_info_fields, snv_entry_fields = list(snv_mt.row.info), list(snv_mt.entry)
@@ -208,21 +227,6 @@ if sv_vcf!='NA':
                                                                               start=merged_mt.locus.position,
                                                                               end=merged_mt.end, reference_genome=build))
     merged_mt = merged_mt.key_rows_by(locus_expr, 'alleles')
-
-# Filter by gene list(s)
-if gene_list_tsv!='NA':
-    gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
-    gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
-                for gene_list_name, uri in gene_list_uris.items()}
-
-    merged_mt = merged_mt.annotate_rows(
-        gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(merged_mt.gene), gene_list_name) 
-            for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
-    
-    in_omim = (merged_mt.vep.transcript_consequences.OMIM_inheritance_code!='')
-    in_gene_list = (merged_mt.gene_lists.size()>0)
-
-    merged_mt = merged_mt.filter_rows(in_omim | in_gene_list)
 
 ## EDITED HAIL FUNCTIONS
 # EDITED: don't check locus struct
@@ -607,11 +611,6 @@ non_trio_pedigree = pedigree.filter_to(non_trio_samples)
 ## Get CompHets 
 # Filter to only in autosomes or PAR
 comphet_mt = merged_mt.filter_rows(merged_mt.locus.in_autosome_or_par())
-# TODO: THIS FILTER WILL MESS UP GENE LIST FILTER
-# TODO: double check OMIM_inheritance_code missing in SVs?
-# Filter only OMIM recessive or missing (for SVs)
-# comphet_mt = comphet_mt.filter_rows((comphet_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('2')) | 
-#                                     (comphet_mt.vep.transcript_consequences.OMIM_inheritance_code==''))
 
 if len(trio_samples)>0:
     merged_trio_comphets = get_trio_comphets(comphet_mt)

@@ -117,9 +117,9 @@ workflow filterClinicalVariants {
     # CompHets
     call filterClinicalCompHets.filterClinicalCompHets as filterCompHetsXLRHomVar {
         input:
-            omim_recessive_vcf=select_first([filterClinicalVariantsSNVIndel.omim_recessive_vcf]),
-            clinvar_vcf=select_first([filterClinicalVariantsSNVIndel.clinvar_vcf]),
-            sv_filtered_vcf=select_first([filterClinicalVariantsSV.sv_filtered_vcf]),
+            omim_recessive_vcf=select_first([filterClinicalVariantsSNVIndel.omim_recessive_vcf, 'NA']),
+            clinvar_vcf=select_first([filterClinicalVariantsSNVIndel.clinvar_vcf, 'NA']),
+            sv_filtered_vcf=select_first([filterClinicalVariantsSV.sv_filtered_vcf, 'NA']),
             ped_uri=ped_uri,
             omim_uri=omim_uri,
             sv_gene_fields=sv_gene_fields,

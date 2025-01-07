@@ -14,9 +14,9 @@ struct RuntimeAttr {
 
 workflow filterClinicalCompHets {
     input {
-        File? omim_recessive_vcf
-        File? clinvar_vcf
-        File? sv_filtered_vcf
+        String omim_recessive_vcf='NA'
+        String clinvar_vcf='NA'
+        String sv_filtered_vcf='NA'
         File ped_uri
         File omim_uri
         String cohort_prefix
@@ -43,7 +43,7 @@ workflow filterClinicalCompHets {
         RuntimeAttr? runtime_attr_merge_results
     }
 
-    if (defined(sv_filtered_vcf)) {
+    if (sv_filtered_vcf!='NA') {
         call addSVSamplesToPed {
             input:
             ped_uri=ped_uri,
@@ -75,7 +75,7 @@ workflow filterClinicalCompHets {
             }
         }
 
-        if (defined(clinvar_vcf)) {
+        if (clinvar_vcf!='NA') {
             call helpers.subsetVCFSamplesHail as subsetVCFSamplesSNVIndelsClinVar {
                 input:
                     samples_file=sample_file,
@@ -86,7 +86,7 @@ workflow filterClinicalCompHets {
             }
         }
 
-        if (defined(sv_filtered_vcf)) {
+        if (sv_filtered_vcf!='NA') {
             call helpers.subsetVCFSamplesHail as subsetVCFSamplesSVs {
                 input:
                     samples_file=sample_file,

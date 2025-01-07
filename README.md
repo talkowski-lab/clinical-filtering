@@ -13,7 +13,7 @@ Each ```v0.x``` is associated with a published Dockstore workflow.
 - Outputs comphets, XLR, and homvar in proband from SNV/Indel and/or SV input.
 
 **```filterClinicalVariants_v0.1.wdl```**: https://dockstore.org/workflows/github.com/talkowski-lab/clinical-filtering/filter-clinical-variants-v01
-- Combines ```filterClinicalVariantsSNVIndel_v0.1.wdl``,```filterClinicalVariantsSV_v0.1.wdl```, and ```filterClinicalCompHets_v0.1.wdl``` into one workflow.
+- Combines ```filterClinicalVariantsSNVIndel_v0.1.wdl```,```filterClinicalVariantsSV_v0.1.wdl```, and ```filterClinicalCompHets_v0.1.wdl``` into one workflow.
 
 **```filterClinicalVariantsNIFS_v0.1.wdl```**: https://dockstore.org/workflows/github.com/talkowski-lab/clinical-filtering/filter-clinical-variants-NIFS-v01
 - SNV/Indel only.

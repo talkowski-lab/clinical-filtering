@@ -35,7 +35,6 @@ workflow filterClinicalVariantsSV {
 
         RuntimeAttr? runtime_attr_bcftools
         RuntimeAttr? runtime_attr_annotate
-        RuntimeAttr? runtime_attr_rename_samples
         RuntimeAttr? runtime_attr_filter_vcf
     }
 

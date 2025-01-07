@@ -24,7 +24,8 @@ build = sys.argv[14]
 ad_alt_threshold = int(sys.argv[15])
 include_not_omim = ast.literal_eval(sys.argv[16].capitalize())
 spliceAI_threshold = float(sys.argv[17])
-gene_list_tsv = sys.argv[18]
+rec_gene_list_tsv = sys.argv[18]
+dom_gene_list_tsv = sys.argv[19]
 
 hl.init(min_block_size=128, 
         spark_conf={"spark.executor.cores": cores, 
@@ -140,8 +141,8 @@ gene_phased_tm = gene_phased_tm.filter_rows(is_splice_var & fails_spliceAI_score
 
 # Output 2: OMIM Recessive
 # Filter by gene list(s)
-if gene_list_tsv!='NA':
-    gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
+if rec_gene_list_tsv!='NA':
+    gene_list_uris = pd.read_csv(rec_gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
     gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
                 for gene_list_name, uri in gene_list_uris.items()}
 
@@ -224,9 +225,16 @@ passes_loeuf_v2 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v
 passes_loeuf_v4 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v4=='', 0, 
                         hl.float(gene_phased_tm.vep.transcript_consequences.LOEUF_v4))<=loeuf_v4_threshold)
 
-# Filter by gene list(s) 
-# Annotations already done when filtering OMIM recessive above
-if gene_list_tsv!='NA':
+# Filter by gene list(s)
+if dom_gene_list_tsv!='NA':
+    gene_list_uris = pd.read_csv(dom_gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
+    gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
+                for gene_list_name, uri in gene_list_uris.items()}
+    # overrides recessive gene_lists but already saved as intermediate
+    gene_phased_tm = gene_phased_tm.annotate_rows(
+        gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(gene_phased_tm.vep.transcript_consequences.SYMBOL), gene_list_name) 
+            for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
+
     in_gene_list = (gene_phased_tm.gene_lists.size()>0)
 else:
     in_gene_list = False

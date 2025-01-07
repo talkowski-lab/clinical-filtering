@@ -27,7 +27,7 @@ build = sys.argv[8]
 cores = sys.argv[9]  # string
 mem = int(np.floor(float(sys.argv[10])))
 ad_alt_threshold = int(sys.argv[11])
-gene_list_tsv = sys.argv[12]
+rec_gene_list_tsv = sys.argv[12]
 
 hl.init(min_block_size=128, 
         local=f"local[*]", 
@@ -104,8 +104,8 @@ if snv_indel_vcf!='NA':
     
     # NEW 1/7/2025
     # Annotate by gene list(s)
-    if gene_list_tsv!='NA':
-        gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
+    if rec_gene_list_tsv!='NA':
+        gene_list_uris = pd.read_csv(rec_gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
         gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
                     for gene_list_name, uri in gene_list_uris.items()}
 
@@ -155,8 +155,8 @@ if sv_vcf!='NA':
 
     # NEW 1/7/2025 
     # Annotate and filter by gene list(s)
-    if gene_list_tsv!='NA':
-        gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
+    if rec_gene_list_tsv!='NA':
+        gene_list_uris = pd.read_csv(rec_gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
         gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
                     for gene_list_name, uri in gene_list_uris.items()}
 

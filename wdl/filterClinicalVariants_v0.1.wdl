@@ -61,7 +61,8 @@ workflow filterClinicalVariants {
         Boolean pass_filter=false
         Boolean include_not_omim=true  # NIFS-specific
 
-        String gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
+        String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
+        String dom_gene_list_tsv='NA'
     }
     
     # SNV/Indel
@@ -91,7 +92,8 @@ workflow filterClinicalVariants {
             # families_per_chunk=families_per_chunk,
             pass_filter=pass_filter,
             # include_not_omim=include_not_omim,
-            gene_list_tsv=gene_list_tsv
+            rec_gene_list_tsv=rec_gene_list_tsv,
+            dom_gene_list_tsv=dom_gene_list_tsv
         }
     }
 
@@ -127,7 +129,7 @@ workflow filterClinicalVariants {
             genome_build=genome_build,
             hail_docker=hail_docker,
             ad_alt_threshold=ad_alt_threshold,
-            gene_list_tsv=gene_list_tsv
+            rec_gene_list_tsv=rec_gene_list_tsv
     }
 
     output {

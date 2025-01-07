@@ -43,7 +43,8 @@ workflow filterClinicalVariants {
         Boolean pass_filter=false
         Boolean include_not_omim=true  # NIFS-specific
 
-        String gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
+        String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
+        String dom_gene_list_tsv='NA' 
 
         Boolean sort_after_merge=false
 
@@ -88,7 +89,8 @@ workflow filterClinicalVariants {
             loeuf_v4_threshold=loeuf_v4_threshold,
             genome_build=genome_build,
             include_not_omim=include_not_omim,
-            gene_list_tsv=gene_list_tsv,
+            rec_gene_list_tsv=rec_gene_list_tsv,
+            dom_gene_list_tsv=dom_gene_list_tsv,
             runtime_attr_override=runtime_attr_override_filter_omim
         }
     }   
@@ -219,7 +221,8 @@ task runClinicalFilteringOMIM {
         Float loeuf_v4_threshold
 
         Boolean include_not_omim
-        String gene_list_tsv
+        String rec_gene_list_tsv
+        String dom_gene_list_tsv
 
         RuntimeAttr? runtime_attr_override
     }
@@ -259,7 +262,7 @@ task runClinicalFilteringOMIM {
         python3 filter_vcf.py ~{vcf_file} ~{prefix} ~{cpu_cores} ~{memory} ~{ped_uri} \
             ~{am_rec_threshold} ~{am_dom_threshold} ~{mpc_rec_threshold} ~{mpc_dom_threshold} \
             ~{gnomad_af_rec_threshold} ~{gnomad_af_dom_threshold} ~{loeuf_v2_threshold} ~{loeuf_v4_threshold} \
-            ~{genome_build} ~{ad_alt_threshold} ~{include_not_omim} ~{spliceAI_threshold} ~{gene_list_tsv}
+            ~{genome_build} ~{ad_alt_threshold} ~{include_not_omim} ~{spliceAI_threshold} ~{rec_gene_list_tsv} ~{dom_gene_list_tsv}
     }
 
     output {

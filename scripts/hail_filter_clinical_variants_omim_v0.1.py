@@ -130,8 +130,13 @@ if 'spliceAI_score' not in list(gene_phased_tm.vep.transcript_consequences):
             )))))
 
 # filter by spliceAI score
-gene_phased_tm = gene_phased_tm.filter_rows((hl.if_else(gene_phased_tm.vep.transcript_consequences.spliceAI_score=='', 1, 
-                hl.float(gene_phased_tm.vep.transcript_consequences.spliceAI_score))>=spliceAI_threshold))
+# NEW 1/7/2025 only apply on splice variants
+splice_vars = ['splice_donor_5th_base_variant', 'splice_region_variant', 'splice_donor_region_variant']
+is_splice_var = (hl.set(splice_vars).intersection(
+            hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()>0)
+fails_spliceAI_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.spliceAI_score=='', 1, 
+                hl.float(gene_phased_tm.vep.transcript_consequences.spliceAI_score))<spliceAI_threshold)
+gene_phased_tm = gene_phased_tm.filter_rows(is_splice_var & fails_spliceAI_score, keep=False)
 
 # Output 2: OMIM Recessive
 # Filter by gene list(s)
@@ -159,8 +164,12 @@ passes_gnomad_af_rec = ((gene_phased_tm.gnomad_popmax_af<=gnomad_af_rec_threshol
 # MPC filter
 passes_mpc_rec = ((gene_phased_tm.info.MPC>=mpc_rec_threshold) | (hl.is_missing(gene_phased_tm.info.MPC)))
 # AlphaMissense filter
-passes_alpha_missense = (hl.if_else(gene_phased_tm.vep.transcript_consequences.am_pathogenicity=='', 1, 
-                hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_rec_threshold)
+# NEW 1/7/2025 only apply on missense variants
+is_missense_var = (hl.set(['missense_variant']).intersection(
+            hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()>0)
+passes_alpha_missense_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.am_pathogenicity=='', 1, 
+                hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_dom_threshold)
+passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_missense_var))
 
 if include_not_omim:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
@@ -202,8 +211,12 @@ passes_gnomad_af_dom = ((gene_phased_tm.gnomad_popmax_af<=gnomad_af_dom_threshol
 # MPC filter
 passes_mpc_dom = ((gene_phased_tm.info.MPC>=mpc_dom_threshold) | (hl.is_missing(gene_phased_tm.info.MPC)))
 # AlphaMissense filter
-passes_alpha_missense = (hl.if_else(gene_phased_tm.vep.transcript_consequences.am_pathogenicity=='', 1, 
+# NEW 1/7/2025 only apply on missense variants
+is_missense_var = (hl.set(['missense_variant']).intersection(
+            hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()>0)
+passes_alpha_missense_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.am_pathogenicity=='', 1, 
                 hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_dom_threshold)
+passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_missense_var))
 # LOEUF v2/v4 filters
 passes_loeuf_v2 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v2=='', 0, 
                         hl.float(gene_phased_tm.vep.transcript_consequences.LOEUF_v2))<=loeuf_v2_threshold)

@@ -23,6 +23,7 @@ workflow filterClinicalVariants {
         File? sv_vcf_idx
         File ped_uri
         File omim_uri
+        File empty_file  # to output if only SVs or SNV/Indels input
 
         # for SVs
         File annot_beds_with_header_tsv
@@ -131,18 +132,17 @@ workflow filterClinicalVariants {
 
     output {
         # SNV/Indels
-        # TODO: select_first might break with one option that isn't guaranteed? output empty file? for the whole WDL basically
-        File clinvar_tsv = select_first([filterClinicalVariantsSNVIndel.clinvar_tsv])
-        File clinvar_vcf = select_first([filterClinicalVariantsSNVIndel.clinvar_vcf])
-        File clinvar_vcf_idx = select_first([filterClinicalVariantsSNVIndel.clinvar_vcf_idx])
-        File omim_recessive_vcf = select_first([filterClinicalVariantsSNVIndel.omim_recessive_vcf])
-        File omim_recessive_vcf_idx = select_first([filterClinicalVariantsSNVIndel.omim_recessive_vcf_idx])
-        File omim_dominant_tsv = select_first([filterClinicalVariantsSNVIndel.omim_dominant_tsv])
+        File clinvar_tsv = select_first([filterClinicalVariantsSNVIndel.clinvar_tsv, empty_file])
+        File clinvar_vcf = select_first([filterClinicalVariantsSNVIndel.clinvar_vcf, empty_file])
+        File clinvar_vcf_idx = select_first([filterClinicalVariantsSNVIndel.clinvar_vcf_idx, empty_file])
+        File omim_recessive_vcf = select_first([filterClinicalVariantsSNVIndel.omim_recessive_vcf, empty_file])
+        File omim_recessive_vcf_idx = select_first([filterClinicalVariantsSNVIndel.omim_recessive_vcf_idx, empty_file])
+        File omim_dominant_tsv = select_first([filterClinicalVariantsSNVIndel.omim_dominant_tsv, empty_file])
 
         # SVs
-        File sv_pathogenic_tsv = select_first([filterClinicalVariantsSV.sv_pathogenic_tsv])
-        File sv_filtered_vcf = select_first([filterClinicalVariantsSV.sv_filtered_vcf])
-        File sv_filtered_vcf_idx = select_first([filterClinicalVariantsSV.sv_filtered_vcf_idx])
+        File sv_pathogenic_tsv = select_first([filterClinicalVariantsSV.sv_pathogenic_tsv, empty_file])
+        File sv_filtered_vcf = select_first([filterClinicalVariantsSV.sv_filtered_vcf, empty_file])
+        File sv_filtered_vcf_idx = select_first([filterClinicalVariantsSV.sv_filtered_vcf_idx, empty_file])
 
         # CompHets/XLR/HomVar
         File comphet_xlr_hom_var_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_tsv

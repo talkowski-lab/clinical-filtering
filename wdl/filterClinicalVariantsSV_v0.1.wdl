@@ -14,11 +14,10 @@ struct RuntimeAttr {
 
 workflow filterClinicalVariantsSV {
     input {
-        File vcf_file
+        File vcf_file  # NOTE: might have to run renameVCFSamples as upstream step if SV sample IDs don't match SNV/Indels!
         File vcf_idx
         File ped_uri
-        File? sample_map_tsv
-        File? gene_list
+        # File? gene_list  # 1/7/2025: added multiple gene list filtering to hail_filter_comphets_xlr_hom_var_v0.1.py
 
         File annot_beds_with_header_tsv
 
@@ -91,19 +90,9 @@ workflow filterClinicalVariantsSV {
         runtime_attr_override=runtime_attr_bcftools
     }
 
-    if (defined(sample_map_tsv)) {
-        call renameVCFSamples {
-            input:
-            vcf_file=combineBedAnnotations.combined_vcf,
-            sample_map_tsv=select_first([sample_map_tsv]),
-            variant_interpretation_docker=variant_interpretation_docker,
-            runtime_attr_override=runtime_attr_rename_samples
-        }
-    }
-
     call filterVCF {
         input:
-        vcf_file=select_first([renameVCFSamples.output_vcf, combineBedAnnotations.combined_vcf]),
+        vcf_file=combineBedAnnotations.combined_vcf,
         ped_uri=ped_uri,
         genome_build=genome_build,
         hail_docker=hail_docker,
@@ -111,23 +100,10 @@ workflow filterClinicalVariantsSV {
         runtime_attr_override=runtime_attr_filter_vcf
     }
 
-    if (defined(gene_list)) {
-        call filterByGeneList {
-            input:
-            vcf_file=filterVCF.sv_filtered_vcf,
-            gene_list=select_first([gene_list]),
-            genome_build=genome_build,
-            hail_docker=hail_docker,
-            size_threshold=size_threshold,
-            sv_gene_fields=sv_gene_fields,
-            runtime_attr_override=runtime_attr_filter_vcf
-        }
-    }
-
     output {
         File sv_pathogenic_tsv = filterVCF.sv_pathogenic_tsv
-        File sv_filtered_vcf = select_first([filterByGeneList.sv_filtered_gene_list_vcf, filterVCF.sv_filtered_vcf])
-        File sv_filtered_vcf_idx = select_first([filterByGeneList.sv_filtered_gene_list_vcf_idx, filterVCF.sv_filtered_vcf_idx])
+        File sv_filtered_vcf = filterVCF.sv_filtered_vcf
+        File sv_filtered_vcf_idx = filterVCF.sv_filtered_vcf_idx
     }
 }
 

@@ -224,11 +224,19 @@ passes_loeuf_v2 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v
 passes_loeuf_v4 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v4=='', 0, 
                         hl.float(gene_phased_tm.vep.transcript_consequences.LOEUF_v4))<=loeuf_v4_threshold)
 
+# Filter by gene list(s) 
+# Annotations already done when filtering OMIM recessive above
+if gene_list_tsv!='NA':
+    in_gene_list = (gene_phased_tm.gene_lists.size()>0)
+else:
+    in_gene_list = False
+
 if include_not_omim:
     omim_dom = gene_phased_tm.filter_rows(
         (passes_gnomad_af_dom) &
         (
             (omim_dom_code) |
+            (in_gene_list) |
             (
                 not_in_omim &
                 (passes_mpc_dom | passes_alpha_missense) &
@@ -238,7 +246,7 @@ if include_not_omim:
     )
 else:
     omim_dom = gene_phased_tm.filter_rows(
-        passes_gnomad_af_dom & omim_dom_code
+        passes_gnomad_af_dom & (omim_dom_code | in_gene_list)
     )
 
 omim_dom = omim_dom.filter_entries((omim_dom.proband_entry.GT.is_non_ref()) | 

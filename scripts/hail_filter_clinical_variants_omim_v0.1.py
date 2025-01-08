@@ -150,9 +150,9 @@ if rec_gene_list_tsv!='NA':
         gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(gene_phased_tm.vep.transcript_consequences.SYMBOL), gene_list_name) 
             for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
 
-    in_gene_list = (gene_phased_tm.gene_lists.size()>0)
+    in_rec_gene_list = (gene_phased_tm.gene_lists.size()>0)
 else:
-    in_gene_list = False
+    in_rec_gene_list = False
 
 not_in_omim = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code=='')
 # OMIM recessive code
@@ -176,7 +176,7 @@ if include_not_omim:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
         omim_rec_code |
         omim_xlr_code_or_in_chrX |
-        in_gene_list |
+        in_rec_gene_list |
         (
             not_in_omim &
             passes_gnomad_af_rec &
@@ -185,7 +185,7 @@ if include_not_omim:
     )
 else:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
-        (omim_rec_code | omim_xlr_code_or_in_chrX | in_gene_list) &
+        (omim_rec_code | omim_xlr_code_or_in_chrX | in_rec_gene_list) &
         passes_alpha_missense
     )
 
@@ -203,6 +203,20 @@ omim_rec_mt = mt.semi_join_rows(omim_rec_gene_phased_tm.rows())
 omim_rec_mt = omim_rec_mt.annotate_rows(info=omim_rec_mt.info.annotate(CSQ=omim_rec_gene_phased_tm.rows()[omim_rec_mt.row_key].CSQ))
 
 # Output 3: OMIM Dominant
+# Filter by gene list(s)
+if dom_gene_list_tsv!='NA':
+    gene_list_uris = pd.read_csv(dom_gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
+    gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
+                for gene_list_name, uri in gene_list_uris.items()}
+    # overrides recessive gene_lists but already saved as intermediate
+    gene_phased_tm = gene_phased_tm.annotate_rows(
+        gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(gene_phased_tm.vep.transcript_consequences.SYMBOL), gene_list_name) 
+            for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
+
+    in_dom_gene_list = (gene_phased_tm.gene_lists.size()>0)
+else:
+    in_dom_gene_list = False
+
 not_in_omim = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code=='')
 # OMIM dominant OR XLD code
 omim_dom_code = ((gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('1')) | 
@@ -225,26 +239,12 @@ passes_loeuf_v2 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v
 passes_loeuf_v4 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v4=='', 0, 
                         hl.float(gene_phased_tm.vep.transcript_consequences.LOEUF_v4))<=loeuf_v4_threshold)
 
-# Filter by gene list(s)
-if dom_gene_list_tsv!='NA':
-    gene_list_uris = pd.read_csv(dom_gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
-    gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
-                for gene_list_name, uri in gene_list_uris.items()}
-    # overrides recessive gene_lists but already saved as intermediate
-    gene_phased_tm = gene_phased_tm.annotate_rows(
-        gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(gene_phased_tm.vep.transcript_consequences.SYMBOL), gene_list_name) 
-            for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
-
-    in_gene_list = (gene_phased_tm.gene_lists.size()>0)
-else:
-    in_gene_list = False
-
 if include_not_omim:
     omim_dom = gene_phased_tm.filter_rows(
         (passes_gnomad_af_dom) &
         (
             (omim_dom_code) |
-            (in_gene_list) |
+            (in_dom_gene_list) |
             (
                 not_in_omim &
                 (passes_mpc_dom | passes_alpha_missense) &
@@ -254,7 +254,7 @@ if include_not_omim:
     )
 else:
     omim_dom = gene_phased_tm.filter_rows(
-        passes_gnomad_af_dom & (omim_dom_code | in_gene_list)
+        passes_gnomad_af_dom & (omim_dom_code | in_dom_gene_list)
     )
 
 omim_dom = omim_dom.filter_entries((omim_dom.proband_entry.GT.is_non_ref()) | 

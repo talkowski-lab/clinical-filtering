@@ -169,7 +169,7 @@ passes_mpc_rec = ((gene_phased_tm.info.MPC>=mpc_rec_threshold) | (hl.is_missing(
 is_missense_var = (hl.set(['missense_variant']).intersection(
             hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()>0)
 passes_alpha_missense_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.am_pathogenicity=='', 1, 
-                hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_dom_threshold)
+                hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_rec_threshold)
 passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_missense_var))
 
 if include_not_omim:
@@ -180,7 +180,8 @@ if include_not_omim:
         (
             not_in_omim &
             passes_gnomad_af_rec &
-            (passes_mpc_rec | passes_alpha_missense)
+            passes_mpc_rec &
+            passes_alpha_missense
         )
     )
 else:
@@ -247,14 +248,17 @@ if include_not_omim:
             (in_dom_gene_list) |
             (
                 not_in_omim &
-                (passes_mpc_dom | passes_alpha_missense) &
+                passes_mpc_dom &
+                passes_alpha_missense &
                 (passes_loeuf_v2 | passes_loeuf_v4)
             )
         )
     )
 else:
     omim_dom = gene_phased_tm.filter_rows(
-        passes_gnomad_af_dom & (omim_dom_code | in_dom_gene_list)
+        passes_gnomad_af_dom & 
+        (omim_dom_code | in_dom_gene_list) &
+        passes_alpha_missense
     )
 
 omim_dom = omim_dom.filter_entries((omim_dom.proband_entry.GT.is_non_ref()) | 

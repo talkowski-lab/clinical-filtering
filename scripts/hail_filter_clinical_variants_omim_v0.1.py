@@ -157,9 +157,8 @@ else:
 not_in_omim = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code=='')
 # OMIM recessive code
 omim_rec_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('2'))
-# OMIM XLR code OR in chrX
-omim_xlr_code_or_in_chrX = ((gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4')) |  
-        ((gene_phased_tm.locus.in_x_nonpar()) | (gene_phased_tm.locus.in_x_par())))
+# OMIM XLR code
+omim_xlr_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))
 # gnomAD AF popmax filter
 passes_gnomad_af_rec = ((gene_phased_tm.gnomad_popmax_af<=gnomad_af_rec_threshold) | (hl.is_missing(gene_phased_tm.gnomad_popmax_af)))
 # MPC filter
@@ -175,7 +174,7 @@ passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_
 if include_not_omim:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
         omim_rec_code |
-        omim_xlr_code_or_in_chrX |
+        omim_xlr_code |
         in_rec_gene_list |
         (
             not_in_omim &
@@ -186,7 +185,7 @@ if include_not_omim:
     )
 else:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
-        (omim_rec_code | omim_xlr_code_or_in_chrX | in_rec_gene_list) &
+        (omim_rec_code | omim_xlr_code | in_rec_gene_list) &
         passes_alpha_missense
     )
 
@@ -219,9 +218,10 @@ else:
     in_dom_gene_list = False
 
 not_in_omim = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code=='')
-# OMIM dominant OR XLD code
-omim_dom_code = ((gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('1')) | 
-                (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('3')))
+# OMIM dominant code
+omim_dom_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('1')) 
+# OMIM XLD code
+omim_xld_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('3'))
 # gnomAD AF popmax filter
 passes_gnomad_af_dom = ((gene_phased_tm.gnomad_popmax_af<=gnomad_af_dom_threshold) | (hl.is_missing(gene_phased_tm.gnomad_popmax_af)))
 # MPC filter
@@ -245,6 +245,7 @@ if include_not_omim:
         (passes_gnomad_af_dom) &
         (
             (omim_dom_code) |
+            (omim_xld_code) |
             (in_dom_gene_list) |
             (
                 not_in_omim &
@@ -257,7 +258,7 @@ if include_not_omim:
 else:
     omim_dom = gene_phased_tm.filter_rows(
         passes_gnomad_af_dom & 
-        (omim_dom_code | in_dom_gene_list) &
+        (omim_dom_code | omim_xld_code | in_dom_gene_list) &
         passes_alpha_missense
     )
 

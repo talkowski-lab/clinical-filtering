@@ -166,11 +166,10 @@ if sv_vcf!='NA':
 
         # OMIM recessive code
         omim_rec_code = (sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('2'))
-        # OMIM XLR code OR in chrX
-        omim_xlr_code_or_in_chrX = ((sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('4')) |  
-            ((sv_mt.locus.in_x_nonpar()) | (sv_mt.locus.in_x_par())))
+        # OMIM XLR code
+        omim_xlr_code = (sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))
         in_gene_list = (sv_mt.gene_lists.size()>0)
-        sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code_or_in_chrX | in_gene_list)
+        sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code | in_gene_list)
 
 if (snv_indel_vcf!='NA') and (sv_vcf!='NA'):
     sv_info_fields, sv_entry_fields = list(sv_mt.row.info), list(sv_mt.entry)
@@ -655,8 +654,7 @@ gene_phased_tm = gene_phased_tm.annotate_cols(trio_status=hl.if_else(gene_phased
                                                    hl.if_else(hl.array(trio_samples).contains(gene_phased_tm.id), 'trio', 'non_trio')))
 
 # XLR only
-xlr_phased_tm = gene_phased_tm.filter_rows((gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4')) |  # OMIM XLR
-                                           ((gene_phased_tm.locus.in_x_nonpar()) | (gene_phased_tm.locus.in_x_par())))  # on X chromosome
+xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))   # OMIM XLR
 xlr_phased = xlr_phased_tm.filter_entries((xlr_phased_tm.proband_entry.GT.is_non_ref()) &
                             (~xlr_phased_tm.is_female)).key_rows_by(locus_expr, 'alleles').entries()
 

@@ -63,7 +63,7 @@ hl.init(min_block_size=128,
         tmp_dir="tmp", local_tmpdir="tmp",
                     )
 
-mt = hl.import_vcf(vcf_file, reference_genome=build, force_bgz=True, call_fields=[], array_elements_required=False)
+mt = hl.import_vcf(vcf_file, reference_genome=build, find_replace=('null', ''), force_bgz=True, call_fields=[], array_elements_required=False)
 
 header = hl.get_vcf_metadata(vcf_file)
 csq_columns = header['info']['CSQ']['Description'].split('Format: ')[1].split('|')

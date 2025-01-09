@@ -64,7 +64,7 @@ def filter_mt(mt):
     return mt 
 
 def load_split_vep_consequences(vcf_uri):
-    mt = hl.import_vcf(vcf_uri, reference_genome=build, force_bgz=True, call_fields=[], array_elements_required=False)
+    mt = hl.import_vcf(vcf_uri, reference_genome=build, find_replace=('null', ''), force_bgz=True, call_fields=[], array_elements_required=False)
     csq_columns = hl.get_vcf_metadata(vcf_uri)['info']['CSQ']['Description'].split('Format: ')[1].split('|')
 
     mt = mt.annotate_rows(vep=mt.info)

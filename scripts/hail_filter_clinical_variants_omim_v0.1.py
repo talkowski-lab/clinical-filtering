@@ -178,20 +178,22 @@ passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_
 
 if include_not_omim:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
-        omim_rec_code |
-        omim_xlr_code |
-        in_rec_gene_list |
+        (passes_alpha_missense) &
         (
-            not_in_omim &
-            passes_gnomad_af_rec &
-            passes_mpc_rec &
-            passes_alpha_missense
+            omim_rec_code |
+            omim_xlr_code |
+            in_rec_gene_list |
+            (
+                not_in_omim &
+                passes_mpc_rec &
+                passes_gnomad_af_rec
+            )
         )
     )
 else:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
-        (omim_rec_code | omim_xlr_code | in_rec_gene_list) &
-        passes_alpha_missense
+        (passes_alpha_missense) &
+            (omim_rec_code | omim_xlr_code | in_rec_gene_list)        
     )
 
 omim_rec_gene_phased_tm = (omim_rec_gene_phased_tm.group_rows_by(omim_rec_gene_phased_tm.locus, omim_rec_gene_phased_tm.alleles)
@@ -248,23 +250,23 @@ passes_loeuf_v4 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v
 if include_not_omim:
     omim_dom = gene_phased_tm.filter_rows(
         (passes_gnomad_af_dom) &
+        (passes_alpha_missense) &
         (
-            (omim_dom_code) |
-            (omim_xld_code) |
-            (in_dom_gene_list) |
+            omim_dom_code |
+            omim_xld_code |
+            in_dom_gene_list |
             (
                 not_in_omim &
                 passes_mpc_dom &
-                passes_alpha_missense &
                 (passes_loeuf_v2 | passes_loeuf_v4)
             )
         )
     )
 else:
     omim_dom = gene_phased_tm.filter_rows(
-        passes_gnomad_af_dom & 
-        (omim_dom_code | omim_xld_code | in_dom_gene_list) &
-        passes_alpha_missense
+        (passes_gnomad_af_dom) &
+        (passes_alpha_missense) &
+        (omim_dom_code | omim_xld_code | in_dom_gene_list)
     )
 
 omim_dom = omim_dom.filter_entries((omim_dom.proband_entry.GT.is_non_ref()) | 

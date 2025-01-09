@@ -101,8 +101,13 @@ all_errors_mt = all_errors.key_by().to_matrix_table(row_key=['locus','alleles'],
 phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_key, phased_tm.col_key].mendel_code)
 
 # Output 1: grab ClinVar only
-clinvar_mt = mt.filter_rows((mt.info.CLNSIG[0].matches('Pathogenic') | mt.info.CLNSIG[0].matches('pathogenic')))
-clinvar_tm = phased_tm.filter_rows((phased_tm.info.CLNSIG[0].matches('Pathogenic') | phased_tm.info.CLNSIG[0].matches('pathogenic')))
+clinvar_mt = mt.filter_rows(hl.any(lambda x: x.matches('athogenic'), mt.info.CLNSIG))
+clinvar_tm = phased_tm.filter_rows(hl.any(lambda x: x.matches('athogenic'), phased_tm.info.CLNSIG))
+# NEW 1/9/2025: keep 2*+ ClinVar only
+clinvar_two_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided', '_multiple_submitters', '_no_conflicts']]
+clinvar_mt = clinvar_mt.filter_rows(hl.any([clinvar_mt.info.CLNREVSTAT==category for category in clinvar_two_star_plus]))
+clinvar_tm = clinvar_tm.filter_rows(hl.any([clinvar_tm.info.CLNREVSTAT==category for category in clinvar_two_star_plus]))
+
 clinvar_tm = clinvar_tm.filter_entries((clinvar_tm.proband_entry.GT.is_non_ref()) | 
                                    (clinvar_tm.mother_entry.GT.is_non_ref()) |
                                    (clinvar_tm.father_entry.GT.is_non_ref()))

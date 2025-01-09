@@ -78,6 +78,8 @@ def load_split_vep_consequences(vcf_uri):
 
     mt = mt.annotate_rows(vep=mt.vep.annotate(transcript_consequences=transcript_consequences_strs))
     mt = mt.annotate_rows(vep=mt.vep.select('transcript_consequences'))
+    # NEW 1/9/2025: annotate all_csqs
+    mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)))
     return mt
 
 ## STEP 1: Merge SNV/Indel VCF with SV VCF (or just one of them)
@@ -93,6 +95,14 @@ if snv_indel_vcf!='NA':
 
     # filter SNV/Indel MT
     snv_mt = snv_mt.explode_rows(snv_mt.vep.transcript_consequences)
+
+    # NEW 1/9/2025: annotate gnomad_popmax_af after exploding by transcript
+    gnomad_fields = [x for x in list(snv_mt.vep.transcript_consequences) if 'gnomAD' in x]
+    snv_mt = snv_mt.annotate_rows(
+        gnomad_popmax_af=hl.max([hl.or_missing(snv_mt.vep.transcript_consequences[gnomad_field]!='',
+                                        hl.float(snv_mt.vep.transcript_consequences[gnomad_field])) 
+                                for gnomad_field in gnomad_fields]))
+
     snv_mt = filter_mt(snv_mt)
 
     # filter out empty gene fields
@@ -515,16 +525,16 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
 
     phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
     phased_tm = get_mendel_errors(mt, phased_tm, pedigree)
-    gene_phased_tm = phased_tm.key_rows_by(locus_expr,'alleles','gene')
+    snv_mt = phased_tm.key_rows_by(locus_expr,'alleles','gene')
 
-    gene_agg_phased_tm = (gene_phased_tm.group_rows_by(gene_phased_tm.gene)
-        .aggregate_rows(locus_alleles = hl.agg.collect(gene_phased_tm.row_key),
-                       variant_type = hl.agg.collect(gene_phased_tm.variant_type))
-        .aggregate_entries(all_locus_alleles=hl.agg.filter(hl.is_defined(gene_phased_tm.proband_entry.GT),  # EDITED
-                                                       hl.agg.collect(gene_phased_tm.row_key)),
-                          proband_PBT_GT = hl.agg.collect(gene_phased_tm.proband_entry.PBT_GT).filter(hl.is_defined),
-                          proband_GT = hl.agg.collect(gene_phased_tm.proband_entry.GT).filter(hl.is_defined))).result()
-    return gene_phased_tm, gene_agg_phased_tm
+    gene_agg_phased_tm = (snv_mt.group_rows_by(snv_mt.gene)
+        .aggregate_rows(locus_alleles = hl.agg.collect(snv_mt.row_key),
+                       variant_type = hl.agg.collect(snv_mt.variant_type))
+        .aggregate_entries(all_locus_alleles=hl.agg.filter(hl.is_defined(snv_mt.proband_entry.GT),  # EDITED
+                                                       hl.agg.collect(snv_mt.row_key)),
+                          proband_PBT_GT = hl.agg.collect(snv_mt.proband_entry.PBT_GT).filter(hl.is_defined),
+                          proband_GT = hl.agg.collect(snv_mt.proband_entry.GT).filter(hl.is_defined))).result()
+    return snv_mt, gene_agg_phased_tm
 
 def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
     subset_mt = mt.filter_cols(hl.array(samples).contains(mt.s), keep=keep)
@@ -542,7 +552,7 @@ def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
 
 def get_non_trio_comphets(mt):
     non_trio_mt, non_trio_tm = get_subset_tm(mt, non_trio_samples, non_trio_pedigree)
-    non_trio_gene_phased_tm, non_trio_gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(non_trio_tm, non_trio_mt, non_trio_pedigree)
+    non_trio_snv_mt, non_trio_gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(non_trio_tm, non_trio_mt, non_trio_pedigree)
 
     # different criteria for non-trios
     potential_comp_hets_non_trios = non_trio_gene_agg_phased_tm.filter_rows(
@@ -553,23 +563,23 @@ def get_non_trio_comphets(mt):
 
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(potential_comp_hets_non_trios.proband_GT.size()>1)
     
-    non_trio_gene_phased_tm = non_trio_gene_phased_tm.key_rows_by(locus_expr, 'alleles', 'gene')
-    non_trio_gene_phased_tm = non_trio_gene_phased_tm.annotate_entries(locus_alleles=  # EDITED
-        potential_comp_hets_non_trios[non_trio_gene_phased_tm.row_key, non_trio_gene_phased_tm.col_key].all_locus_alleles,
+    non_trio_snv_mt = non_trio_snv_mt.key_rows_by(locus_expr, 'alleles', 'gene')
+    non_trio_snv_mt = non_trio_snv_mt.annotate_entries(locus_alleles=  # EDITED
+        potential_comp_hets_non_trios[non_trio_snv_mt.row_key, non_trio_snv_mt.col_key].all_locus_alleles,
                                                                       proband_GT=
-        potential_comp_hets_non_trios[non_trio_gene_phased_tm.row_key, non_trio_gene_phased_tm.col_key].proband_GT,
+        potential_comp_hets_non_trios[non_trio_snv_mt.row_key, non_trio_snv_mt.col_key].proband_GT,
                                                                       proband_GT_set=hl.set(
-        potential_comp_hets_non_trios[non_trio_gene_phased_tm.row_key, non_trio_gene_phased_tm.col_key].proband_GT),
+        potential_comp_hets_non_trios[non_trio_snv_mt.row_key, non_trio_snv_mt.col_key].proband_GT),
                                                                       proband_PBT_GT_set=hl.set(
-        potential_comp_hets_non_trios[non_trio_gene_phased_tm.row_key, non_trio_gene_phased_tm.col_key].proband_PBT_GT))
-    non_trio_gene_phased_tm = non_trio_gene_phased_tm.filter_entries((hl.set(non_trio_gene_phased_tm.locus_alleles).size()>1) &
-                                                                     (non_trio_gene_phased_tm.proband_GT.size()>1))  # EDITED
-    gene_phased_tm_comp_hets_non_trios = non_trio_gene_phased_tm.semi_join_rows(potential_comp_hets_non_trios.rows()).key_rows_by(locus_expr, 'alleles')
-    return gene_phased_tm_comp_hets_non_trios.drop('locus_alleles')  # EDITED
+        potential_comp_hets_non_trios[non_trio_snv_mt.row_key, non_trio_snv_mt.col_key].proband_PBT_GT))
+    non_trio_snv_mt = non_trio_snv_mt.filter_entries((hl.set(non_trio_snv_mt.locus_alleles).size()>1) &
+                                                                     (non_trio_snv_mt.proband_GT.size()>1))  # EDITED
+    snv_mt_comp_hets_non_trios = non_trio_snv_mt.semi_join_rows(potential_comp_hets_non_trios.rows()).key_rows_by(locus_expr, 'alleles')
+    return snv_mt_comp_hets_non_trios.drop('locus_alleles')  # EDITED
 
 def get_trio_comphets(mt):
     trio_mt, trio_tm = get_subset_tm(mt, trio_samples, trio_pedigree, keep=True, complete_trios=True)
-    trio_gene_phased_tm, trio_gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(trio_tm, trio_mt, trio_pedigree)
+    trio_snv_mt, trio_gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(trio_tm, trio_mt, trio_pedigree)
 
     # different criteria for trios (requires phasing)
     potential_comp_hets_trios = trio_gene_agg_phased_tm.filter_rows(
@@ -580,17 +590,17 @@ def get_trio_comphets(mt):
 
     potential_comp_hets_trios = potential_comp_hets_trios.filter_entries(hl.set(potential_comp_hets_trios.proband_PBT_GT).size()>1)
 
-    trio_gene_phased_tm = trio_gene_phased_tm.key_rows_by(locus_expr, 'alleles', 'gene')
-    trio_gene_phased_tm = trio_gene_phased_tm.annotate_entries(proband_GT=
-        potential_comp_hets_trios[trio_gene_phased_tm.row_key, trio_gene_phased_tm.col_key].proband_GT,
+    trio_snv_mt = trio_snv_mt.key_rows_by(locus_expr, 'alleles', 'gene')
+    trio_snv_mt = trio_snv_mt.annotate_entries(proband_GT=
+        potential_comp_hets_trios[trio_snv_mt.row_key, trio_snv_mt.col_key].proband_GT,
                                                                proband_GT_set=hl.set(
-        potential_comp_hets_trios[trio_gene_phased_tm.row_key, trio_gene_phased_tm.col_key].proband_GT),
+        potential_comp_hets_trios[trio_snv_mt.row_key, trio_snv_mt.col_key].proband_GT),
                                                                proband_PBT_GT_set=hl.set(
-        potential_comp_hets_trios[trio_gene_phased_tm.row_key, trio_gene_phased_tm.col_key].proband_PBT_GT))
+        potential_comp_hets_trios[trio_snv_mt.row_key, trio_snv_mt.col_key].proband_PBT_GT))
 
-    trio_gene_phased_tm = trio_gene_phased_tm.filter_entries(trio_gene_phased_tm.proband_PBT_GT_set.size()>1)  
-    gene_phased_tm_comp_hets_trios = trio_gene_phased_tm.semi_join_rows(potential_comp_hets_trios.rows()).key_rows_by(locus_expr, 'alleles')
-    return gene_phased_tm_comp_hets_trios
+    trio_snv_mt = trio_snv_mt.filter_entries(trio_snv_mt.proband_PBT_GT_set.size()>1)  
+    snv_mt_comp_hets_trios = trio_snv_mt.semi_join_rows(potential_comp_hets_trios.rows()).key_rows_by(locus_expr, 'alleles')
+    return snv_mt_comp_hets_trios
 
 def get_transmission(phased_tm_ht):
     phased_tm_ht = phased_tm_ht.annotate(transmission=hl.if_else(phased_tm_ht.proband_entry.PBT_GT==hl.parse_call('0|0'), 'uninherited',
@@ -649,18 +659,18 @@ merged_tm = hl.trio_matrix(merged_mt, pedigree, complete_trios=False)
 if 'AD' in list(merged_mt.entry):
     merged_tm = merged_tm.filter_entries(merged_tm.proband_entry.AD[1]>=ad_alt_threshold)
 
-gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(merged_tm, merged_mt, pedigree)
-gene_phased_tm = gene_phased_tm.annotate_cols(trio_status=hl.if_else(gene_phased_tm.fam_id=='-9', 'not_in_pedigree', 
-                                                   hl.if_else(hl.array(trio_samples).contains(gene_phased_tm.id), 'trio', 'non_trio')))
+snv_mt, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(merged_tm, merged_mt, pedigree)
+snv_mt = snv_mt.annotate_cols(trio_status=hl.if_else(snv_mt.fam_id=='-9', 'not_in_pedigree', 
+                                                   hl.if_else(hl.array(trio_samples).contains(snv_mt.id), 'trio', 'non_trio')))
 
 # XLR only
-xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))   # OMIM XLR
+xlr_phased_tm = snv_mt.filter_rows(snv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))   # OMIM XLR
 xlr_phased = xlr_phased_tm.filter_entries((xlr_phased_tm.proband_entry.GT.is_non_ref()) &
                             (~xlr_phased_tm.is_female)).key_rows_by(locus_expr, 'alleles').entries()
 
 
 # HomVar in proband only
-phased_hom_var = gene_phased_tm.filter_entries(gene_phased_tm.proband_entry.GT.is_hom_var())
+phased_hom_var = snv_mt.filter_entries(snv_mt.proband_entry.GT.is_hom_var())
 phased_hom_var = phased_hom_var.filter_entries((phased_hom_var.locus.in_x_nonpar()) &
                             (~phased_hom_var.is_female), keep=False)  # filter out non-PAR chrX in males
 phased_hom_var = phased_hom_var.filter_rows(hl.agg.count_where(

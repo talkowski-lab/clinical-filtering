@@ -90,11 +90,8 @@ transcript_consequences_strs = transcript_consequences.map(lambda x: hl.if_else(
 mt = mt.annotate_rows(vep=mt.vep.annotate(transcript_consequences=transcript_consequences_strs))
 mt = mt.annotate_rows(vep=mt.vep.select('transcript_consequences'))
 
-gnomad_fields = [x for x in list(mt.vep.transcript_consequences[0]) if 'gnomAD' in x]
-mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)),  
-                             gnomad_popmax_af=hl.max([hl.or_missing(hl.array(hl.set(mt.vep.transcript_consequences[gnomad_field]))[0]!='',
-                                    hl.float(hl.array(hl.set(mt.vep.transcript_consequences[gnomad_field]))[0])) 
-                             for gnomad_field in gnomad_fields]))
+# NEW 1/9/2025: moved gnomad_popmax_af
+mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)))
 
 # Phasing
 tmp_ped = pd.read_csv(ped_uri, sep='\t').iloc[:,:6]
@@ -111,6 +108,14 @@ all_errors_mt = all_errors.key_by().to_matrix_table(row_key=['locus','alleles'],
 phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_key, phased_tm.col_key].mendel_code)
 
 gene_phased_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
+
+# NEW 1/9/2025: moved gnomad_popmax_af to after exploding by transcript
+gnomad_fields = [x for x in list(gene_phased_tm.vep.transcript_consequences) if 'gnomAD' in x]
+gene_phased_tm = gene_phased_tm.annotate_rows(
+    gnomad_popmax_af=hl.max([hl.or_missing(gene_phased_tm.vep.transcript_consequences[gnomad_field]!='',
+                                    hl.float(gene_phased_tm.vep.transcript_consequences[gnomad_field])) 
+                             for gnomad_field in gnomad_fields]))
+
 gene_phased_tm = filter_mt(gene_phased_tm)
 
 # annotate spliceAI score if missing

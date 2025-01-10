@@ -117,8 +117,10 @@ clinvar_tm = filter_mt(clinvar_tm, filter_csq=False, filter_impact=False)
 clinvar_tm = get_transmission(clinvar_tm)
 
 # filter out ClinVar benign
-mt = mt.filter_rows((hl.is_missing(mt.info.CLNSIG)) |
-    ~(mt.info.CLNSIG[0].matches('Benign') | mt.info.CLNSIG[0].matches('benign')))
+# NEW 1/10/2025 filter out 2*+ benign only!
+is_clinvar_benign = hl.any(lambda x: x.matches('enign'), mt.info.CLNSIG)
+is_clinvar_two_star_plus = hl.any([mt.info.CLNREVSTAT==category for category in clinvar_two_star_plus])
+mt = mt.filter_rows(is_clinvar_benign & is_clinvar_two_star_plus, keep=False)
 
 # filter PASS
 if (pass_filter):

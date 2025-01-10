@@ -136,13 +136,20 @@ if 'spliceAI_score' not in list(gene_phased_tm.vep.transcript_consequences):
             )))))
 
 # filter by spliceAI score
-# NEW 1/7/2025 only apply on splice variants
+# NEW 1/7/2025 only apply on splice variants --> updated below
+# NEW 1/10/2025 only apply on splice variants with no other HIGH/MODERATE impact consequences
 splice_vars = ['splice_donor_5th_base_variant', 'splice_region_variant', 'splice_donor_region_variant']
-is_splice_var = (hl.set(splice_vars).intersection(
+has_splice_var = (hl.set(splice_vars).intersection(
             hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()>0)
+is_splice_var_only = (hl.set(splice_vars).intersection(
+            hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()==
+            hl.set(gene_phased_tm.vep.transcript_consequences.Consequence).size())
+has_low_or_modifier_impact = (hl.array(['LOW','MODIFIER']).contains(mt.vep.transcript_consequences.IMPACT))
+
 fails_spliceAI_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.spliceAI_score=='', 1, 
                 hl.float(gene_phased_tm.vep.transcript_consequences.spliceAI_score))<spliceAI_threshold)
-gene_phased_tm = gene_phased_tm.filter_rows(is_splice_var & fails_spliceAI_score, keep=False)
+gene_phased_tm = gene_phased_tm.filter_rows((is_splice_var_only | 
+                                             (has_splice_var & has_low_or_modifier_impact)) & fails_spliceAI_score, keep=False)
 
 # Output 2: OMIM Recessive
 # Filter by gene list(s)

@@ -143,8 +143,8 @@ has_splice_var = (hl.set(splice_vars).intersection(
             hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()>0)
 is_splice_var_only = (hl.set(splice_vars).intersection(
             hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()==
-            hl.set(gene_phased_tm.vep.transcript_consequences.Consequence).size())
-has_low_or_modifier_impact = (hl.array(['LOW','MODIFIER']).contains(mt.vep.transcript_consequences.IMPACT))
+                hl.set(gene_phased_tm.vep.transcript_consequences.Consequence).size())
+has_low_or_modifier_impact = (hl.array(['LOW','MODIFIER']).contains(gene_phased_tm.vep.transcript_consequences.IMPACT))
 
 fails_spliceAI_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.spliceAI_score=='', 1, 
                 hl.float(gene_phased_tm.vep.transcript_consequences.spliceAI_score))<spliceAI_threshold)

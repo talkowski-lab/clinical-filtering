@@ -704,7 +704,7 @@ phased_hom_var = phased_hom_var.annotate(variant_category='hom_var')
 merged_comphets = merged_comphets.annotate(variant_category='comphet')
 mat_carrier = mat_carrier.annotate(variant_category='maternal_carrier')
 
-merged_comphets_xlr_hom_var_mat_carrier = merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set','proband_CA').union(xlr_phased).union(phased_hom_var).union(mat_carrier)
+merged_comphets_xlr_hom_var_mat_carrier = merged_comphets.drop('proband_GT_set','proband_PBT_GT_set').union(xlr_phased).union(phased_hom_var).union(mat_carrier)
 
 # Annotate PAR status
 merged_comphets_xlr_hom_var_mat_carrier = merged_comphets_xlr_hom_var_mat_carrier.annotate(in_non_par=~(merged_comphets_xlr_hom_var_mat_carrier.locus.in_autosome_or_par()))

@@ -541,7 +541,7 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
                                                        hl.agg.collect(phased_tm.row_key)),
                           proband_PBT_GT = hl.agg.collect(phased_tm.proband_entry.PBT_GT).filter(hl.is_defined),
                           proband_GT = hl.agg.collect(phased_tm.proband_entry.GT).filter(hl.is_defined),
-                          proband_CA = hl.agg.collect(snv_mt.proband_entry.CA).filter(hl.is_defined))  # NEW FOR NIFS CLUSTER
+                          proband_CA = hl.agg.collect(phased_tm.proband_entry.CA).filter(hl.is_defined))  # NEW FOR NIFS CLUSTER
         ).result()
     return phased_tm, gene_agg_phased_tm
 

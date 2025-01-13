@@ -1,3 +1,9 @@
+###
+# Finally forked from hail_filter_comphets_xlr_hom_var_v0.1.py on 1/13/2025
+# to output maternal carrier variants (mat_carrier_tsv) and use cluster info 
+# (CA in FORMAT field) for comphets. 
+###
+
 from pyspark.sql import SparkSession
 import hail as hl
 import numpy as np
@@ -28,6 +34,7 @@ cores = sys.argv[9]  # string
 mem = int(np.floor(float(sys.argv[10])))
 ad_alt_threshold = int(sys.argv[11])
 rec_gene_list_tsv = sys.argv[12]
+carrier_gene_list = sys.argv[13]
 
 hl.init(min_block_size=128, 
         local=f"local[*]", 
@@ -533,7 +540,9 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
         .aggregate_entries(all_locus_alleles=hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  # EDITED
                                                        hl.agg.collect(phased_tm.row_key)),
                           proband_PBT_GT = hl.agg.collect(phased_tm.proband_entry.PBT_GT).filter(hl.is_defined),
-                          proband_GT = hl.agg.collect(phased_tm.proband_entry.GT).filter(hl.is_defined))).result()
+                          proband_GT = hl.agg.collect(phased_tm.proband_entry.GT).filter(hl.is_defined),
+                          proband_CA = hl.agg.collect(snv_mt.proband_entry.CA).filter(hl.is_defined))  # NEW FOR NIFS CLUSTER
+        ).result()
     return phased_tm, gene_agg_phased_tm
 
 def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
@@ -550,7 +559,7 @@ def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
         subset_tm = subset_tm.filter_entries(subset_tm.proband_entry.AD[1]>=ad_alt_threshold)
     return subset_mt, subset_tm
 
-def get_non_trio_comphets(mt):
+def get_non_trio_comphets(mt):  # EDITED FOR NIFS
     non_trio_mt, non_trio_tm = get_subset_tm(mt, non_trio_samples, non_trio_pedigree)
     non_trio_phased_tm, non_trio_gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(non_trio_tm, non_trio_mt, non_trio_pedigree)
 
@@ -563,17 +572,26 @@ def get_non_trio_comphets(mt):
 
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(potential_comp_hets_non_trios.proband_GT.size()>1)
     
+    potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(
+        (hl.set([0]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0) &  # NEW FOR NIFS
+                (hl.set([2, 3, 4, 5]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0)
+    )
+
     non_trio_phased_tm = non_trio_phased_tm.key_rows_by(locus_expr, 'alleles', 'gene')
     non_trio_phased_tm = non_trio_phased_tm.annotate_entries(locus_alleles=  # EDITED
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].all_locus_alleles,
-                                                                      proband_GT=
+                                                                    proband_GT=
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_GT,
-                                                                      proband_GT_set=hl.set(
+                                                                    proband_GT_set=hl.set(
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_GT),
-                                                                      proband_PBT_GT_set=hl.set(
-        potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_PBT_GT))
+                                                                    proband_PBT_GT_set=hl.set(
+        potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_PBT_GT),
+                                                                    proband_CA=  # NEW FOR NIFS
+        potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_CA)  
     non_trio_phased_tm = non_trio_phased_tm.filter_entries((hl.set(non_trio_phased_tm.locus_alleles).size()>1) &
-                                                                     (non_trio_phased_tm.proband_GT.size()>1))  # EDITED
+                                                    (hl.set([0]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0) &  # NEW FOR NIFS
+                                                        (hl.set([2, 3, 4, 5]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0)
+                                                    )  
     phased_tm_comp_hets_non_trios = non_trio_phased_tm.semi_join_rows(potential_comp_hets_non_trios.rows()).key_rows_by(locus_expr, 'alleles')
     return phased_tm_comp_hets_non_trios.drop('locus_alleles')  # EDITED
 
@@ -663,6 +681,12 @@ gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(mer
 gene_phased_tm = gene_phased_tm.annotate_cols(trio_status=hl.if_else(gene_phased_tm.fam_id=='-9', 'not_in_pedigree', 
                                                    hl.if_else(hl.array(trio_samples).contains(gene_phased_tm.id), 'trio', 'non_trio')))
 
+# NEW 1/13/2025: maternal carrier variants
+# in carrier gene list and in cluster where mother is het (clusters 1-3)
+carrier_genes = pd.read_csv(carrier_gene_list, sep='\t', header=None)[0].tolist()
+mat_carrier = gene_phased_tm.filter_rows((hl.array(carrier_genes).contains(gene_phased_tm.vep.transcript_consequences.SYMBOL)) &
+                           (hl.array([1, 2, 3]).contains(gene_phased_tm.proband_entry.CA))).key_rows_by(locus_expr, 'alleles').entries()
+
 # XLR only
 xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))   # OMIM XLR
 xlr_phased = xlr_phased_tm.filter_entries((xlr_phased_tm.proband_entry.GT.is_non_ref()) &
@@ -678,15 +702,16 @@ phased_hom_var = phased_hom_var.filter_rows(hl.agg.count_where(
 xlr_phased = xlr_phased.annotate(variant_category='XLR')
 phased_hom_var = phased_hom_var.annotate(variant_category='hom_var')
 merged_comphets = merged_comphets.annotate(variant_category='comphet')
+mat_carrier = mat_carrier.annotate(variant_category='maternal_carrier')
 
-merged_comphets_xlr_hom_var = merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set').union(xlr_phased).union(phased_hom_var)
+merged_comphets_xlr_hom_var_mat_carrier = merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set','proband_CA').union(xlr_phased).union(phased_hom_var).union(mat_carrier)
 
 # Annotate PAR status
-merged_comphets_xlr_hom_var = merged_comphets_xlr_hom_var.annotate(in_non_par=~(merged_comphets_xlr_hom_var.locus.in_autosome_or_par()))
-merged_comphets_xlr_hom_var = get_transmission(merged_comphets_xlr_hom_var)
+merged_comphets_xlr_hom_var_mat_carrier = merged_comphets_xlr_hom_var_mat_carrier.annotate(in_non_par=~(merged_comphets_xlr_hom_var_mat_carrier.locus.in_autosome_or_par()))
+merged_comphets_xlr_hom_var_mat_carrier = get_transmission(merged_comphets_xlr_hom_var_mat_carrier)
 
-output_filename = f"{prefix}_{variant_types}_comp_hets_xlr_hom_var.tsv.gz"
+output_filename = f"{prefix}_{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
 if len(output_filename)>(os.pathconf('/', 'PC_NAME_MAX')-len('/cromwell_root/.')):  # filename too long
-    output_filename = f"{variant_types}_comp_hets_xlr_hom_var.tsv.gz"
+    output_filename = f"{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
 
-merged_comphets_xlr_hom_var.flatten().export(output_filename)
+merged_comphets_xlr_hom_var_mat_carrier.flatten().export(output_filename)

@@ -3,12 +3,10 @@ version 1.0
 import "mergeVCFs.wdl" as mergeVCFs
 import "mergeVCFSamples.wdl" as mergeVCFSamples
 import "helpers.wdl" as helpers
-import "filterClinicalCompHets_v0.1.wdl" as filterClinicalCompHets
 
 struct RuntimeAttr {
     Float? mem_gb
     Int? cpu_cores
-    Int? gpu_cores
     Int? disk_gb
     Int? boot_disk_gb
     Int? preemptible_tries
@@ -50,6 +48,7 @@ workflow filterClinicalVariants {
         Boolean pass_filter=false
         Boolean include_not_omim=false  # NIFS-specific
 
+        File carrier_gene_list  # NIFS-specific
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
         String dom_gene_list_tsv='NA'
 
@@ -106,7 +105,7 @@ workflow filterClinicalVariants {
             dom_gene_list_tsv=dom_gene_list_tsv
         }
 
-        call filterClinicalCompHets.filterCompHetsXLRHomVar as filterCompHetsXLRHomVar {
+        call filterCompHetsXLRHomVar {
             input:
                 snv_indel_vcf=runClinicalFilteringOMIM.omim_recessive_vcf,
                 clinvar_vcf=runClinicalFiltering.clinvar_vcf,
@@ -119,6 +118,7 @@ workflow filterClinicalVariants {
                 hail_docker=hail_docker,
                 ad_alt_threshold=ad_alt_threshold,
                 rec_gene_list_tsv=rec_gene_list_tsv,
+                carrier_gene_list=carrier_gene_list,
                 runtime_attr_override=runtime_attr_filter_comphets
         }
     }
@@ -160,10 +160,10 @@ workflow filterClinicalVariants {
 
     call helpers.mergeResultsPython as mergeCompHetsXLRHomVar {
         input:
-            tsvs=filterCompHetsXLRHomVar.comphet_xlr_hom_var_tsv,
+            tsvs=filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv,
             hail_docker=hail_docker,
-            input_size=size(filterCompHetsXLRHomVar.comphet_xlr_hom_var_tsv, 'GB'),
-            merged_filename="~{cohort_prefix}_SNV_Indel_comp_hets_xlr_hom_var.tsv.gz",
+            input_size=size(filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv, 'GB'),
+            merged_filename="~{cohort_prefix}_SNV_Indel_comp_hets_xlr_hom_var_mat_carrier.tsv.gz",
             runtime_attr_override=runtime_attr_merge_comphets
     }
 
@@ -174,7 +174,7 @@ workflow filterClinicalVariants {
         File omim_recessive_vcf = mergeOMIMRecessive.merged_vcf_file
         File omim_recessive_vcf_idx = mergeOMIMRecessive.merged_vcf_idx
         File omim_dominant_tsv = mergeOMIMDominant.merged_tsv
-        File comphet_xlr_hom_var_tsv = mergeCompHetsXLRHomVar.merged_tsv
+        File comphet_xlr_hom_var_mat_carrier_tsv = mergeCompHetsXLRHomVar.merged_tsv
     }
 }
 
@@ -414,5 +414,72 @@ task runClinicalFilteringOMIM {
     output {
         File omim_recessive_vcf = prefix + '_OMIM_recessive.vcf.bgz'
         File omim_dominant = prefix + '_OMIM_dominant.tsv.gz'
+    }
+}
+
+task filterCompHetsXLRHomVar {
+    input {
+        String snv_indel_vcf
+        String clinvar_vcf
+        String sv_vcf
+        File ped_uri
+        File carrier_gene_list
+        String omim_uri
+        String rec_gene_list_tsv
+
+        Int ad_alt_threshold
+
+        Array[String] sv_gene_fields
+        String genome_build
+
+        String filter_comphets_xlr_hom_var_script
+        String hail_docker
+        
+        RuntimeAttr? runtime_attr_override
+    }
+    String variant_types_ = if (snv_indel_vcf!='NA') then 'SV_SNV_Indel' else 'SV'
+    String variant_types = if (sv_vcf!='NA') then variant_types_ else 'SNV_Indel'
+    Map[String, Array[String]] vcf_files = {'SV_SNV_Indel': [snv_indel_vcf, clinvar_vcf, sv_vcf], 'SV': [sv_vcf], 'SNV_Indel': [snv_indel_vcf, clinvar_vcf]}
+
+    Float input_size = size(vcf_files[variant_types], 'GB')
+    Float base_disk_gb = 10.0
+    Float input_disk_scale = 10.0
+
+    RuntimeAttr runtime_default = object {
+        mem_gb: 4,
+        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
+        cpu_cores: 1,
+        preemptible_tries: 3,
+        max_retries: 1,
+        boot_disk_gb: 10
+    }
+
+    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
+
+    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
+    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
+    
+    runtime {
+        memory: "~{memory} GB"
+        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
+        cpu: cpu_cores
+        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
+        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
+        docker: hail_docker
+        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
+    }
+
+    String vcf_file = if (variant_types=='SV') then sv_vcf else snv_indel_vcf
+    String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
+    String prefix = basename(vcf_file, file_ext) + '_filtered'
+
+    command {
+        curl ~{filter_comphets_xlr_hom_var_script} > filter_vcf.py
+        python3 filter_vcf.py ~{snv_indel_vcf} ~{clinvar_vcf} ~{sv_vcf} ~{ped_uri} ~{prefix} ~{omim_uri} \
+            ~{sep=',' sv_gene_fields} ~{genome_build} ~{cpu_cores} ~{memory} ~{ad_alt_threshold} ~{rec_gene_list_tsv} ~{carrier_gene_list}
+    }
+
+    output {
+        File comphet_xlr_hom_var_mat_carrier_tsv = glob('*_comp_hets_xlr_hom_var_mat_carrier.tsv.gz')[0]
     }
 }

@@ -4,6 +4,7 @@
 # (CA in FORMAT field) for comphets. 
 # SVs ignored for NIFS for now.
 # 1/14/2025: added variant_source column
+# 1/14/2025: added workaround for empty CA field (usually cluster 5)
 ###
 
 from pyspark.sql import SparkSession
@@ -545,11 +546,14 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
         .aggregate_rows(locus_alleles = hl.agg.collect(phased_tm.row_key),
                        variant_type = hl.agg.collect(phased_tm.variant_type),
                        variant_source = hl.agg.collect(phased_tm.variant_source))  # NEW 1/14/2025: added variant_source
-        .aggregate_entries(all_locus_alleles=hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  # EDITED
+        .aggregate_entries(all_locus_alleles=hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  # NEW 1/14/2025: changed all aggregate_entries fields to use hl.agg.filter with proband_entry.GT
                                                        hl.agg.collect(phased_tm.row_key)),
-                          proband_PBT_GT = hl.agg.collect(phased_tm.proband_entry.PBT_GT).filter(hl.is_defined),
-                          proband_GT = hl.agg.collect(phased_tm.proband_entry.GT).filter(hl.is_defined),
-                          proband_CA = hl.agg.collect(phased_tm.proband_entry.CA).filter(hl.is_defined))  # NEW FOR NIFS CLUSTER
+                          proband_PBT_GT = hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  
+                                                       hl.agg.collect(phased_tm.proband_entry.PBT_GT)),
+                          proband_GT = hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  
+                                                       hl.agg.collect(phased_tm.proband_entry.GT)),
+                          proband_CA = hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  
+                                                       hl.agg.collect(phased_tm.proband_entry.CA)))  # NEW FOR NIFS CLUSTER
         ).result()
     return phased_tm, gene_agg_phased_tm
 
@@ -579,10 +583,12 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.key_rows_by(potential_comp_hets_non_trios.locus_alleles[locus_expr], potential_comp_hets_non_trios.locus_alleles.alleles, 'gene')
 
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(potential_comp_hets_non_trios.proband_GT.size()>1)
-    
+
+    in_cluster0 = (hl.set([0]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0)
+    in_maternally_inherited_cluster = ((hl.set([2, 3, 4, 5]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0) |
+                                        (hl.any(hl.is_missing, potential_comp_hets_non_trios.proband_CA)))  # NEW 1/14/2025: workaround for empty CA field (usually cluster 5)
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(
-        (hl.set([0]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0) &  # NEW FOR NIFS
-                (hl.set([2, 3, 4, 5]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0)
+        in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS
     )
 
     non_trio_phased_tm = non_trio_phased_tm.key_rows_by(locus_expr, 'alleles', 'gene')
@@ -596,9 +602,12 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_PBT_GT),
                                                                     proband_CA=  # NEW FOR NIFS
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_CA)  
+
+    in_cluster0 = (hl.set([0]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0)
+    in_maternally_inherited_cluster = ((hl.set([2, 3, 4, 5]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0) | 
+                                    (hl.any(hl.is_missing, non_trio_phased_tm.proband_CA)))  # NEW 1/14/2025: workaround for empty CA field (usually cluster 5)
     non_trio_phased_tm = non_trio_phased_tm.filter_entries((hl.set(non_trio_phased_tm.locus_alleles).size()>1) &
-                                                    (hl.set([0]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0) &  # NEW FOR NIFS
-                                                        (hl.set([2, 3, 4, 5]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0)
+                                                    in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS     
                                                     )  
     phased_tm_comp_hets_non_trios = non_trio_phased_tm.semi_join_rows(potential_comp_hets_non_trios.rows()).key_rows_by(locus_expr, 'alleles')
     return phased_tm_comp_hets_non_trios.drop('locus_alleles')  # EDITED

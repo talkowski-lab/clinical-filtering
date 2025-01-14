@@ -605,9 +605,9 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
     # NEW 1/14/2025
     non_trio_phased_tm = non_trio_phased_tm.annotate_rows(
                                                                     variant_type=  
-        hl.array(hl.set(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_type)),
+        hl.str(', ').join(hl.sorted(hl.array(hl.set(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_type)))),
                                                                     variant_source= 
-        hl.array(hl.set(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_source))
+        hl.str(', ').join(hl.sorted(hl.array(hl.set(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_source))))
     )  
 
     in_cluster0 = (hl.set([0]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0)

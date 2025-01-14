@@ -55,7 +55,7 @@ def filter_mt(mt):
     '''
     mt: can be trio matrix (tm) or matrix table (mt) but must be transcript-level, not variant-level
     '''
-    # filter by Consequence
+    # filter by Consequence —— exclude rows where Consequence contains only terms in this list
     exclude_csqs = ['intergenic_variant', 'upstream_gene_variant', 'downstream_gene_variant',
                     'synonymous_variant', 'coding_sequence_variant', 'sequence_variant']
     mt = mt.filter_rows(hl.set(exclude_csqs).intersection(
@@ -65,7 +65,7 @@ def filter_mt(mt):
     mt = mt.filter_rows((mt.vep.transcript_consequences.CANONICAL=='YES') | 
                         (mt.vep.transcript_consequences.MANE_PLUS_CLINICAL!=''))
 
-    # filter by Impact and splice/noncoding consequence
+    # filter by HIGH/MODERATE Impact OR Consequence contains at least one splice/noncoding consequence
     splice_vars = ['splice_donor_5th_base_variant', 'splice_region_variant', 'splice_donor_region_variant']
     keep_vars = ['non_coding_transcript_exon_variant']
     mt = mt.filter_rows(
@@ -91,7 +91,7 @@ def load_split_vep_consequences(vcf_uri):
 
     mt = mt.annotate_rows(vep=mt.vep.annotate(transcript_consequences=transcript_consequences_strs))
     mt = mt.annotate_rows(vep=mt.vep.select('transcript_consequences'))
-    # NEW 1/9/2025: annotate all_csqs
+    # NEW 1/9/2025: annotate all_csqs (TODO: many transcripts already filtered out in upstream steps?)
     mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)))
     return mt
 
@@ -104,14 +104,14 @@ if snv_indel_vcf!='NA':
     # Load and merge SNV/Indel ClinVar P/LP VCF
     if clinvar_vcf!='NA':
         clinvar_mt = load_split_vep_consequences(clinvar_vcf) 
-        # NEW 1/14/2025: added variant_source
+        # NEW 1/14/2025: added variant_source —— ClinVar_P/LP or OMIM_recessive or both
         snv_mt_no_clinvar = snv_mt
         snv_mt = snv_mt.union_rows(clinvar_mt).distinct_by_row()
         snv_mt = snv_mt.annotate_rows(variant_source=hl.if_else(hl.is_defined(clinvar_mt.rows()[snv_mt.row_key]),  # if in ClinVar
                                                  hl.if_else(hl.is_defined(snv_mt_no_clinvar.rows()[snv_mt.row_key]), 'ClinVar_P/LP_OMIM_recessive',  # if also in omim_recessive_vcf
                                                             'ClinVar_P/LP'), 'OMIM_recessive'))
 
-    # filter SNV/Indel MT
+    # Explode rows by transcript
     snv_mt = snv_mt.explode_rows(snv_mt.vep.transcript_consequences)
 
     # NEW 1/9/2025: annotate gnomad_popmax_af after exploding by transcript
@@ -120,10 +120,11 @@ if snv_indel_vcf!='NA':
         gnomad_popmax_af=hl.max([hl.or_missing(snv_mt.vep.transcript_consequences[gnomad_field]!='',
                                         hl.float(snv_mt.vep.transcript_consequences[gnomad_field])) 
                                 for gnomad_field in gnomad_fields]))
-
+    
+    # Filter SNV/Indel MT
     snv_mt = filter_mt(snv_mt)
 
-    # filter out empty gene fields
+    # Filter out empty gene fields
     snv_mt = snv_mt.annotate_rows(gene=snv_mt['vep']['transcript_consequences']['SYMBOL'])
     snv_mt = snv_mt.filter_rows(snv_mt.gene!='')
 
@@ -149,7 +150,7 @@ if sv_vcf!='NA':
     # filter out BNDs
     sv_mt = sv_mt.filter_rows(sv_mt.info.SVTYPE!='BND') 
 
-    # ignore genes for CPX SVs
+    # Annotate genes —— ignore genes for CPX SVs
     sv_mt = sv_mt.annotate_rows(gene=hl.or_missing(sv_mt.info.SVTYPE!='CPX', 
                                                    hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in sv_gene_fields])))))
     sv_mt = sv_mt.annotate_rows(variant_type='SV')
@@ -164,7 +165,7 @@ if sv_vcf!='NA':
 
     sv_mt = sv_mt.annotate_rows(gene_source=get_predicted_sources_expr(sv_mt, sv_gene_fields))
 
-    # VEP
+    # Make "fake" VEP annotations for SV MT formatting
     if (snv_indel_vcf!='NA'):
         snv_vep_fields = {field: str(snv_mt.vep.transcript_consequences[field].dtype) for field in list(snv_mt.row.vep.transcript_consequences)}
     else:
@@ -199,6 +200,7 @@ if sv_vcf!='NA':
         in_gene_list = (sv_mt.gene_lists.size()>0)
         sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code | in_gene_list)
 
+# Unify SNV/Indel MT and SV MT INFO (row) and entry fields
 if (snv_indel_vcf!='NA') and (sv_vcf!='NA'):
     sv_info_fields, sv_entry_fields = list(sv_mt.row.info), list(sv_mt.entry)
     snv_info_fields, snv_entry_fields = list(snv_mt.row.info), list(snv_mt.entry)
@@ -232,6 +234,7 @@ if (snv_indel_vcf!='NA') and (sv_vcf!='NA'):
     if len(shared_samps)==0:
         shared_samps = ['']
 
+    # Match column order before merging
     def align_mt2_cols_to_mt1(mt1, mt2):
         mt1 = mt1.add_col_index()
         mt2 = mt2.add_col_index()
@@ -252,7 +255,7 @@ elif sv_vcf!='NA':
     variant_types = 'SV'
     merged_mt = sv_mt
 
-# Merge SV VCF with SNV/Indel VCF
+# Clean up merged SV VCF with SNV/Indel VCF
 if sv_vcf!='NA':
     # Change locus to locus_interval to include END for SVs
     merged_mt = merged_mt.annotate_rows(end=hl.if_else(hl.is_defined(merged_mt.info.END2), merged_mt.info.END2, merged_mt.info.END))
@@ -266,8 +269,8 @@ if sv_vcf!='NA':
                                                                               end=merged_mt.end, reference_genome=build))
     merged_mt = merged_mt.key_rows_by(locus_expr, 'alleles')
 
-    # NEW 1/14/2025: Annotate PAR status (moved up from end of script)
-    merged_mt = merged_mt.annotate_rows(in_non_par=~(merged_mt.locus.in_autosome_or_par()))
+# NEW 1/14/2025: Annotate PAR status (moved up from end of script)
+merged_mt = merged_mt.annotate_rows(in_non_par=~(merged_mt.locus.in_autosome_or_par()))
 
 ## EDITED HAIL FUNCTIONS
 # EDITED: don't check locus struct

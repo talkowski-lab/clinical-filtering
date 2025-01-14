@@ -601,7 +601,12 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
                                                                     proband_PBT_GT_set=hl.set(
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_PBT_GT),
                                                                     proband_CA=  # NEW FOR NIFS
-        potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_CA)  
+        potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_CA,
+                                                                    variant_type=  # NEW 1/14/2025
+        hl.array(hl.set(potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].variant_type)),
+                                                                    variant_source=  # NEW 1/14/2025
+        hl.array(hl.set(potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].variant_source))
+    )  
 
     in_cluster0 = (hl.set([0]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0)
     in_maternally_inherited_cluster = ((hl.set([2, 3, 4, 5]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0) | 

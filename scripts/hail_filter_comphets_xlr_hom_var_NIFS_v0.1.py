@@ -5,6 +5,9 @@
 # SVs ignored for NIFS for now.
 # 1/14/2025: added variant_source column
 # 1/14/2025: added workaround for empty CA field (usually cluster 5)
+# 1/14/2025: removed get_transmission function (irrelevant for NIFS)
+# 1/14/2025: moved non-PAR annotations up
+# 1/14/2025: use to_pandas() to bypass ClassTooLargeException in Hail tables union
 ###
 
 from pyspark.sql import SparkSession
@@ -262,6 +265,9 @@ if sv_vcf!='NA':
                                                                               start=merged_mt.locus.position,
                                                                               end=merged_mt.end, reference_genome=build))
     merged_mt = merged_mt.key_rows_by(locus_expr, 'alleles')
+
+    # NEW 1/14/2025: Annotate PAR status (moved up from end of script)
+    merged_mt = merged_mt.annotate_rows(in_non_par=~(merged_mt.locus.in_autosome_or_par()))
 
 ## EDITED HAIL FUNCTIONS
 # EDITED: don't check locus struct
@@ -542,19 +548,19 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     phased_tm = get_mendel_errors(mt, phased_tm, pedigree)
     phased_tm = phased_tm.key_rows_by(locus_expr,'alleles','gene')
 
+    # NEW 1/14/2025: filter_entries before aggregation
+    phased_tm = phased_tm.filter_entries(hl.is_defined(phased_tm.proband_entry.GT))
     gene_agg_phased_tm = (phased_tm.group_rows_by(phased_tm.gene)
         .aggregate_rows(locus_alleles = hl.agg.collect(phased_tm.row_key),
                        variant_type = hl.agg.collect_as_set(phased_tm.variant_type),
-                       variant_source = hl.agg.collect_as_set(phased_tm.variant_source))  # NEW 1/14/2025: added variant_source
-        .aggregate_entries(all_locus_alleles=hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  # NEW 1/14/2025: changed all aggregate_entries fields to use hl.agg.filter with proband_entry.GT
-                                                       hl.agg.collect(phased_tm.row_key)),
-                          proband_PBT_GT = hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  
-                                                       hl.agg.collect(phased_tm.proband_entry.PBT_GT)),
-                          proband_GT = hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  
-                                                       hl.agg.collect(phased_tm.proband_entry.GT)),
-                          proband_CA = hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  
-                                                       hl.agg.collect(phased_tm.proband_entry.CA)))  # NEW FOR NIFS CLUSTER
+                       variant_source = hl.agg.collect_as_set(phased_tm.variant_source)
+                       )  # NEW 1/14/2025: added variant_source
+        .aggregate_entries(all_locus_alleles=hl.agg.collect(phased_tm.row_key),
+                          proband_PBT_GT = hl.agg.collect(phased_tm.proband_entry.PBT_GT),
+                          proband_GT = hl.agg.collect(phased_tm.proband_entry.GT),
+                          proband_CA = hl.agg.collect(phased_tm.proband_entry.CA))  # NEW FOR NIFS CLUSTER
         ).result()
+    
     return phased_tm, gene_agg_phased_tm
 
 def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
@@ -644,14 +650,6 @@ def get_trio_comphets(mt):
     phased_tm_comp_hets_trios = trio_phased_tm.semi_join_rows(potential_comp_hets_trios.rows()).key_rows_by(locus_expr, 'alleles')
     return phased_tm_comp_hets_trios
 
-def get_transmission(phased_tm_ht):
-    phased_tm_ht = phased_tm_ht.annotate(transmission=hl.if_else(phased_tm_ht.proband_entry.PBT_GT==hl.parse_call('0|0'), 'uninherited',
-            hl.if_else(phased_tm_ht.proband_entry.PBT_GT==hl.parse_call('0|1'), 'inherited_from_mother',
-                        hl.if_else(phased_tm_ht.proband_entry.PBT_GT==hl.parse_call('1|0'), 'inherited_from_father',
-                                hl.or_missing(phased_tm_ht.proband_entry.PBT_GT==hl.parse_call('1|1'), 'inherited_from_both'))))
-    )
-    return phased_tm_ht
-
 # Subset pedigree to samples in VCF, edit parental IDs
 vcf_samples = merged_mt.s.collect()
 tmp_ped = pd.read_csv(ped_uri, sep='\t').iloc[:,:6]
@@ -728,14 +726,16 @@ phased_hom_var = phased_hom_var.annotate(variant_category='hom_var')
 merged_comphets = merged_comphets.annotate(variant_category='comphet')
 mat_carrier = mat_carrier.annotate(variant_category='maternal_carrier')
 
-merged_comphets_xlr_hom_var_mat_carrier = merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set','proband_CA').union(xlr_phased).union(phased_hom_var).union(mat_carrier)
+# NEW 1/14/2025: use to_pandas() to bypass ClassTooLargeException in Hail tables union
+merged_comphets_df = merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set','proband_CA').flatten().to_pandas()
+xlr_phased_df = xlr_phased.flatten().to_pandas()
+phased_hom_var_df = phased_hom_var.flatten().to_pandas()
+mat_carrier_df = mat_carrier.flatten().to_pandas()
 
-# Annotate PAR status
-merged_comphets_xlr_hom_var_mat_carrier = merged_comphets_xlr_hom_var_mat_carrier.annotate(in_non_par=~(merged_comphets_xlr_hom_var_mat_carrier.locus.in_autosome_or_par()))
-merged_comphets_xlr_hom_var_mat_carrier = get_transmission(merged_comphets_xlr_hom_var_mat_carrier)
+merged_comphets_xlr_hom_var_mat_carrier_df = pd.concat([merged_comphets_df, xlr_phased_df, phased_hom_var_df, mat_carrier_df])
 
 output_filename = f"{prefix}_{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
 if len(output_filename)>(os.pathconf('/', 'PC_NAME_MAX')-len('/cromwell_root/.')):  # filename too long
     output_filename = f"{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
 
-merged_comphets_xlr_hom_var_mat_carrier.flatten().export(output_filename)
+merged_comphets_xlr_hom_var_mat_carrier_df.to_csv(output_filename, sep='\t', index=False)

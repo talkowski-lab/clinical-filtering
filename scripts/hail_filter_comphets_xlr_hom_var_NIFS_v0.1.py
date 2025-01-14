@@ -2,6 +2,7 @@
 # Finally forked from hail_filter_comphets_xlr_hom_var_v0.1.py on 1/13/2025
 # to output maternal carrier variants (mat_carrier_tsv) and use cluster info 
 # (CA in FORMAT field) for comphets. 
+# SVs ignored for NIFS for now.
 ###
 
 from pyspark.sql import SparkSession
@@ -98,6 +99,9 @@ if snv_indel_vcf!='NA':
     # Load and merge SNV/Indel ClinVar P/LP VCF
     if clinvar_vcf!='NA':
         clinvar_mt = load_split_vep_consequences(clinvar_vcf) 
+        # NEW 1/14/2025: added variant_source
+        clinvar_mt = clinvar_mt.annotate_rows(variant_source='ClinVar_P/LP')
+        snv_mt = snv_mt.annotate_rows(variant_source='OMIM_recessive')
         snv_mt = snv_mt.union_rows(clinvar_mt).distinct_by_row()
 
     # filter SNV/Indel MT
@@ -536,7 +540,8 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
 
     gene_agg_phased_tm = (phased_tm.group_rows_by(phased_tm.gene)
         .aggregate_rows(locus_alleles = hl.agg.collect(phased_tm.row_key),
-                       variant_type = hl.agg.collect(phased_tm.variant_type))
+                       variant_type = hl.agg.collect(phased_tm.variant_type),
+                       variant_source = hl.agg.collect(phased_tm.variant_source))  # NEW 1/14/2025: added variant_source
         .aggregate_entries(all_locus_alleles=hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  # EDITED
                                                        hl.agg.collect(phased_tm.row_key)),
                           proband_PBT_GT = hl.agg.collect(phased_tm.proband_entry.PBT_GT).filter(hl.is_defined),

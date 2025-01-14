@@ -1,6 +1,6 @@
 ###
 # Finally forked from hail_filter_comphets_xlr_hom_var_v0.1.py on 1/13/2025
-# to output maternal carrier variants (mat_carrier_tsv) and use cluster info 
+# to include maternal carrier variants in output and use cluster info 
 # (CA in FORMAT field) for comphets. 
 # SVs ignored for NIFS for now.
 # 1/14/2025: added variant_source column
@@ -101,9 +101,11 @@ if snv_indel_vcf!='NA':
     if clinvar_vcf!='NA':
         clinvar_mt = load_split_vep_consequences(clinvar_vcf) 
         # NEW 1/14/2025: added variant_source
-        clinvar_mt = clinvar_mt.annotate_rows(variant_source='ClinVar_P/LP')
-        snv_mt = snv_mt.annotate_rows(variant_source='OMIM_recessive')
+        snv_mt_no_clinvar = snv_mt
         snv_mt = snv_mt.union_rows(clinvar_mt).distinct_by_row()
+        snv_mt = snv_mt.annotate_rows(variant_source=hl.if_else(hl.is_defined(clinvar_mt.rows()[snv_mt.row_key]),  # if in ClinVar
+                                                 hl.if_else(hl.is_defined(snv_mt_no_clinvar.rows()[snv_mt.row_key]), 'ClinVar_P/LP_OMIM_recessive',  # if also in omim_recessive_vcf
+                                                            'ClinVar_P/LP'), 'OMIM_recessive'))
 
     # filter SNV/Indel MT
     snv_mt = snv_mt.explode_rows(snv_mt.vep.transcript_consequences)

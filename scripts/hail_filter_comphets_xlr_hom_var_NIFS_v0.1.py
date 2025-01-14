@@ -684,7 +684,7 @@ gene_phased_tm = gene_phased_tm.annotate_cols(trio_status=hl.if_else(gene_phased
 # NEW 1/13/2025: maternal carrier variants
 # in carrier gene list and in cluster where mother is het (clusters 1-3)
 carrier_genes = pd.read_csv(carrier_gene_list, sep='\t', header=None)[0].tolist()
-mat_carrier = gene_phased_tm.filter_rows((hl.array(carrier_genes).contains(gene_phased_tm.vep.transcript_consequences.SYMBOL)) &
+mat_carrier = gene_phased_tm.filter_entries((hl.array(carrier_genes).contains(gene_phased_tm.vep.transcript_consequences.SYMBOL)) &
                            (hl.array([1, 2, 3]).contains(gene_phased_tm.proband_entry.CA))).key_rows_by(locus_expr, 'alleles').entries()
 
 # XLR only

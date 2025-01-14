@@ -555,8 +555,8 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     phased_tm = phased_tm.filter_entries(hl.is_defined(phased_tm.proband_entry.GT))
     gene_agg_phased_tm = (phased_tm.group_rows_by(phased_tm.gene)
         .aggregate_rows(locus_alleles = hl.agg.collect(phased_tm.row_key),
-                       variant_type = hl.agg.collect_as_set(phased_tm.variant_type),
-                       variant_source = hl.agg.collect_as_set(phased_tm.variant_source)
+                       variant_type = hl.agg.collect_as_set(phased_tm.variant_type),  # SET
+                       variant_source = hl.agg.collect_as_set(phased_tm.variant_source)  # SET
                        )  # NEW 1/14/2025: added variant_source
         .aggregate_entries(all_locus_alleles=hl.agg.collect(phased_tm.row_key),
                           proband_PBT_GT = hl.agg.collect(phased_tm.proband_entry.PBT_GT),
@@ -584,51 +584,60 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
     non_trio_mt, non_trio_tm = get_subset_tm(mt, non_trio_samples, non_trio_pedigree)
     non_trio_phased_tm, non_trio_gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(non_trio_tm, non_trio_mt, non_trio_pedigree)
 
-    # different criteria for non-trios
+    # Filter to genes where at least one sample has are multiple variants
     potential_comp_hets_non_trios = non_trio_gene_agg_phased_tm.filter_rows(
             hl.agg.count_where(non_trio_gene_agg_phased_tm.proband_GT.size()>1)>0
     )
+    # Explode by variant (locus_expr, alleles) --> key by locus_expr, alleles, gene
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.explode_rows(potential_comp_hets_non_trios.locus_alleles)
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.key_rows_by(potential_comp_hets_non_trios.locus_alleles[locus_expr], potential_comp_hets_non_trios.locus_alleles.alleles, 'gene')
 
+    # Filter to variants that hit genes with multiple variants
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(potential_comp_hets_non_trios.proband_GT.size()>1)
 
+    # NIFS-specific: comphets must have at least one variant in cluster 0 (fetal 0/1, maternal 0/0) 
+    # and one maternally-inherited variant (clusters 3-5, tentatively cluster 2?)
     in_cluster0 = (hl.set([0]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0)
+    # NEW 1/14/2025: workaround for empty CA field (usually cluster 5, seems like an upstream bug)
     in_maternally_inherited_cluster = ((hl.set([2, 3, 4, 5]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0) |
-                                        (hl.any(hl.is_missing, potential_comp_hets_non_trios.proband_CA)))  # NEW 1/14/2025: workaround for empty CA field (usually cluster 5)
+                                        (hl.any(hl.is_missing, potential_comp_hets_non_trios.proband_CA)))  
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(
-        in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS
+        in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS     
     )
 
+    # Annotate non-gene-aggregated TM using potential comphets from gene-aggregated TM 
     non_trio_phased_tm = non_trio_phased_tm.key_rows_by(locus_expr, 'alleles', 'gene')
     non_trio_phased_tm = non_trio_phased_tm.annotate_entries(locus_alleles=  # EDITED
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].all_locus_alleles,
-                                                                    proband_GT=
+                                                            proband_GT=
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_GT,
-                                                                    proband_GT_set=hl.set(
+                                                            proband_GT_set=hl.set(
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_GT),
-                                                                    proband_PBT_GT_set=hl.set(
+                                                            proband_PBT_GT_set=hl.set(
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_PBT_GT),
-                                                                    proband_CA=  # NEW FOR NIFS
+                                                            proband_CA=  # NEW FOR NIFS
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_CA)
-    # NEW 1/14/2025
-    non_trio_phased_tm = non_trio_phased_tm.annotate_rows(
-                                                                    variant_type=  
+    
+    # NEW 1/14/2025: Annotate variant_type and variant_source as comma-separated strings of unique values (basically per gene)
+    non_trio_phased_tm = non_trio_phased_tm.annotate_rows(variant_type=  
         hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_type))),
-                                                                    variant_source= 
+                                                        variant_source= 
         hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_source)))
     )  
 
+    # Apply same NIFS-specific comphet filter on entries to non-gene-aggregated TM
     in_cluster0 = (hl.set([0]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0)
+    # NEW 1/14/2025: workaround for empty CA field (usually cluster 5, seems like an upstream bug)
     in_maternally_inherited_cluster = ((hl.set([2, 3, 4, 5]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0) | 
-                                    (hl.any(hl.is_missing, non_trio_phased_tm.proband_CA)))  # NEW 1/14/2025: workaround for empty CA field (usually cluster 5)
+                                    (hl.any(hl.is_missing, non_trio_phased_tm.proband_CA))) 
     non_trio_phased_tm = non_trio_phased_tm.filter_entries((hl.set(non_trio_phased_tm.locus_alleles).size()>1) &
                                                     in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS     
                                                     )  
+    # Grab rows (variants) from non-gene-aggregated TM, of potential comphets from gene-aggregated TM
     phased_tm_comp_hets_non_trios = non_trio_phased_tm.semi_join_rows(potential_comp_hets_non_trios.rows()).key_rows_by(locus_expr, 'alleles')
-    return phased_tm_comp_hets_non_trios.drop('locus_alleles')  # EDITED
+    return phased_tm_comp_hets_non_trios.drop('locus_alleles')
 
-def get_trio_comphets(mt):
+def get_trio_comphets(mt):  # IRRELEVANT FOR NIFS —— IGNORE
     trio_mt, trio_tm = get_subset_tm(mt, trio_samples, trio_pedigree, keep=True, complete_trios=True)
     trio_phased_tm, trio_gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(trio_tm, trio_mt, trio_pedigree)
 
@@ -738,7 +747,7 @@ mat_carrier_df = mat_carrier.flatten().to_pandas()
 merged_comphets_xlr_hom_var_mat_carrier_df = pd.concat([merged_comphets_df, xlr_phased_df, phased_hom_var_df, mat_carrier_df])
 
 output_filename = f"{prefix}_{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
-if len(output_filename)>(os.pathconf('/', 'PC_NAME_MAX')-len('/cromwell_root/.')):  # filename too long
+if len(output_filename)>(os.pathconf('/', 'PC_NAME_MAX')-len('/cromwell_root/.')):  # if filename too long
     output_filename = f"{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
 
 merged_comphets_xlr_hom_var_mat_carrier_df.to_csv(output_filename, sep='\t', index=False)

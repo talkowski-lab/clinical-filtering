@@ -544,8 +544,8 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
 
     gene_agg_phased_tm = (phased_tm.group_rows_by(phased_tm.gene)
         .aggregate_rows(locus_alleles = hl.agg.collect(phased_tm.row_key),
-                       variant_type = hl.agg.collect(phased_tm.variant_type),
-                       variant_source = hl.agg.collect(phased_tm.variant_source))  # NEW 1/14/2025: added variant_source
+                       variant_type = hl.agg.collect_as_set(phased_tm.variant_type),
+                       variant_source = hl.agg.collect_as_set(phased_tm.variant_source))  # NEW 1/14/2025: added variant_source
         .aggregate_entries(all_locus_alleles=hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  # NEW 1/14/2025: changed all aggregate_entries fields to use hl.agg.filter with proband_entry.GT
                                                        hl.agg.collect(phased_tm.row_key)),
                           proband_PBT_GT = hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  
@@ -605,9 +605,9 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
     # NEW 1/14/2025
     non_trio_phased_tm = non_trio_phased_tm.annotate_rows(
                                                                     variant_type=  
-        hl.str(', ').join(hl.sorted(hl.array(hl.set(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_type)))),
+        hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_type))),
                                                                     variant_source= 
-        hl.str(', ').join(hl.sorted(hl.array(hl.set(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_source))))
+        hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_source)))
     )  
 
     in_cluster0 = (hl.set([0]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0)

@@ -3,6 +3,7 @@
 # to output maternal carrier variants (mat_carrier_tsv) and use cluster info 
 # (CA in FORMAT field) for comphets. 
 # SVs ignored for NIFS for now.
+# 1/14/2025: added variant_source column
 ###
 
 from pyspark.sql import SparkSession

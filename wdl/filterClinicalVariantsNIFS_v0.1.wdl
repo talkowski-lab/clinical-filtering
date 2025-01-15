@@ -53,12 +53,17 @@ workflow filterClinicalVariants {
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
         String dom_gene_list_tsv='NA'
 
+        # merge TSVs
         RuntimeAttr? runtime_attr_merge_clinvar
+        RuntimeAttr? runtime_attr_merge_omim_dom
+        RuntimeAttr? runtime_attr_merge_comphets
+        # merge VCFs
         RuntimeAttr? runtime_attr_merge_omim_rec_vcfs
         RuntimeAttr? runtime_attr_merge_clinvar_vcfs
-        RuntimeAttr? runtime_attr_merge_omim_dom
+        # filtering steps
+        RuntimeAttr? runtime_attr_filter
+        RuntimeAttr? runtime_attr_filter_omim
         RuntimeAttr? runtime_attr_filter_comphets
-        RuntimeAttr? runtime_attr_merge_comphets
     }
 
     scatter (pair in zip(annot_vcf_files, predicted_sex_chrom_ploidies)) {
@@ -91,6 +96,8 @@ workflow filterClinicalVariants {
             carrier_gene_list=carrier_gene_list,
             rec_gene_list_tsv=rec_gene_list_tsv,
             dom_gene_list_tsv=dom_gene_list_tsv,
+            runtime_attr_filter=runtime_attr_filter,
+            runtime_attr_filter_omim=runtime_attr_filter_omim,
             runtime_attr_filter_comphets=runtime_attr_filter_comphets
         }
     }

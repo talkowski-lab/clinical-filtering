@@ -51,6 +51,8 @@ workflow filterClinicalVariants {
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
         String dom_gene_list_tsv='NA'
 
+        RuntimeAttr? runtime_attr_filter
+        RuntimeAttr? runtime_attr_filter_omim
         RuntimeAttr? runtime_attr_filter_comphets
     }
 
@@ -71,7 +73,8 @@ workflow filterClinicalVariants {
         af_threshold=af_threshold,
         gnomad_af_threshold=gnomad_af_threshold,
         genome_build=genome_build,
-        pass_filter=pass_filter
+        pass_filter=pass_filter,
+        runtime_attr_override=runtime_attr_filter
     }
 
     call runClinicalFilteringOMIM {
@@ -93,7 +96,8 @@ workflow filterClinicalVariants {
         genome_build=genome_build,
         include_not_omim=include_not_omim,
         rec_gene_list_tsv=rec_gene_list_tsv,
-        dom_gene_list_tsv=dom_gene_list_tsv
+        dom_gene_list_tsv=dom_gene_list_tsv,
+        runtime_attr_override=runtime_attr_filter_omim
     }
 
     call filterCompHetsXLRHomVar {

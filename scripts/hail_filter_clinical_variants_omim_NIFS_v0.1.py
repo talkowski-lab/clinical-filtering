@@ -8,6 +8,7 @@
 1/15/2025:
 - removed get_transmission function (irrelevant for NIFS)
 - commented out all_csqs and gnomad_popmax_af annotations because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
+- changed has_low_or_modifier_impact to is_moderate_or_high_impact inverse logic (should have the same result)
 '''
 ###
 
@@ -154,7 +155,7 @@ is_splice_var_only = (hl.set(splice_vars).intersection(
 fails_spliceAI_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.spliceAI_score=='', 1, 
                 hl.float(gene_phased_tm.vep.transcript_consequences.spliceAI_score))<spliceAI_threshold)
 
-# NEW 1/15/2025 change has_low_or_modifier_impact to is_moderate_or_high_impact inverse logic
+# NEW 1/15/2025 changed has_low_or_modifier_impact to is_moderate_or_high_impact inverse logic
 # has_low_or_modifier_impact = (hl.array(['LOW','MODIFIER']).contains(gene_phased_tm.vep.transcript_consequences.IMPACT))
 # gene_phased_tm = gene_phased_tm.filter_rows((is_splice_var_only | 
 #                                              (has_splice_var & has_low_or_modifier_impact)) & fails_spliceAI_score, keep=False)

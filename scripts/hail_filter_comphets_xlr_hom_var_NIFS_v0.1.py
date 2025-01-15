@@ -3,11 +3,16 @@
 # to include maternal carrier variants in output and use cluster info 
 # (CA in FORMAT field) for comphets. 
 # SVs ignored for NIFS for now.
-# 1/14/2025: added variant_source column
-# 1/14/2025: added workaround for empty CA field (usually cluster 5)
-# 1/14/2025: removed get_transmission function (irrelevant for NIFS)
-# 1/14/2025: moved non-PAR annotations up
-# 1/14/2025: use to_pandas() to bypass ClassTooLargeException in Hail tables union
+'''
+1/14/2025:
+- added variant_source column
+- added workaround for empty CA field (usually cluster 5)
+- removed get_transmission function (irrelevant for NIFS)
+- moved non-PAR annotations up
+- changed export() to to_pandas() to bypass ClassTooLargeException in Hail tables union
+1/15/2025:
+- changed comphets maternally-inherited clusters from clusters 2-5 to 1-4 (cluster 5 workaround no longer necessary)
+'''
 ###
 
 from pyspark.sql import SparkSession
@@ -598,9 +603,7 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
     # NIFS-specific: comphets must have at least one variant in cluster 0 (fetal 0/1, maternal 0/0) 
     # and one maternally-inherited variant (clusters 3-5, tentatively cluster 2?)
     in_cluster0 = (hl.set([0]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0)
-    # NEW 1/14/2025: workaround for empty CA field (usually cluster 5, seems like an upstream bug)
-    in_maternally_inherited_cluster = ((hl.set([2, 3, 4, 5]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0) |
-                                        (hl.any(hl.is_missing, potential_comp_hets_non_trios.proband_CA)))  
+    in_maternally_inherited_cluster = (hl.set([1, 2, 3, 4]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0)  
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(
         in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS     
     )
@@ -627,9 +630,7 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
 
     # Apply same NIFS-specific comphet filter on entries to non-gene-aggregated TM
     in_cluster0 = (hl.set([0]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0)
-    # NEW 1/14/2025: workaround for empty CA field (usually cluster 5, seems like an upstream bug)
-    in_maternally_inherited_cluster = ((hl.set([2, 3, 4, 5]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0) | 
-                                    (hl.any(hl.is_missing, non_trio_phased_tm.proband_CA))) 
+    in_maternally_inherited_cluster = (hl.set([1, 2, 3, 4]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0) 
     non_trio_phased_tm = non_trio_phased_tm.filter_entries((hl.set(non_trio_phased_tm.locus_alleles).size()>1) &
                                                     in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS     
                                                     )  

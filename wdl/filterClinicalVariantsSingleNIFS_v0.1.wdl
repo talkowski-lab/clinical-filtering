@@ -3,7 +3,6 @@ version 1.0
 import "mergeVCFs.wdl" as mergeVCFs
 import "mergeVCFSamples.wdl" as mergeVCFSamples
 import "helpers.wdl" as helpers
-import "filterClinicalVariantsSingleNIFS_v0.1.wdl" as filterClinicalVariantsSingleNIFS
 
 struct RuntimeAttr {
     Float? mem_gb
@@ -14,14 +13,14 @@ struct RuntimeAttr {
     Int? max_retries
 }
 
-# run on sample-set level
+# run on sample level
 # expect only SNV/Indel VCF, no SV VCF for NIFS
 workflow filterClinicalVariants {
     input {
-        Array[File] annot_vcf_files
+        File vcf_file
         # File ped_uri  # make a dummy ped with all singletons for NIFS
 
-        Array[String] predicted_sex_chrom_ploidies  # XX or XY
+        String predicted_sex_chrom_ploidy  # XX or XY
 
         String cohort_prefix
         String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_v0.1.py"
@@ -53,101 +52,76 @@ workflow filterClinicalVariants {
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
         String dom_gene_list_tsv='NA'
 
-        RuntimeAttr? runtime_attr_merge_clinvar
-        RuntimeAttr? runtime_attr_merge_omim_rec_vcfs
-        RuntimeAttr? runtime_attr_merge_clinvar_vcfs
-        RuntimeAttr? runtime_attr_merge_omim_dom
         RuntimeAttr? runtime_attr_filter_comphets
-        RuntimeAttr? runtime_attr_merge_comphets
     }
 
-    scatter (pair in zip(annot_vcf_files, predicted_sex_chrom_ploidies)) {
-        File vcf_file = pair.left
-        String predicted_sex_chrom_ploidy = pair.right
-        call filterClinicalVariantsSingleNIFS.filterClinicalVariants as filterClinicalVariantsSingleNIFS {
-            input:
-            predicted_sex_chrom_ploidy=predicted_sex_chrom_ploidy,
-            vcf_file=vcf_file,
-            cohort_prefix=cohort_prefix,
-            filter_clinical_variants_snv_indel_script=filter_clinical_variants_snv_indel_script,
-            filter_clinical_variants_snv_indel_omim_script=filter_clinical_variants_snv_indel_omim_script,
+    call makeDummyPed {
+        input:
+        predicted_sex_chrom_ploidy=predicted_sex_chrom_ploidy,
+        vcf_file=vcf_file,
+        hail_docker=hail_docker,
+        genome_build=genome_build
+    }
+
+    call runClinicalFiltering {
+        input:
+        vcf_file=vcf_file,
+        ped_uri=makeDummyPed.ped_uri,
+        filter_clinical_variants_snv_indel_script=filter_clinical_variants_snv_indel_script,
+        hail_docker=hail_docker,
+        af_threshold=af_threshold,
+        gnomad_af_threshold=gnomad_af_threshold,
+        genome_build=genome_build,
+        pass_filter=pass_filter
+    }
+
+    call runClinicalFilteringOMIM {
+        input:
+        vcf_file=runClinicalFiltering.filtered_vcf,
+        ped_uri=makeDummyPed.ped_uri,
+        filter_clinical_variants_snv_indel_omim_script=filter_clinical_variants_snv_indel_omim_script,
+        hail_docker=hail_docker,
+        spliceAI_threshold=spliceAI_threshold,
+        ad_alt_threshold=ad_alt_threshold,
+        am_rec_threshold=am_rec_threshold,
+        am_dom_threshold=am_dom_threshold,
+        mpc_rec_threshold=mpc_rec_threshold,
+        mpc_dom_threshold=mpc_dom_threshold,
+        gnomad_af_rec_threshold=gnomad_af_rec_threshold,
+        gnomad_af_dom_threshold=gnomad_af_dom_threshold,
+        loeuf_v2_threshold=loeuf_v2_threshold,
+        loeuf_v4_threshold=loeuf_v4_threshold,
+        genome_build=genome_build,
+        include_not_omim=include_not_omim,
+        rec_gene_list_tsv=rec_gene_list_tsv,
+        dom_gene_list_tsv=dom_gene_list_tsv
+    }
+
+    call filterCompHetsXLRHomVar {
+        input:
+            snv_indel_vcf=runClinicalFilteringOMIM.omim_recessive_vcf,
+            clinvar_vcf=runClinicalFiltering.clinvar_vcf,
+            sv_vcf='NA',
+            ped_uri=makeDummyPed.ped_uri,
+            omim_uri=runClinicalFiltering.clinvar_vcf,  # dummy input
+            sv_gene_fields=['NA'],
             filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
-            hail_docker=hail_docker,
-            sv_base_mini_docker=sv_base_mini_docker,
-            ad_alt_threshold=ad_alt_threshold,
-            spliceAI_threshold=spliceAI_threshold,
-            af_threshold=af_threshold,
-            gnomad_af_threshold=gnomad_af_threshold,
-            am_rec_threshold=am_rec_threshold,
-            am_dom_threshold=am_dom_threshold,
-            mpc_rec_threshold=mpc_rec_threshold,
-            mpc_dom_threshold=mpc_dom_threshold,
-            gnomad_af_rec_threshold=gnomad_af_rec_threshold,
-            gnomad_af_dom_threshold=gnomad_af_dom_threshold,
-            loeuf_v2_threshold=loeuf_v2_threshold,
-            loeuf_v4_threshold=loeuf_v4_threshold,
             genome_build=genome_build,
-            pass_filter=pass_filter,
-            include_not_omim=include_not_omim,
-            carrier_gene_list=carrier_gene_list,
+            hail_docker=hail_docker,
+            ad_alt_threshold=ad_alt_threshold,
             rec_gene_list_tsv=rec_gene_list_tsv,
-            dom_gene_list_tsv=dom_gene_list_tsv,
-            runtime_attr_filter_comphets=runtime_attr_filter_comphets
-        }
-    }
-
-    call helpers.mergeResultsPython as mergeClinVar {
-        input:
-            tsvs=filterClinicalVariantsSingleNIFS.clinvar_tsv,
-            hail_docker=hail_docker,
-            input_size=size(filterClinicalVariantsSingleNIFS.clinvar_tsv, 'GB'),
-            merged_filename=cohort_prefix+'_clinvar_variants.tsv.gz',
-            runtime_attr_override=runtime_attr_merge_clinvar
-    }
-
-    call helpers.mergeResultsPython as mergeOMIMDominant {
-        input:
-            tsvs=filterClinicalVariantsSingleNIFS.omim_dominant_tsv,
-            hail_docker=hail_docker,
-            input_size=size(filterClinicalVariantsSingleNIFS.omim_dominant_tsv, 'GB'),
-            merged_filename=cohort_prefix+'_OMIM_dominant.tsv.gz',
-            runtime_attr_override=runtime_attr_merge_omim_dom
-    }
-
-    # mergeVCFSamples instead of mergeVCFs
-    call mergeVCFSamples.mergeVCFs as mergeOMIMRecessive {
-        input:  
-            vcf_files=filterClinicalVariantsSingleNIFS.omim_recessive_vcf,
-            sv_base_mini_docker=sv_base_mini_docker,
-            output_vcf_name=cohort_prefix + '_OMIM_recessive.vcf.gz',
-            runtime_attr_override=runtime_attr_merge_omim_rec_vcfs
-    }
-
-    call mergeVCFSamples.mergeVCFs as mergeClinVarVCFs {
-        input:  
-            vcf_files=filterClinicalVariantsSingleNIFS.clinvar_vcf,
-            sv_base_mini_docker=sv_base_mini_docker,
-            output_vcf_name=cohort_prefix + '_ClinVar_variants.vcf.gz',
-            runtime_attr_override=runtime_attr_merge_clinvar_vcfs
-    }
-
-    call helpers.mergeResultsPython as mergeCompHetsXLRHomVar {
-        input:
-            tsvs=filterClinicalVariantsSingleNIFS.comphet_xlr_hom_var_mat_carrier_tsv,
-            hail_docker=hail_docker,
-            input_size=size(filterClinicalVariantsSingleNIFS.comphet_xlr_hom_var_mat_carrier_tsv, 'GB'),
-            merged_filename="~{cohort_prefix}_SNV_Indel_comp_hets_xlr_hom_var_mat_carrier.tsv.gz",
-            runtime_attr_override=runtime_attr_merge_comphets
+            carrier_gene_list=carrier_gene_list,
+            runtime_attr_override=runtime_attr_filter_comphets
     }
 
     output {
-        File clinvar_tsv = mergeClinVar.merged_tsv
-        File clinvar_vcf = mergeClinVarVCFs.merged_vcf_file
-        File clinvar_vcf_idx = mergeClinVarVCFs.merged_vcf_idx
-        File omim_recessive_vcf = mergeOMIMRecessive.merged_vcf_file
-        File omim_recessive_vcf_idx = mergeOMIMRecessive.merged_vcf_idx
-        File omim_dominant_tsv = mergeOMIMDominant.merged_tsv
-        File comphet_xlr_hom_var_mat_carrier_tsv = mergeCompHetsXLRHomVar.merged_tsv
+        File clinvar_tsv = runClinicalFiltering.clinvar
+        File clinvar_vcf = runClinicalFiltering.clinvar_vcf
+        File clinvar_vcf_idx = runClinicalFiltering.clinvar_vcf_idx
+        File omim_recessive_vcf = runClinicalFilteringOMIM.omim_recessive_vcf
+        File omim_recessive_vcf_idx = runClinicalFilteringOMIM.omim_recessive_vcf_idx
+        File omim_dominant_tsv = runClinicalFilteringOMIM.omim_dominant
+        File comphet_xlr_hom_var_mat_carrier_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv
     }
 }
 
@@ -206,6 +180,7 @@ task runClinicalFiltering {
     output {
         File clinvar = prefix + '_clinvar_variants.tsv.gz'
         File clinvar_vcf = prefix + '_clinvar_variants.vcf.bgz'
+        File clinvar_vcf_idx = prefix + '_clinvar_variants.vcf.bgz.tbi'
         File filtered_vcf = prefix + '_clinical.vcf.bgz'
     }
 }
@@ -386,6 +361,7 @@ task runClinicalFilteringOMIM {
 
     output {
         File omim_recessive_vcf = prefix + '_OMIM_recessive.vcf.bgz'
+        File omim_recessive_vcf_idx = prefix + '_OMIM_recessive.vcf.bgz.tbi'
         File omim_dominant = prefix + '_OMIM_dominant.tsv.gz'
     }
 }

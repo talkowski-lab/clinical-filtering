@@ -140,7 +140,7 @@ mt = mt.filter_rows((mt.gnomad_popmax_af<=gnomad_af_threshold) | (hl.is_missing(
 hl.export_vcf(mt, prefix+'_clinical.vcf.bgz', metadata=header)
 
 # export ClinVar VCF
-hl.export_vcf(clinvar_mt, prefix+'_clinvar_variants.vcf.bgz', metadata=header)
+hl.export_vcf(clinvar_mt, prefix+'_clinvar_variants.vcf.bgz', metadata=header, tabix=True)
 
 # export ClinVar TSV
 clinvar_tm.entries().flatten().export(prefix+'_clinvar_variants.tsv.gz', delimiter='\t')

@@ -68,7 +68,6 @@ workflow filterClinicalVariants {
             input:
             predicted_sex_chrom_ploidy=predicted_sex_chrom_ploidy,
             vcf_file=vcf_file,
-            cohort_prefix=cohort_prefix,
             filter_clinical_variants_snv_indel_script=filter_clinical_variants_snv_indel_script,
             filter_clinical_variants_snv_indel_omim_script=filter_clinical_variants_snv_indel_omim_script,
             filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,

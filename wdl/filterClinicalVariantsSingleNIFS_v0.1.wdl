@@ -22,8 +22,8 @@ workflow filterClinicalVariants {
 
         String predicted_sex_chrom_ploidy  # XX or XY
 
-        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_v0.1.py"
-        String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_v0.1.py"
+        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_NIFS_v0.1.py"
+        String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_NIFS_v0.1.py"
         String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py"
 
         String hail_docker
@@ -118,6 +118,7 @@ workflow filterClinicalVariants {
     }
 
     output {
+        File mat_carrier_tsv = runClinicalFiltering.mat_carrier_tsv
         File clinvar_tsv = runClinicalFiltering.clinvar
         File clinvar_vcf = runClinicalFiltering.clinvar_vcf
         File clinvar_vcf_idx = runClinicalFiltering.clinvar_vcf_idx
@@ -181,6 +182,7 @@ task runClinicalFiltering {
     }
 
     output {
+        File mat_carrier_tsv = prefix + '_mat_carrier_variants.vcf.gz'
         File clinvar = prefix + '_clinvar_variants.tsv.gz'
         File clinvar_vcf = prefix + '_clinvar_variants.vcf.bgz'
         File clinvar_vcf_idx = prefix + '_clinvar_variants.vcf.bgz.tbi'

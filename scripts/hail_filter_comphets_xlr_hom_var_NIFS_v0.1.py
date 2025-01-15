@@ -14,6 +14,7 @@
 - changed export() to to_pandas() to bypass ClassTooLargeException in Hail tables union
 1/15/2025:
 - changed comphets maternally-inherited clusters from clusters 2-5 to 1-4 (cluster 5 workaround no longer necessary)
+- commented out all_csqs and gnomad_popmax_af annotations because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
 '''
 ###
 
@@ -99,7 +100,8 @@ def load_split_vep_consequences(vcf_uri):
     mt = mt.annotate_rows(vep=mt.vep.annotate(transcript_consequences=transcript_consequences_strs))
     mt = mt.annotate_rows(vep=mt.vep.select('transcript_consequences'))
     # NEW 1/9/2025: annotate all_csqs (TODO: many transcripts already filtered out in upstream steps?)
-    mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)))
+    # NEW 1/15/2025: commented out because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
+    # mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)))
     return mt
 
 ## STEP 1: Merge SNV/Indel VCF with SV VCF (or just one of them)
@@ -122,11 +124,12 @@ if snv_indel_vcf!='NA':
     snv_mt = snv_mt.explode_rows(snv_mt.vep.transcript_consequences)
 
     # NEW 1/9/2025: annotate gnomad_popmax_af after exploding by transcript
-    gnomad_fields = [x for x in list(snv_mt.vep.transcript_consequences) if 'gnomAD' in x]
-    snv_mt = snv_mt.annotate_rows(
-        gnomad_popmax_af=hl.max([hl.or_missing(snv_mt.vep.transcript_consequences[gnomad_field]!='',
-                                        hl.float(snv_mt.vep.transcript_consequences[gnomad_field])) 
-                                for gnomad_field in gnomad_fields]))
+    # NEW 1/15/2025: commented out because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
+    # gnomad_fields = [x for x in list(snv_mt.vep.transcript_consequences) if 'gnomAD' in x]
+    # snv_mt = snv_mt.annotate_rows(
+    #     gnomad_popmax_af=hl.max([hl.or_missing(snv_mt.vep.transcript_consequences[gnomad_field]!='',
+    #                                     hl.float(snv_mt.vep.transcript_consequences[gnomad_field])) 
+    #                             for gnomad_field in gnomad_fields]))
     
     # Filter SNV/Indel MT
     snv_mt = filter_mt(snv_mt)

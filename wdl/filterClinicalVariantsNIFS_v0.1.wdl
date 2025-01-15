@@ -24,8 +24,8 @@ workflow filterClinicalVariants {
         Array[String] predicted_sex_chrom_ploidies  # XX or XY
 
         String cohort_prefix
-        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_v0.1.py"
-        String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_v0.1.py"
+        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_NIFS_v0.1.py"
+        String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_NIFS_v0.1.py"
         String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py"
 
         String hail_docker
@@ -57,6 +57,7 @@ workflow filterClinicalVariants {
         RuntimeAttr? runtime_attr_merge_clinvar
         RuntimeAttr? runtime_attr_merge_omim_dom
         RuntimeAttr? runtime_attr_merge_comphets
+        RuntimeAttr? runtime_attr_merge_mat_carriers
         # merge VCFs
         RuntimeAttr? runtime_attr_merge_omim_rec_vcfs
         RuntimeAttr? runtime_attr_merge_clinvar_vcfs
@@ -111,6 +112,15 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_merge_clinvar
     }
 
+    call helpers.mergeResultsPython as mergeMaternalCarriers {
+        input:
+            tsvs=filterClinicalVariantsSingleNIFS.mat_carrier_tsv,
+            hail_docker=hail_docker,
+            input_size=size(filterClinicalVariantsSingleNIFS.mat_carrier_tsv, 'GB'),
+            merged_filename=cohort_prefix+'_mat_carrier_variants.tsv.gz',
+            runtime_attr_override=runtime_attr_merge_mat_carriers
+    }
+
     call helpers.mergeResultsPython as mergeOMIMDominant {
         input:
             tsvs=filterClinicalVariantsSingleNIFS.omim_dominant_tsv,
@@ -147,6 +157,7 @@ workflow filterClinicalVariants {
     }
 
     output {
+        File mat_carrier_tsv = mergeMaternalCarriers.merged_tsv
         File clinvar_tsv = mergeClinVar.merged_tsv
         File clinvar_vcf = mergeClinVarVCFs.merged_vcf_file
         File clinvar_vcf_idx = mergeClinVarVCFs.merged_vcf_idx

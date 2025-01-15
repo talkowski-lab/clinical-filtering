@@ -182,7 +182,7 @@ task runClinicalFiltering {
     }
 
     output {
-        File mat_carrier_tsv = prefix + '_mat_carrier_variants.vcf.gz'
+        File mat_carrier_tsv = prefix + '_mat_carrier_variants.tsv.gz'
         File clinvar = prefix + '_clinvar_variants.tsv.gz'
         File clinvar_vcf = prefix + '_clinvar_variants.vcf.bgz'
         File clinvar_vcf_idx = prefix + '_clinvar_variants.vcf.bgz.tbi'

@@ -19,7 +19,7 @@ Each ```v0.x``` is associated with a published Dockstore workflow.
 - SNV/Indel only. Run at *sample-set* level.
 - Combines ```filterClinicalVariants_v0.1.wdl``` and ```filterClinicalCompHets_v0.1.wdl``` into one workflow, with some differences in filters.
 
-**```filterClinicalVariantsSingleNIFS_v0.1.wdl```**: https://dockstore.org/workflows/github.com/talkowski-lab/clinical-filtering/filter-clinical-variants-NIFS-v01
+**```filterClinicalVariantsSingleNIFS_v0.1.wdl```**: https://dockstore.org/workflows/github.com/talkowski-lab/clinical-filtering/filter-clinical-variants-single-NIFS-v01
 - SNV/Indel only. Run at *sample* level.
 
 

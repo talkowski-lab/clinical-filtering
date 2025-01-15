@@ -16,7 +16,11 @@ Each ```v0.x``` is associated with a published Dockstore workflow.
 - Combines ```filterClinicalVariantsSNVIndel_v0.1.wdl```,```filterClinicalVariantsSV_v0.1.wdl```, and ```filterClinicalCompHets_v0.1.wdl``` into one workflow.
 
 **```filterClinicalVariantsNIFS_v0.1.wdl```**: https://dockstore.org/workflows/github.com/talkowski-lab/clinical-filtering/filter-clinical-variants-NIFS-v01
-- SNV/Indel only.
+- SNV/Indel only. Run at *sample-set* level.
 - Combines ```filterClinicalVariants_v0.1.wdl``` and ```filterClinicalCompHets_v0.1.wdl``` into one workflow, with some differences in filters.
-  
+
+**```filterClinicalVariantsSingleNIFS_v0.1.wdl```**: https://dockstore.org/workflows/github.com/talkowski-lab/clinical-filtering/filter-clinical-variants-NIFS-v01
+- SNV/Indel only. Run at *sample* level.
+
+
 **TODO**: Generally want to add scripts to the Docker images for each task/workflow instead of having them as WDL inputs, but not a priority.

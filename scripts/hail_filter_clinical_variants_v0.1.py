@@ -1,3 +1,13 @@
+###
+# TODO: script description
+
+## CHANGE LOG:
+'''
+1/15/2025:
+- fixed bug where empty CLNSIG/CLNREVSTAT (not in ClinVar) gets filtered out
+'''
+###
+
 from pyspark.sql import SparkSession
 import hail as hl
 import numpy as np
@@ -118,8 +128,10 @@ clinvar_tm = get_transmission(clinvar_tm)
 
 # filter out ClinVar benign
 # NEW 1/10/2025 filter out 2*+ benign only!
-is_clinvar_benign = hl.any(lambda x: x.matches('enign'), mt.info.CLNSIG)
-is_clinvar_two_star_plus = hl.any([mt.info.CLNREVSTAT==category for category in clinvar_two_star_plus])
+# NEW: 1/15/2025: fixed bug where empty CLNSIG/CLNREVSTAT (not in ClinVar) gets filtered out
+is_clinvar_benign = ((hl.is_defined(mt.info.CLNSIG)) & (hl.any(lambda x: x.matches('enign'), mt.info.CLNSIG)))
+is_clinvar_two_star_plus = ((hl.is_defined(mt.info.CLNREVSTAT)) & 
+                (hl.any([mt.info.CLNREVSTAT==category for category in clinvar_two_star_plus])))
 mt = mt.filter_rows(is_clinvar_benign & is_clinvar_two_star_plus, keep=False)
 
 # filter PASS

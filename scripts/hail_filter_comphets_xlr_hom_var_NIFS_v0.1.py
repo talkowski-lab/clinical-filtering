@@ -3,6 +3,8 @@
 # to include maternal carrier variants in output and use cluster info 
 # (CA in FORMAT field) for comphets. 
 # SVs ignored for NIFS for now.
+
+## CHANGE LOG:
 '''
 1/14/2025:
 - added variant_source column

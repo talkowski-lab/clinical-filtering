@@ -15,6 +15,8 @@
 1/15/2025:
 - changed comphets maternally-inherited clusters from clusters 2-5 to 1-4 (cluster 5 workaround no longer necessary)
 - commented out all_csqs and gnomad_popmax_af annotations because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
+1/16/2025:
+- filter out cluster 5 rows for comphets that were "coming along for the ride"
 '''
 ###
 
@@ -594,7 +596,7 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
     non_trio_mt, non_trio_tm = get_subset_tm(mt, non_trio_samples, non_trio_pedigree)
     non_trio_phased_tm, non_trio_gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(non_trio_tm, non_trio_mt, non_trio_pedigree)
 
-    # Filter to genes where at least one sample has are multiple variants
+    # Filter to genes where at least one sample has multiple variants
     potential_comp_hets_non_trios = non_trio_gene_agg_phased_tm.filter_rows(
             hl.agg.count_where(non_trio_gene_agg_phased_tm.proband_GT.size()>1)>0
     )
@@ -606,7 +608,7 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(potential_comp_hets_non_trios.proband_GT.size()>1)
 
     # NIFS-specific: comphets must have at least one variant in cluster 0 (fetal 0/1, maternal 0/0) 
-    # and one maternally-inherited variant (clusters 3-5, tentatively cluster 2?)
+    # and one maternally-inherited variant (clusters 1-4)
     in_cluster0 = (hl.set([0]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0)
     in_maternally_inherited_cluster = (hl.set([1, 2, 3, 4]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0)  
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(
@@ -639,6 +641,9 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
     non_trio_phased_tm = non_trio_phased_tm.filter_entries((hl.set(non_trio_phased_tm.locus_alleles).size()>1) &
                                                     in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS     
                                                     )  
+    # NEW 1/16/2025: filter out cluster 5 rows for comphets that were "coming along for the ride"
+    non_trio_phased_tm = non_trio_phased_tm.filter_rows(hl.array([1, 2, 3, 4]).contains(non_trio_phased_tm.info.CA))
+
     # Grab rows (variants) from non-gene-aggregated TM, of potential comphets from gene-aggregated TM
     phased_tm_comp_hets_non_trios = non_trio_phased_tm.semi_join_rows(potential_comp_hets_non_trios.rows()).key_rows_by(locus_expr, 'alleles')
     return phased_tm_comp_hets_non_trios.drop('locus_alleles')

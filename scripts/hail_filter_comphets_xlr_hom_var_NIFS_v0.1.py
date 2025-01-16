@@ -642,7 +642,7 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
                                                     in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS     
                                                     )  
     # NEW 1/16/2025: filter out cluster 5 rows for comphets that were "coming along for the ride"
-    non_trio_phased_tm = non_trio_phased_tm.filter_rows(hl.array([1, 2, 3, 4]).contains(non_trio_phased_tm.info.CA))
+    non_trio_phased_tm = non_trio_phased_tm.filter_rows(hl.array([0, 1, 2, 3, 4]).contains(non_trio_phased_tm.info.CA))
 
     # Grab rows (variants) from non-gene-aggregated TM, of potential comphets from gene-aggregated TM
     phased_tm_comp_hets_non_trios = non_trio_phased_tm.semi_join_rows(potential_comp_hets_non_trios.rows()).key_rows_by(locus_expr, 'alleles')

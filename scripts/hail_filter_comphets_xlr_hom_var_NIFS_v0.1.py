@@ -558,7 +558,7 @@ def get_mendel_errors(mt, phased_tm, pedigree):
 def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     # filter out calls that are hom ref in proband
     # NEw 1/17/2025: test commenting out filter_entries before aggregation
-    tm = tm.filter_entries(tm.proband_entry.GT.is_non_ref())
+    # tm = tm.filter_entries(tm.proband_entry.GT.is_non_ref())
 
     phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
     phased_tm = get_mendel_errors(mt, phased_tm, pedigree)

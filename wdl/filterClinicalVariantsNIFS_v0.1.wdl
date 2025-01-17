@@ -19,7 +19,6 @@ struct RuntimeAttr {
 workflow filterClinicalVariants {
     input {
         Array[File] annot_vcf_files
-        # File ped_uri  # make a dummy ped with all singletons for NIFS
 
         Array[String] predicted_sex_chrom_ploidies  # XX or XY
 

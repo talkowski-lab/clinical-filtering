@@ -18,7 +18,6 @@ struct RuntimeAttr {
 workflow filterClinicalVariants {
     input {
         File vcf_file
-        # File ped_uri  # make a dummy ped with all singletons for NIFS
 
         String predicted_sex_chrom_ploidy  # XX or XY
 
@@ -268,6 +267,8 @@ task makeDummyPed {
         raise Exception(f"You have {len(probands)} proband samples!")
     if len(mothers) != 1:
         raise Exception(f"You have {len(mothers)} maternal samples!")
+    proband = probands[0]
+    mother = mothers[0]
 
     ped = pd.DataFrame({
         'family_id': fam_ids,
@@ -279,15 +280,16 @@ task makeDummyPed {
     })
     ped.index = ped.sample_id
 
-    # set mothers' sex to 2
-    ped.loc[mothers, 'sex'] = 2
+    # set mother's sex to 2
+    ped.loc[mother, 'sex'] = 2
 
     # use predicted_sex_chrom_ploidy for proband sex
-    for proband in probands:
-        if predicted_sex_chrom_ploidy == 'XX':
-            ped.loc[proband, 'sex'] = 2
-        elif predicted_sex_chrom_ploidy == 'XY':
-            ped.loc[proband, 'sex'] = 1
+    if predicted_sex_chrom_ploidy == 'XX':
+        ped.loc[proband, 'sex'] = 2
+    elif predicted_sex_chrom_ploidy == 'XY':
+        ped.loc[proband, 'sex'] = 1
+    # NEW 1/17/2025: set maternal_id to mother for proband (treat as duo instead of two singletons)
+    ped.loc[proband, 'maternal_id'] = mother
 
     ped.to_csv(out_ped, sep='\t', index=False)
     EOF

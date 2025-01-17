@@ -564,7 +564,8 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     phased_tm = phased_tm.key_rows_by(locus_expr,'alleles','gene')
 
     # NEW 1/14/2025: filter_entries before aggregation
-    phased_tm = phased_tm.filter_entries(hl.is_defined(phased_tm.proband_entry.GT))
+    # NEw 1/17/2025: test commenting out filter_entries before aggregation
+    # phased_tm = phased_tm.filter_entries(hl.is_defined(phased_tm.proband_entry.GT))
     gene_agg_phased_tm = (phased_tm.group_rows_by(phased_tm.gene)
         .aggregate_rows(locus_alleles = hl.agg.collect(phased_tm.row_key),
                        variant_type = hl.agg.collect_as_set(phased_tm.variant_type),  # SET

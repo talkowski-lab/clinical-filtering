@@ -17,6 +17,9 @@
 - commented out all_csqs and gnomad_popmax_af annotations because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
 1/16/2025:
 - filter out cluster 5 rows for comphets that were "coming along for the ride"
+1/17/2025: 
+- comment out filter_entries before aggregation
+- only include fetal sample in output (mother_entry will be filled)
 '''
 ###
 
@@ -557,7 +560,7 @@ def get_mendel_errors(mt, phased_tm, pedigree):
 
 def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     # filter out calls that are hom ref in proband
-    # NEw 1/17/2025: test commenting out filter_entries before aggregation
+    # NEw 1/17/2025: comment out filter_entries before aggregation
     # tm = tm.filter_entries(tm.proband_entry.GT.is_non_ref())
 
     phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
@@ -757,6 +760,9 @@ phased_hom_var_df = phased_hom_var.flatten().to_pandas()
 mat_carrier_df = mat_carrier.flatten().to_pandas()
 
 merged_comphets_xlr_hom_var_mat_carrier_df = pd.concat([merged_comphets_df, xlr_phased_df, phased_hom_var_df, mat_carrier_df])
+
+# NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)
+merged_comphets_xlr_hom_var_mat_carrier_df = merged_comphets_xlr_hom_var_mat_carrier_df[merged_comphets_xlr_hom_var_mat_carrier_df.id.astype(str).str.contains('_fetal')]
 
 output_filename = f"{prefix}_{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
 if len(output_filename)>(os.pathconf('/', 'PC_NAME_MAX')-len('/cromwell_root/.')):  # if filename too long

@@ -123,6 +123,7 @@ workflow filterClinicalVariants {
         File clinvar_vcf_idx = runClinicalFiltering.clinvar_vcf_idx
         File omim_recessive_vcf = runClinicalFilteringOMIM.omim_recessive_vcf
         File omim_recessive_vcf_idx = runClinicalFilteringOMIM.omim_recessive_vcf_idx
+        File omim_recessive_tsv = runClinicalFilteringOMIM.omim_recessive_tsv  # NEW 1/17/2025
         File omim_dominant_tsv = runClinicalFilteringOMIM.omim_dominant
         File comphet_xlr_hom_var_mat_carrier_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv
     }
@@ -370,6 +371,7 @@ task runClinicalFilteringOMIM {
         File omim_recessive_vcf = prefix + '_OMIM_recessive.vcf.bgz'
         File omim_recessive_vcf_idx = prefix + '_OMIM_recessive.vcf.bgz.tbi'
         File omim_dominant = prefix + '_OMIM_dominant.tsv.gz'
+        File omim_recessive_tsv = prefix + '_OMIM_recessive.tsv.gz'  # NEW 1/17/2025
     }
 }
 

@@ -308,4 +308,5 @@ omim_dom = omim_dom.annotate_rows(variant_category='OMIM_dominant')
 hl.export_vcf(omim_rec_mt, prefix+'_OMIM_recessive.vcf.bgz', metadata=header, tabix=True)
 
 # export OMIM Dominant TSV
+# NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)
 omim_dom.entries().flatten().export(prefix+'_OMIM_dominant.tsv.gz', delimiter='\t')

@@ -55,6 +55,7 @@ workflow filterClinicalVariants {
         # merge TSVs
         RuntimeAttr? runtime_attr_merge_clinvar
         RuntimeAttr? runtime_attr_merge_omim_dom
+        RuntimeAttr? runtime_attr_merge_omim_rec
         RuntimeAttr? runtime_attr_merge_comphets
         RuntimeAttr? runtime_attr_merge_mat_carriers
         # merge VCFs
@@ -129,8 +130,17 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_merge_omim_dom
     }
 
+    call helpers.mergeResultsPython as mergeOMIMRecessive {
+        input:
+            tsvs=filterClinicalVariantsSingleNIFS.omim_recessive_tsv,
+            hail_docker=hail_docker,
+            input_size=size(filterClinicalVariantsSingleNIFS.omim_recessive_tsv, 'GB'),
+            merged_filename=cohort_prefix+'_OMIM_recessive.tsv.gz',
+            runtime_attr_override=runtime_attr_merge_omim_rec
+    }
+
     # mergeVCFSamples instead of mergeVCFs
-    call mergeVCFSamples.mergeVCFs as mergeOMIMRecessive {
+    call mergeVCFSamples.mergeVCFs as mergeOMIMRecessiveVCFs {
         input:  
             vcf_files=filterClinicalVariantsSingleNIFS.omim_recessive_vcf,
             sv_base_mini_docker=sv_base_mini_docker,
@@ -160,8 +170,9 @@ workflow filterClinicalVariants {
         File clinvar_tsv = mergeClinVar.merged_tsv
         File clinvar_vcf = mergeClinVarVCFs.merged_vcf_file
         File clinvar_vcf_idx = mergeClinVarVCFs.merged_vcf_idx
-        File omim_recessive_vcf = mergeOMIMRecessive.merged_vcf_file
-        File omim_recessive_vcf_idx = mergeOMIMRecessive.merged_vcf_idx
+        File omim_recessive_vcf = mergeOMIMRecessiveVCFs.merged_vcf_file
+        File omim_recessive_vcf_idx = mergeOMIMRecessiveVCFs.merged_vcf_idx
+        File omim_recessive_tsv = mergeOMIMRecessive.merged_tsv
         File omim_dominant_tsv = mergeOMIMDominant.merged_tsv
         File comphet_xlr_hom_var_mat_carrier_tsv = mergeCompHetsXLRHomVar.merged_tsv
     }

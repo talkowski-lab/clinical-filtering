@@ -316,4 +316,4 @@ omim_dom.filter_cols(omim_dom.proband.s.matches('_fetal')).entries().flatten().e
 
 # NEW 1/17/2025: export OMIM Recessive TSV (NIFS-specific)
 omim_rec = omim_rec_gene_phased_tm.annotate_rows(variant_category='OMIM_recessive')
-omim_rec.filter_cols(omim_rec.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_OMIM_dominant.tsv.gz', delimiter='\t')
+omim_rec.filter_cols(omim_rec.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_OMIM_recessive.tsv.gz', delimiter='\t')

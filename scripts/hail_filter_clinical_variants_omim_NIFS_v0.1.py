@@ -9,6 +9,9 @@
 - removed get_transmission function (irrelevant for NIFS)
 - commented out all_csqs and gnomad_popmax_af annotations because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
 - changed has_low_or_modifier_impact to is_moderate_or_high_impact inverse logic (should have the same result)
+1/17/2025: 
+- add omim_recessive_tsv output
+- only include fetal sample in output (mother_entry will be filled)
 '''
 ###
 
@@ -309,4 +312,8 @@ hl.export_vcf(omim_rec_mt, prefix+'_OMIM_recessive.vcf.bgz', metadata=header, ta
 
 # export OMIM Dominant TSV
 # NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)
-omim_dom.entries().flatten().export(prefix+'_OMIM_dominant.tsv.gz', delimiter='\t')
+omim_dom.filter_cols(omim_dom.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_OMIM_dominant.tsv.gz', delimiter='\t')
+
+# NEW 1/17/2025: export OMIM Recessive TSV (NIFS-specific)
+omim_rec = omim_rec_gene_phased_tm.annotate_rows(variant_category='OMIM_recessive')
+omim_rec.filter_cols(omim_rec.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_OMIM_dominant.tsv.gz', delimiter='\t')

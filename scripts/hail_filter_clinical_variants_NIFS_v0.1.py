@@ -9,6 +9,8 @@
 - removed get_transmission function (irrelevant for NIFS)
 - added mat_carrier_tsv output (gencc_omim_tm)
 - moved all_csqs and gnomad_popmax_af annotations to INFO field
+1/17/2025: 
+- only include fetal sample in output (mother_entry will be filled)
 '''
 ###
 
@@ -173,8 +175,9 @@ hl.export_vcf(mt, prefix+'_clinical.vcf.bgz', metadata=header)
 # export ClinVar VCF
 hl.export_vcf(clinvar_mt, prefix+'_clinvar_variants.vcf.bgz', metadata=header, tabix=True)
 
+# NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)
 # export ClinVar TSV
-clinvar_tm.entries().flatten().export(prefix+'_clinvar_variants.tsv.gz', delimiter='\t')
+clinvar_tm.filter_cols(clinvar_tm.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_clinvar_variants.tsv.gz', delimiter='\t')
 
 # export GenCC_OMIM TSV
-gencc_omim_tm.entries().flatten().export(prefix+'_mat_carrier_variants.tsv.gz', delimiter='\t')
+gencc_omim_tm.filter_cols(gencc_omim_tm.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_mat_carrier_variants.tsv.gz', delimiter='\t')

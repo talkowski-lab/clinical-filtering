@@ -11,6 +11,8 @@
 - moved all_csqs and gnomad_popmax_af annotations to INFO field
 1/17/2025: 
 - only include fetal sample in output (mother_entry will be filled)
+1/21/2025:
+- added CA_from_GT annotation to INFO
 '''
 ###
 
@@ -117,6 +119,35 @@ pedigree = hl.Pedigree.read(f"{prefix}.ped", delimiter='\t')
 
 tm = hl.trio_matrix(mt, pedigree, complete_trios=False)
 phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
+
+# NEW 1/21/2025: NIFS-specific
+# make new row-level annotation, similar to CA, but purely based on GT
+phased_tm = phased_tm.annotate_entries(CA_from_GT=hl.if_else(
+    (phased_tm.proband_entry.GT.is_het()) & (phased_tm.mother_entry.GT.is_hom_ref()), 0,
+    hl.if_else(
+        (phased_tm.proband_entry.GT.is_hom_ref()) & (phased_tm.mother_entry.GT.is_het()), 1,
+        hl.if_else(
+            (phased_tm.proband_entry.GT.is_het()) & (phased_tm.mother_entry.GT.is_het()), 2,
+            hl.if_else(
+                (phased_tm.proband_entry.GT.is_hom_var()) & (phased_tm.mother_entry.GT.is_het()), 3,
+                hl.if_else(
+                    (phased_tm.proband_entry.GT.is_het()) & (phased_tm.mother_entry.GT.is_hom_var()), 4,
+                    hl.or_missing(
+                        (phased_tm.proband_entry.GT.is_hom_var()) & (phased_tm.mother_entry.GT.is_hom_var()), 5
+                    )
+                )
+            )
+        )
+    ) 
+))
+phased_tm = phased_tm.annotate_rows(CA_from_GT_list=hl.array(hl.set(hl.agg.collect(phased_tm.CA_from_GT).filter(hl.is_defined))))  # CA_from_GT_list as intermediate field
+phased_tm = phased_tm.annotate_rows(info=phased_tm.info.annotate(
+    CA_from_GT=hl.or_missing(phased_tm.CA_from_GT_list.size()>0, phased_tm.CA_from_GT_list[0])))
+# annotate mt from phased_mt
+mt = mt.annotate_rows(info=phased_tm.rows()[mt.row_key].info)
+# add CA_from_GT to INFO in VCF header
+header['info']['CA_from_GT'] = {'Description': "Cluster assignment, CA, based on fetal/maternal GTs only.",
+    'Number': '1', 'Type': 'Int'}
 
 # Mendel errors
 all_errors, per_fam, per_sample, per_variant = hl.mendel_errors(mt['GT'], pedigree)

@@ -20,6 +20,8 @@
 1/17/2025: 
 - comment out filter_entries before aggregation
 - only include fetal sample in output (mother_entry will be filled)
+1/21/2025:
+- changed comphets to use CA_from_GT instead of CA
 '''
 ###
 
@@ -572,13 +574,15 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     gene_agg_phased_tm = (phased_tm.group_rows_by(phased_tm.gene)
         .aggregate_rows(locus_alleles = hl.agg.collect(phased_tm.row_key),
                        variant_type = hl.agg.collect_as_set(phased_tm.variant_type),  # SET
-                       variant_source = hl.agg.collect_as_set(phased_tm.variant_source)  # SET
+                       variant_source = hl.agg.collect_as_set(phased_tm.variant_source),  # SET
+                       CA_from_GT = hl.agg.collect(phased_tm.info.CA_from_GT) 
                        )  # NEW 1/14/2025: added variant_source
+                       # NEW 1/21/2025: added CA_from_GT
         .aggregate_entries(all_locus_alleles=hl.agg.collect(phased_tm.row_key),
                           proband_PBT_GT = hl.agg.collect(phased_tm.proband_entry.PBT_GT),
                           proband_GT = hl.agg.collect(phased_tm.proband_entry.GT),
-                          proband_CA = hl.agg.collect(phased_tm.proband_entry.CA))  # NEW FOR NIFS CLUSTER
-        ).result()
+                        #   proband_CA = hl.agg.collect(phased_tm.proband_entry.CA)  # NEW FOR NIFS CLUSTER, NEW 1/21/2025: commented out proband_CA
+        )).result()
     
     return phased_tm, gene_agg_phased_tm
 
@@ -613,8 +617,8 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
 
     # NIFS-specific: comphets must have at least one variant in cluster 0 (fetal 0/1, maternal 0/0) 
     # and one maternally-inherited variant (clusters 1-4)
-    in_cluster0 = (hl.set([0]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0)
-    in_maternally_inherited_cluster = (hl.set([1, 2, 3, 4]).intersection(hl.set(potential_comp_hets_non_trios.proband_CA)).size()>0)  
+    in_cluster0 = (hl.set([0]).intersection(hl.set(potential_comp_hets_non_trios.CA_from_GT)).size()>0)
+    in_maternally_inherited_cluster = (hl.set([1, 2, 3, 4]).intersection(hl.set(potential_comp_hets_non_trios.CA_from_GT)).size()>0)  
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(
         in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS     
     )
@@ -629,8 +633,9 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_GT),
                                                             proband_PBT_GT_set=hl.set(
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_PBT_GT),
-                                                            proband_CA=  # NEW FOR NIFS
-        potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_CA)
+        #                                                     proband_CA=  # NEW FOR NIFS, NEW 1/21/2025: commented out proband_CA
+        # potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_CA
+        )
     
     # NEW 1/14/2025: Annotate variant_type and variant_source as comma-separated strings of unique values (basically per gene)
     non_trio_phased_tm = non_trio_phased_tm.annotate_rows(variant_type=  
@@ -640,13 +645,13 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
     )  
 
     # Apply same NIFS-specific comphet filter on entries to non-gene-aggregated TM
-    in_cluster0 = (hl.set([0]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0)
-    in_maternally_inherited_cluster = (hl.set([1, 2, 3, 4]).intersection(hl.set(non_trio_phased_tm.proband_CA)).size()>0) 
+    in_cluster0 = (hl.set([0]).intersection(hl.set(non_trio_phased_tm.CA_from_GT)).size()>0)
+    in_maternally_inherited_cluster = (hl.set([1, 2, 3, 4]).intersection(hl.set(non_trio_phased_tm.CA_from_GT)).size()>0) 
     non_trio_phased_tm = non_trio_phased_tm.filter_entries((hl.set(non_trio_phased_tm.locus_alleles).size()>1) &
                                                     in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS     
                                                     )  
     # NEW 1/16/2025: filter out cluster 5 rows for comphets that were "coming along for the ride"
-    non_trio_phased_tm = non_trio_phased_tm.filter_rows(hl.array([0, 1, 2, 3, 4]).contains(non_trio_phased_tm.info.CA))
+    non_trio_phased_tm = non_trio_phased_tm.filter_rows(hl.array([0, 1, 2, 3, 4]).contains(non_trio_phased_tm.info.CA_from_GT))
 
     # Grab rows (variants) from non-gene-aggregated TM, of potential comphets from gene-aggregated TM
     phased_tm_comp_hets_non_trios = non_trio_phased_tm.semi_join_rows(potential_comp_hets_non_trios.rows()).key_rows_by(locus_expr, 'alleles')
@@ -732,9 +737,10 @@ gene_phased_tm = gene_phased_tm.annotate_cols(trio_status=hl.if_else(gene_phased
 
 # NEW 1/13/2025: maternal carrier variants
 # in carrier gene list and in cluster where mother is het (clusters 1-3)
+# NEW 1/21/2025: filter_rows using CA_from_GT
 carrier_genes = pd.read_csv(carrier_gene_list, sep='\t', header=None)[0].tolist()
-mat_carrier = gene_phased_tm.filter_entries((hl.array(carrier_genes).contains(gene_phased_tm.vep.transcript_consequences.SYMBOL)) &
-                           (hl.array([1, 2, 3]).contains(gene_phased_tm.proband_entry.CA))).key_rows_by(locus_expr, 'alleles').entries()
+mat_carrier = gene_phased_tm.filter_rows((hl.array(carrier_genes).contains(gene_phased_tm.vep.transcript_consequences.SYMBOL)) &
+                           (hl.array([1, 2, 3]).contains(gene_phased_tm.info.CA_from_GT))).key_rows_by(locus_expr, 'alleles').entries()
 
 # XLR only
 xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))   # OMIM XLR
@@ -754,7 +760,8 @@ merged_comphets = merged_comphets.annotate(variant_category='comphet')
 mat_carrier = mat_carrier.annotate(variant_category='maternal_carrier')
 
 # NEW 1/14/2025: use to_pandas() to bypass ClassTooLargeException in Hail tables union
-merged_comphets_df = merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set','proband_CA').flatten().to_pandas()
+# NEW 1/21/2025: replaced proband_CA with CA_from_GT
+merged_comphets_df = merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set','CA_from_GT').flatten().to_pandas()
 xlr_phased_df = xlr_phased.flatten().to_pandas()
 phased_hom_var_df = phased_hom_var.flatten().to_pandas()
 mat_carrier_df = mat_carrier.flatten().to_pandas()

@@ -638,10 +638,13 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
         )
     
     # NEW 1/14/2025: Annotate variant_type and variant_source as comma-separated strings of unique values (basically per gene)
+    # NEW 1/21/2025: Annotate CA_from_GT
     non_trio_phased_tm = non_trio_phased_tm.annotate_rows(variant_type=  
         hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_type))),
                                                         variant_source= 
-        hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_source)))
+        hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_source))),
+                                                        CA_from_GT=
+        potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].CA_from_GT
     )  
 
     # Apply same NIFS-specific comphet filter on entries to non-gene-aggregated TM

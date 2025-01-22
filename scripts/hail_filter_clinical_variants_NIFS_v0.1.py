@@ -143,6 +143,7 @@ phased_tm = phased_tm.annotate_entries(CA_from_GT=hl.if_else(
 phased_tm = phased_tm.annotate_rows(CA_from_GT_list=hl.array(hl.set(hl.agg.collect(phased_tm.CA_from_GT).filter(hl.is_defined))))  # CA_from_GT_list as intermediate field
 phased_tm = phased_tm.annotate_rows(info=phased_tm.info.annotate(
     CA_from_GT=hl.or_missing(phased_tm.CA_from_GT_list.size()>0, phased_tm.CA_from_GT_list[0])))
+phased_tm = phased_tm.drop('CA_from_GT_list')
 # annotate mt from phased_mt
 mt = mt.annotate_rows(info=phased_tm.rows()[mt.row_key].info)
 # add CA_from_GT to INFO in VCF header

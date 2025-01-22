@@ -22,6 +22,8 @@
 - only include fetal sample in output (mother_entry will be filled)
 1/21/2025:
 - changed comphets to use CA_from_GT instead of CA
+1/22/2025:
+- use export() and then load in pandas() instead of to_pandas() to match formatting with other outputs
 '''
 ###
 
@@ -764,10 +766,16 @@ mat_carrier = mat_carrier.annotate(variant_category='maternal_carrier')
 
 # NEW 1/14/2025: use to_pandas() to bypass ClassTooLargeException in Hail tables union
 # NEW 1/21/2025: replaced proband_CA with CA_from_GT
-merged_comphets_df = merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set','CA_from_GT').flatten().to_pandas()
-xlr_phased_df = xlr_phased.flatten().to_pandas()
-phased_hom_var_df = phased_hom_var.flatten().to_pandas()
-mat_carrier_df = mat_carrier.flatten().to_pandas()
+# NEW 1/22/2025: use export() and then load in pandas() instead of to_pandas() to match formatting with other outputs
+merged_comphets_df = merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set','CA_from_GT').flatten().export('comphets.tsv.gz')
+xlr_phased_df = xlr_phased.flatten().export('xlr.tsv.gz')
+phased_hom_var_df = phased_hom_var.flatten().export('hom_var.tsv.gz')
+mat_carrier_df = mat_carrier.flatten().export('mat_carrier.tsv.gz')
+
+merged_comphets_df = pd.read_csv('comphets.tsv.gz', sep='\t')
+xlr_phased_df = pd.read_csv('xlr.tsv.gz', sep='\t')
+phased_hom_var_df = pd.read_csv('hom_var.tsv.gz', sep='\t')
+mat_carrier_df = pd.read_csv('mat_carrier.tsv.gz', sep='\t')
 
 merged_comphets_xlr_hom_var_mat_carrier_df = pd.concat([merged_comphets_df, xlr_phased_df, phased_hom_var_df, mat_carrier_df])
 

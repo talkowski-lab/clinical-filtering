@@ -24,6 +24,7 @@
 - changed comphets to use CA_from_GT instead of CA
 1/22/2025:
 - use export() and then load in pandas instead of to_pandas() to match formatting with other outputs
+- filter by proband GT before aggregating rows (for CA_from_GT edge cases)
 '''
 ###
 
@@ -573,6 +574,8 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
 
     # NEW 1/14/2025: filter_entries before aggregation
     phased_tm = phased_tm.filter_entries(hl.is_defined(phased_tm.proband_entry.GT))
+    # NEW 1/21/2025: filter by proband GT before aggregating rows (for CA_from_GT edge cases)
+    phased_tm = phased_tm.filter_rows(hl.agg.count_where(hl.is_defined(phased_tm.proband_entry.GT))>0)
     gene_agg_phased_tm = (phased_tm.group_rows_by(phased_tm.gene)
         .aggregate_rows(locus_alleles = hl.agg.collect(phased_tm.row_key),
                        variant_type = hl.agg.collect_as_set(phased_tm.variant_type),  # SET

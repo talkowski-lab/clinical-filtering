@@ -1,20 +1,3 @@
-###
-# Finally forked from hail_filter_clinical_variants_omim_v0.1.py on 1/15/2025
-# to match other scripts.
-
-## CHANGE LOG:
-'''
-1/15/2025:
-- removed get_transmission function (irrelevant for NIFS)
-- commented out all_csqs and gnomad_popmax_af annotations because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
-- changed has_low_or_modifier_impact to is_moderate_or_high_impact inverse logic (should have the same result)
-1/17/2025: 
-- add omim_recessive_tsv output
-- only include fetal sample in output (mother_entry will be filled)
-1/27/2025:
-- filter by AD before outputting omim_recessive_tsv
-'''
-###
 
 from pyspark.sql import SparkSession
 import hail as hl
@@ -81,6 +64,14 @@ def filter_mt(mt):
         )
     return mt 
 
+def get_transmission(phased_tm):
+    phased_tm = phased_tm.annotate_entries(transmission=hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|0'), 'uninherited',
+            hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|1'), 'inherited_from_mother',
+                        hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|0'), 'inherited_from_father',
+                                hl.or_missing(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|1'), 'inherited_from_both'))))
+    )
+    return phased_tm
+
 mt = hl.import_vcf(vcf_file, reference_genome=build, find_replace=('null', ''), force_bgz=True, call_fields=[], array_elements_required=False)
 
 header = hl.get_vcf_metadata(vcf_file)
@@ -100,8 +91,7 @@ mt = mt.annotate_rows(vep=mt.vep.annotate(transcript_consequences=transcript_con
 mt = mt.annotate_rows(vep=mt.vep.select('transcript_consequences'))
 
 # NEW 1/9/2025: moved gnomad_popmax_af
-# NEW 1/15/2025: commented out because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
-# mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)))
+mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)))
 
 # Phasing
 tmp_ped = pd.read_csv(ped_uri, sep='\t').iloc[:,:6]
@@ -120,12 +110,11 @@ phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_k
 gene_phased_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
 
 # NEW 1/9/2025: moved gnomad_popmax_af to after exploding by transcript
-# NEW 1/15/2025: commented out because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
-# gnomad_fields = [x for x in list(gene_phased_tm.vep.transcript_consequences) if 'gnomAD' in x]
-# gene_phased_tm = gene_phased_tm.annotate_rows(
-#     gnomad_popmax_af=hl.max([hl.or_missing(gene_phased_tm.vep.transcript_consequences[gnomad_field]!='',
-#                                     hl.float(gene_phased_tm.vep.transcript_consequences[gnomad_field])) 
-#                              for gnomad_field in gnomad_fields]))
+gnomad_fields = [x for x in list(gene_phased_tm.vep.transcript_consequences) if 'gnomAD' in x]
+gene_phased_tm = gene_phased_tm.annotate_rows(
+    gnomad_popmax_af=hl.max([hl.or_missing(gene_phased_tm.vep.transcript_consequences[gnomad_field]!='',
+                                    hl.float(gene_phased_tm.vep.transcript_consequences[gnomad_field])) 
+                             for gnomad_field in gnomad_fields]))
 
 gene_phased_tm = filter_mt(gene_phased_tm)
 
@@ -155,18 +144,12 @@ has_splice_var = (hl.set(splice_vars).intersection(
 is_splice_var_only = (hl.set(splice_vars).intersection(
             hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()==
                 hl.set(gene_phased_tm.vep.transcript_consequences.Consequence).size())
+has_low_or_modifier_impact = (hl.array(['LOW','MODIFIER']).contains(gene_phased_tm.vep.transcript_consequences.IMPACT))
 
 fails_spliceAI_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.spliceAI_score=='', 1, 
                 hl.float(gene_phased_tm.vep.transcript_consequences.spliceAI_score))<spliceAI_threshold)
-
-# NEW 1/15/2025 changed has_low_or_modifier_impact to is_moderate_or_high_impact inverse logic
-# has_low_or_modifier_impact = (hl.array(['LOW','MODIFIER']).contains(gene_phased_tm.vep.transcript_consequences.IMPACT))
-# gene_phased_tm = gene_phased_tm.filter_rows((is_splice_var_only | 
-#                                              (has_splice_var & has_low_or_modifier_impact)) & fails_spliceAI_score, keep=False)
-
-is_moderate_or_high_impact = (hl.array(['HIGH','MODERATE']).contains(gene_phased_tm.vep.transcript_consequences.IMPACT))
 gene_phased_tm = gene_phased_tm.filter_rows((is_splice_var_only | 
-                                             (has_splice_var & ~is_moderate_or_high_impact)) & fails_spliceAI_score, keep=False)
+                                             (has_splice_var & has_low_or_modifier_impact)) & fails_spliceAI_score, keep=False)
 
 # Output 2: OMIM Recessive
 # Filter by gene list(s)
@@ -189,7 +172,7 @@ omim_rec_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_cod
 # OMIM XLR code
 omim_xlr_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))
 # gnomAD AF popmax filter
-passes_gnomad_af_rec = ((gene_phased_tm.info.gnomad_popmax_af<=gnomad_af_rec_threshold) | (hl.is_missing(gene_phased_tm.info.gnomad_popmax_af)))
+passes_gnomad_af_rec = ((gene_phased_tm.gnomad_popmax_af<=gnomad_af_rec_threshold) | (hl.is_missing(gene_phased_tm.gnomad_popmax_af)))
 # MPC filter
 passes_mpc_rec = ((gene_phased_tm.info.MPC>=mpc_rec_threshold) | (hl.is_missing(gene_phased_tm.info.MPC)))
 # AlphaMissense filter
@@ -254,7 +237,7 @@ omim_dom_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_cod
 # OMIM XLD code
 omim_xld_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('3'))
 # gnomAD AF popmax filter
-passes_gnomad_af_dom = ((gene_phased_tm.info.gnomad_popmax_af<=gnomad_af_dom_threshold) | (hl.is_missing(gene_phased_tm.info.gnomad_popmax_af)))
+passes_gnomad_af_dom = ((gene_phased_tm.gnomad_popmax_af<=gnomad_af_dom_threshold) | (hl.is_missing(gene_phased_tm.gnomad_popmax_af)))
 # MPC filter
 passes_mpc_dom = ((gene_phased_tm.info.MPC>=mpc_dom_threshold) | (hl.is_missing(gene_phased_tm.info.MPC)))
 # AlphaMissense filter
@@ -303,28 +286,15 @@ omim_dom = omim_dom.filter_entries((omim_dom.proband_entry.AD[1]>=ad_alt_thresho
                                    (omim_dom.father_entry.AD[1]>=ad_alt_threshold))
 
 # variant must be in at least 1 trio
-omim_dom = omim_dom.filter_rows(hl.agg.count_where((hl.is_defined(omim_dom.proband_entry.GT)) |
+omim_dom = omim_dom.filter_rows((hl.agg.count_where((hl.is_defined(omim_dom.proband_entry.GT)) |
                                                     (hl.is_defined(omim_dom.mother_entry.GT)) |
-                                                    (hl.is_defined(omim_dom.father_entry.GT)))>0)
+                                                    (hl.is_defined(omim_dom.father_entry.GT)))>0))
 omim_dom = omim_dom.annotate_rows(variant_category='OMIM_dominant')
 
-# NEW 1/17/2025: export OMIM Recessive TSV
-omim_rec = gene_phased_tm.semi_join_rows(omim_rec_mt.rows())
-
-# NEW 1/27/2025: filter by AD before outputting omim_recessive_tsv
-# filter by AD of alternate allele in trio
-omim_rec = omim_rec.filter_entries(omim_rec.proband_entry.AD[1]>=ad_alt_threshold)
-# variant must be in at least 1 trio
-omim_rec = omim_rec.filter_rows(hl.agg.count_where(hl.is_defined(omim_rec.proband_entry.GT))>0)
-omim_rec = omim_rec.annotate_rows(variant_category='OMIM_recessive')
+omim_dom = get_transmission(omim_dom)
 
 # export OMIM Recessive VCF
 hl.export_vcf(omim_rec_mt, prefix+'_OMIM_recessive.vcf.bgz', metadata=header, tabix=True)
 
 # export OMIM Dominant TSV
-# NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)
-omim_dom.filter_cols(omim_dom.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_OMIM_dominant.tsv.gz', delimiter='\t')
-
-# export OMIM Recessive TSV
-# NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)
-omim_rec.filter_cols(omim_rec.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_OMIM_recessive.tsv.gz', delimiter='\t')
+omim_dom.entries().flatten().export(prefix+'_OMIM_dominant.tsv.gz', delimiter='\t')

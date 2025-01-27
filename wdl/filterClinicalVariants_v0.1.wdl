@@ -137,8 +137,10 @@ workflow filterClinicalVariants {
         File clinvar_tsv = select_first([filterClinicalVariantsSNVIndel.clinvar_tsv, empty_file])
         File clinvar_vcf = select_first([filterClinicalVariantsSNVIndel.clinvar_vcf, empty_file])
         File clinvar_vcf_idx = select_first([filterClinicalVariantsSNVIndel.clinvar_vcf_idx, empty_file])
+        File mat_carrier_tsv = select_first([filterClinicalVariantsSNVIndel.mat_carrier_tsv, empty_file])
         File omim_recessive_vcf = select_first([filterClinicalVariantsSNVIndel.omim_recessive_vcf, empty_file])
         File omim_recessive_vcf_idx = select_first([filterClinicalVariantsSNVIndel.omim_recessive_vcf_idx, empty_file])
+        File omim_recessive_tsv = select_first([filterClinicalVariantsSNVIndel.omim_recessive_tsv, empty_file])
         File omim_dominant_tsv = select_first([filterClinicalVariantsSNVIndel.omim_dominant_tsv, empty_file])
 
         # SVs
@@ -147,6 +149,6 @@ workflow filterClinicalVariants {
         File sv_filtered_vcf_idx = select_first([filterClinicalVariantsSV.sv_filtered_vcf_idx, empty_file])
 
         # CompHets/XLR/HomVar
-        File comphet_xlr_hom_var_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_tsv
+        File comphet_xlr_hom_var_mat_carrier_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv
     }
 }

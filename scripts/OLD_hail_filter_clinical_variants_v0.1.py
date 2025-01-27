@@ -1,13 +1,10 @@
 ###
-# Copied over from hail_filter_clinical_variants_NIFS_v0.1.py on 1/27/2025
-# to incorporate updates made to NIFS pipeline
+# TODO: script description
 
 ## CHANGE LOG:
 '''
-1/27/2025:
-- removed all code related to CA (NIFS-specific)
-- edited gencc_omim_tm filtering to use mother_entry.GT instead of CA for mother het status
-- removed "# NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)" code logic for outputs (NIFS-specific)
+1/15/2025:
+- fixed bug where empty CLNSIG/CLNREVSTAT (not in ClinVar) gets filtered out
 '''
 ###
 
@@ -56,6 +53,14 @@ def filter_mt(mt, filter_csq=True, filter_impact=True):
             )
     return mt 
 
+def get_transmission(phased_tm):
+    phased_tm = phased_tm.annotate_entries(transmission=hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|0'), 'uninherited',
+            hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|1'), 'inherited_from_mother',
+                        hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|0'), 'inherited_from_father',
+                                hl.or_missing(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|1'), 'inherited_from_both'))))
+    )
+    return phased_tm
+
 hl.init(min_block_size=128, 
         spark_conf={"spark.executor.cores": cores, 
                     "spark.executor.memory": f"{int(np.floor(mem*0.4))}g",
@@ -86,18 +91,11 @@ transcript_consequences_strs = transcript_consequences.map(lambda x: hl.if_else(
 mt = mt.annotate_rows(vep=mt.vep.annotate(transcript_consequences=transcript_consequences_strs))
 mt = mt.annotate_rows(vep=mt.vep.select('transcript_consequences'))
 
-# NEW 1/15/2025: moved all_csqs and gnomad_popmax_af annotations to INFO field
 gnomad_fields = [x for x in list(mt.vep.transcript_consequences[0]) if 'gnomAD' in x]
-mt = mt.annotate_rows(info=mt.info.annotate(
-    all_csqs=hl.array(hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence))),  
-    gnomad_popmax_af=hl.max([hl.or_missing(hl.array(hl.set(mt.vep.transcript_consequences[gnomad_field]))[0]!='',
-        hl.float(hl.array(hl.set(mt.vep.transcript_consequences[gnomad_field]))[0])) 
-    for gnomad_field in gnomad_fields])))
-# add all_csqs and gnomad_popmax_af fields to INFO in VCF header
-header['info']['all_csqs'] = {'Description': "All unique consequences in vep.transcript_consequences.Consequence for each variant.",
-    'Number': '.', 'Type': 'String'}
-header['info']['gnomad_popmax_af'] = {'Description': "GnomAD Popmax AF taken across all fields in vep.transcript_consequences containing the string 'gnomAD'.",
-    'Number': '1', 'Type': 'Float'}
+mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)),  
+                             gnomad_popmax_af=hl.max([hl.or_missing(hl.array(hl.set(mt.vep.transcript_consequences[gnomad_field]))[0]!='',
+                                    hl.float(hl.array(hl.set(mt.vep.transcript_consequences[gnomad_field]))[0])) 
+                             for gnomad_field in gnomad_fields]))
 
 # Phasing
 tmp_ped = pd.read_csv(ped_uri, sep='\t').iloc[:,:6]
@@ -125,16 +123,8 @@ clinvar_tm = clinvar_tm.filter_entries((clinvar_tm.proband_entry.GT.is_non_ref()
                                    (clinvar_tm.father_entry.GT.is_non_ref()))
 clinvar_tm = clinvar_tm.annotate_rows(variant_category='ClinVar_P/LP')
 clinvar_tm = clinvar_tm.explode_rows(clinvar_tm.vep.transcript_consequences)
-clinvar_tm = filter_mt(clinvar_tm, filter_csq=False, filter_impact=False)  # filter to CANONICAL and/or MANE_PLUS_CLINICAL
-
-# NEW 1/15/2025: liberal set of maternal carrier variants
-# Output 2: grab all GenCC_OMIM variants
-gencc_omim_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
-# NEW 1/27/2025: grab anything in GenCC_OMIM gene list and het in mother
-gencc_omim_tm = gencc_omim_tm.filter_rows(gencc_omim_tm.vep.transcript_consequences.OMIM_inheritance_code!='')
-gencc_omim_tm = gencc_omim_tm.filter_entries(gencc_omim_tm.mother_entry.GT.is_het())
-gencc_omim_tm = gencc_omim_tm.annotate_rows(variant_category='GenCC_OMIM')
-gencc_omim_tm = filter_mt(gencc_omim_tm, filter_csq=False, filter_impact=False)  # filter to CANONICAL and/or MANE_PLUS_CLINICAL
+clinvar_tm = filter_mt(clinvar_tm, filter_csq=False, filter_impact=False)
+clinvar_tm = get_transmission(clinvar_tm)
 
 # filter out ClinVar benign
 # NEW 1/10/2025 filter out 2*+ benign only!
@@ -152,11 +142,11 @@ if (pass_filter):
 exclude_csqs = ['intergenic_variant', 'upstream_gene_variant', 'downstream_gene_variant',
                 'synonymous_variant', 'coding_sequence_variant', 'sequence_variant']
 
-mt = mt.filter_rows(hl.set(exclude_csqs).intersection(hl.set(mt.info.all_csqs)).size()!=mt.info.all_csqs.size())
+mt = mt.filter_rows(hl.set(exclude_csqs).intersection(mt.all_csqs).size()!=mt.all_csqs.size())
 
 # filter by cohort AF and gnomAD AF
 mt = mt.filter_rows(mt.info.cohort_AF<=af_threshold)
-mt = mt.filter_rows((mt.info.gnomad_popmax_af<=gnomad_af_threshold) | (hl.is_missing(mt.info.gnomad_popmax_af)))
+mt = mt.filter_rows((mt.gnomad_popmax_af<=gnomad_af_threshold) | (hl.is_missing(mt.gnomad_popmax_af)))
 
 # export intermediate VCF
 hl.export_vcf(mt, prefix+'_clinical.vcf.bgz', metadata=header)
@@ -166,6 +156,3 @@ hl.export_vcf(clinvar_mt, prefix+'_clinvar_variants.vcf.bgz', metadata=header, t
 
 # export ClinVar TSV
 clinvar_tm.entries().flatten().export(prefix+'_clinvar_variants.tsv.gz', delimiter='\t')
-
-# export GenCC_OMIM TSV
-gencc_omim_tm.entries().flatten().export(prefix+'_mat_carrier_variants.tsv.gz', delimiter='\t')

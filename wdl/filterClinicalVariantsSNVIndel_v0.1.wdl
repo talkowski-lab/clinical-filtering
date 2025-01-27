@@ -2,6 +2,7 @@ version 1.0
 
 import "mergeVCFs.wdl" as mergeVCFs
 import "helpers.wdl" as helpers
+import "filterClinicalVariantsTasks_v0.1.wdl" as filterClinicalVariants
 
 struct RuntimeAttr {
     Float? mem_gb
@@ -48,17 +49,21 @@ workflow filterClinicalVariants {
 
         Boolean sort_after_merge=false
 
-        RuntimeAttr? runtime_attr_override_filter
-        RuntimeAttr? runtime_attr_override_filter_omim
+        # merge TSVs
         RuntimeAttr? runtime_attr_merge_clinvar
-        RuntimeAttr? runtime_attr_merge_omim_rec_vcfs
-        RuntimeAttr? runtime_attr_merge_clinvar_vcfs
         RuntimeAttr? runtime_attr_merge_omim_dom
         RuntimeAttr? runtime_attr_merge_omim_rec
+        RuntimeAttr? runtime_attr_merge_mat_carriers
+        # merge VCFs
+        RuntimeAttr? runtime_attr_merge_omim_rec_vcfs
+        RuntimeAttr? runtime_attr_merge_clinvar_vcfs
+        # filtering steps
+        RuntimeAttr? runtime_attr_filter
+        RuntimeAttr? runtime_attr_filter_omim
     }
 
     scatter (vcf_file in annot_vcf_files) {
-        call runClinicalFiltering {
+        call filterClinicalVariants.runClinicalFiltering as runClinicalFiltering {
             input:
             vcf_file=vcf_file,
             ped_uri=ped_uri,
@@ -68,10 +73,10 @@ workflow filterClinicalVariants {
             gnomad_af_threshold=gnomad_af_threshold,
             genome_build=genome_build,
             pass_filter=pass_filter,
-            runtime_attr_override=runtime_attr_override_filter
+            runtime_attr_override=runtime_attr_filter
         }
 
-        call runClinicalFilteringOMIM {
+        call filterClinicalVariants.runClinicalFilteringOMIM as runClinicalFilteringOMIM {
             input:
             vcf_file=runClinicalFiltering.filtered_vcf,
             ped_uri=ped_uri,
@@ -91,7 +96,7 @@ workflow filterClinicalVariants {
             include_not_omim=include_not_omim,
             rec_gene_list_tsv=rec_gene_list_tsv,
             dom_gene_list_tsv=dom_gene_list_tsv,
-            runtime_attr_override=runtime_attr_override_filter_omim
+            runtime_attr_override=runtime_attr_filter_omim
         }
     }   
 
@@ -113,7 +118,25 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_merge_omim_dom
     }
 
-    call mergeVCFs.mergeVCFs as mergeOMIMRecessive {
+    call helpers.mergeResultsPython as mergeMaternalCarriers {
+        input:
+            tsvs=runClinicalFiltering.mat_carrier_tsv,
+            hail_docker=hail_docker,
+            input_size=size(runClinicalFiltering.mat_carrier_tsv, 'GB'),
+            merged_filename=cohort_prefix+'_mat_carrier_variants.tsv.gz',
+            runtime_attr_override=runtime_attr_merge_mat_carriers
+    }
+
+    call helpers.mergeResultsPython as mergeOMIMRecessive {
+        input:
+            tsvs=runClinicalFilteringOMIM.omim_recessive_tsv,
+            hail_docker=hail_docker,
+            input_size=size(runClinicalFilteringOMIM.omim_recessive_tsv, 'GB'),
+            merged_filename=cohort_prefix+'_OMIM_recessive.tsv.gz',
+            runtime_attr_override=runtime_attr_merge_omim_rec
+    }
+
+    call mergeVCFs.mergeVCFs as mergeOMIMRecessiveVCFs {
         input:  
             vcf_files=runClinicalFilteringOMIM.omim_recessive_vcf,
             sv_base_mini_docker=sv_base_mini_docker,
@@ -132,141 +155,13 @@ workflow filterClinicalVariants {
     }
 
     output {
+        File mat_carrier_tsv = mergeMaternalCarriers.merged_tsv
         File clinvar_tsv = mergeClinVar.merged_tsv
         File clinvar_vcf = mergeClinVarVCFs.merged_vcf_file
         File clinvar_vcf_idx = mergeClinVarVCFs.merged_vcf_idx
-        File omim_recessive_vcf = mergeOMIMRecessive.merged_vcf_file
-        File omim_recessive_vcf_idx = mergeOMIMRecessive.merged_vcf_idx
+        File omim_recessive_vcf = mergeOMIMRecessiveVCFs.merged_vcf_file
+        File omim_recessive_vcf_idx = mergeOMIMRecessiveVCFs.merged_vcf_idx
+        File omim_recessive_tsv = mergeOMIMRecessive.merged_tsv
         File omim_dominant_tsv = mergeOMIMDominant.merged_tsv
-    }
-}
-
-task runClinicalFiltering {
-    input {
-        File vcf_file
-        File ped_uri
-
-        String filter_clinical_variants_snv_indel_script
-        String hail_docker
-        String genome_build
-
-        Float af_threshold
-        Float gnomad_af_threshold
-        Boolean pass_filter
-
-        RuntimeAttr? runtime_attr_override
-    }
-    Float input_size = size(vcf_file, 'GB')
-    Float base_disk_gb = 10.0
-    Float input_disk_scale = 5.0
-
-    RuntimeAttr runtime_default = object {
-        mem_gb: 4,
-        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
-        cpu_cores: 1,
-        preemptible_tries: 3,
-        max_retries: 1,
-        boot_disk_gb: 10
-    }
-
-    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
-
-    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
-    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
-    
-    runtime {
-        memory: "~{memory} GB"
-        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
-        cpu: cpu_cores
-        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
-        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
-        docker: hail_docker
-        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
-    }
-
-    String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = basename(vcf_file, file_ext) + '_filtered'
-
-    command {
-        curl ~{filter_clinical_variants_snv_indel_script} > filter_vcf.py
-        python3 filter_vcf.py ~{vcf_file} ~{prefix} ~{cpu_cores} ~{memory} \
-            ~{ped_uri} ~{af_threshold} ~{gnomad_af_threshold} ~{genome_build} ~{pass_filter}
-    }
-
-    output {
-        File clinvar = prefix + '_clinvar_variants.tsv.gz'
-        File clinvar_vcf = prefix + '_clinvar_variants.vcf.bgz'
-        File filtered_vcf = prefix + '_clinical.vcf.bgz'
-    }
-}
-
-task runClinicalFilteringOMIM {
-    input {
-        File vcf_file
-        File ped_uri
-
-        String filter_clinical_variants_snv_indel_omim_script
-        String hail_docker
-        String genome_build
-        
-        Int ad_alt_threshold  
-        Float spliceAI_threshold   
-        Float am_rec_threshold
-        Float am_dom_threshold
-        Float mpc_rec_threshold
-        Float mpc_dom_threshold
-        Float gnomad_af_rec_threshold
-        Float gnomad_af_dom_threshold
-        Float loeuf_v2_threshold
-        Float loeuf_v4_threshold
-
-        Boolean include_not_omim
-        String rec_gene_list_tsv
-        String dom_gene_list_tsv
-
-        RuntimeAttr? runtime_attr_override
-    }
-    Float input_size = size(vcf_file, 'GB')
-    Float base_disk_gb = 10.0
-    Float input_disk_scale = 5.0
-
-    RuntimeAttr runtime_default = object {
-        mem_gb: 4,
-        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
-        cpu_cores: 1,
-        preemptible_tries: 3,
-        max_retries: 1,
-        boot_disk_gb: 10
-    }
-
-    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
-
-    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
-    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
-    
-    runtime {
-        memory: "~{memory} GB"
-        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
-        cpu: cpu_cores
-        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
-        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
-        docker: hail_docker
-        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
-    }
-
-    String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = basename(vcf_file, file_ext) + '_filtered'
-
-    command {
-        curl ~{filter_clinical_variants_snv_indel_omim_script} > filter_vcf.py
-        python3 filter_vcf.py ~{vcf_file} ~{prefix} ~{cpu_cores} ~{memory} ~{ped_uri} \
-            ~{am_rec_threshold} ~{am_dom_threshold} ~{mpc_rec_threshold} ~{mpc_dom_threshold} \
-            ~{gnomad_af_rec_threshold} ~{gnomad_af_dom_threshold} ~{loeuf_v2_threshold} ~{loeuf_v4_threshold} \
-            ~{genome_build} ~{ad_alt_threshold} ~{include_not_omim} ~{spliceAI_threshold} ~{rec_gene_list_tsv} ~{dom_gene_list_tsv}
-    }
-
-    output {
-        File omim_recessive_vcf = prefix + '_OMIM_recessive.vcf.bgz'
-        File omim_dominant = prefix + '_OMIM_dominant.tsv.gz'
     }
 }

@@ -118,15 +118,15 @@ workflow filterClinicalCompHets {
     String variant_types = if sv_filtered_vcf!='NA' then variant_types_ else 'SNV_Indel'
     call helpers.mergeResultsPython as mergeCompHetsXLRHomVar {
         input:
-            tsvs=filterCompHetsXLRHomVar.comphet_xlr_hom_var_tsv,
+            tsvs=filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv,
             hail_docker=hail_docker,
-            input_size=size(filterCompHetsXLRHomVar.comphet_xlr_hom_var_tsv, 'GB'),
-            merged_filename="~{cohort_prefix}_~{variant_types}_comp_hets_xlr_hom_var.tsv.gz",
+            input_size=size(filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv, 'GB'),
+            merged_filename="~{cohort_prefix}_~{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz",
             runtime_attr_override=runtime_attr_merge_results
     }
 
     output {
-        File comphet_xlr_hom_var_tsv = mergeCompHetsXLRHomVar.merged_tsv
+        File comphet_xlr_hom_var_mat_carrier_tsv = mergeCompHetsXLRHomVar.merged_tsv
     }
 }
 
@@ -276,6 +276,6 @@ task filterCompHetsXLRHomVar {
     }
 
     output {
-        File comphet_xlr_hom_var_tsv = glob('*_comp_hets_xlr_hom_var.tsv.gz')[0]
+        File comphet_xlr_hom_var_mat_carrier_tsv = glob('*_comp_hets_xlr_hom_var_mat_carrier.tsv.gz')[0]
     }
 }

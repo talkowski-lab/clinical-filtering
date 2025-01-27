@@ -1,33 +1,3 @@
-###
-# Finally forked from hail_filter_comphets_xlr_hom_var_v0.1.py on 1/13/2025
-# to include maternal carrier variants in output and use cluster info 
-# (CA in FORMAT field) for comphets. 
-# SVs ignored for NIFS for now.
-
-## CHANGE LOG:
-'''
-1/14/2025:
-- added variant_source column
-- added workaround for empty CA field (usually cluster 5)
-- removed get_transmission function (irrelevant for NIFS)
-- moved non-PAR annotations up
-- changed export() to to_pandas() to bypass ClassTooLargeException in Hail tables union
-1/15/2025:
-- changed comphets maternally-inherited clusters from clusters 2-5 to 1-4 (cluster 5 workaround no longer necessary)
-- commented out all_csqs and gnomad_popmax_af annotations because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
-1/16/2025:
-- filter out cluster 5 rows for comphets that were "coming along for the ride"
-1/17/2025: 
-- comment out filter_entries before aggregation because filters out CA=1 (NIFS-specific)
-- only include fetal sample in output (mother_entry will be filled)
-1/21/2025:
-- changed comphets to use CA_from_GT instead of CA
-1/22/2025:
-- use export() and then load in pandas instead of to_pandas() to match formatting with other outputs
-- filter by proband GT before aggregating rows (for CA_from_GT edge cases)
-'''
-###
-
 from pyspark.sql import SparkSession
 import hail as hl
 import numpy as np
@@ -58,7 +28,6 @@ cores = sys.argv[9]  # string
 mem = int(np.floor(float(sys.argv[10])))
 ad_alt_threshold = int(sys.argv[11])
 rec_gene_list_tsv = sys.argv[12]
-carrier_gene_list = sys.argv[13]
 
 hl.init(min_block_size=128, 
         local=f"local[*]", 
@@ -73,7 +42,7 @@ def filter_mt(mt):
     '''
     mt: can be trio matrix (tm) or matrix table (mt) but must be transcript-level, not variant-level
     '''
-    # filter by Consequence —— exclude rows where Consequence contains only terms in this list
+    # filter by Consequence
     exclude_csqs = ['intergenic_variant', 'upstream_gene_variant', 'downstream_gene_variant',
                     'synonymous_variant', 'coding_sequence_variant', 'sequence_variant']
     mt = mt.filter_rows(hl.set(exclude_csqs).intersection(
@@ -83,7 +52,7 @@ def filter_mt(mt):
     mt = mt.filter_rows((mt.vep.transcript_consequences.CANONICAL=='YES') | 
                         (mt.vep.transcript_consequences.MANE_PLUS_CLINICAL!=''))
 
-    # filter by HIGH/MODERATE Impact OR Consequence contains at least one splice/noncoding consequence
+    # filter by Impact and splice/noncoding consequence
     splice_vars = ['splice_donor_5th_base_variant', 'splice_region_variant', 'splice_donor_region_variant']
     keep_vars = ['non_coding_transcript_exon_variant']
     mt = mt.filter_rows(
@@ -109,8 +78,8 @@ def load_split_vep_consequences(vcf_uri):
 
     mt = mt.annotate_rows(vep=mt.vep.annotate(transcript_consequences=transcript_consequences_strs))
     mt = mt.annotate_rows(vep=mt.vep.select('transcript_consequences'))
-    # NEW 1/15/2025: commented out because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
-    # mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)))
+    # NEW 1/9/2025: annotate all_csqs
+    mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)))
     return mt
 
 ## STEP 1: Merge SNV/Indel VCF with SV VCF (or just one of them)
@@ -122,28 +91,21 @@ if snv_indel_vcf!='NA':
     # Load and merge SNV/Indel ClinVar P/LP VCF
     if clinvar_vcf!='NA':
         clinvar_mt = load_split_vep_consequences(clinvar_vcf) 
-        # NEW 1/14/2025: added variant_source —— ClinVar_P/LP or OMIM_recessive or both
-        snv_mt_no_clinvar = snv_mt
         snv_mt = snv_mt.union_rows(clinvar_mt).distinct_by_row()
-        snv_mt = snv_mt.annotate_rows(variant_source=hl.if_else(hl.is_defined(clinvar_mt.rows()[snv_mt.row_key]),  # if in ClinVar
-                                                 hl.if_else(hl.is_defined(snv_mt_no_clinvar.rows()[snv_mt.row_key]), 'ClinVar_P/LP_OMIM_recessive',  # if also in omim_recessive_vcf
-                                                            'ClinVar_P/LP'), 'OMIM_recessive'))
 
-    # Explode rows by transcript
+    # filter SNV/Indel MT
     snv_mt = snv_mt.explode_rows(snv_mt.vep.transcript_consequences)
 
     # NEW 1/9/2025: annotate gnomad_popmax_af after exploding by transcript
-    # NEW 1/15/2025: commented out because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
-    # gnomad_fields = [x for x in list(snv_mt.vep.transcript_consequences) if 'gnomAD' in x]
-    # snv_mt = snv_mt.annotate_rows(
-    #     gnomad_popmax_af=hl.max([hl.or_missing(snv_mt.vep.transcript_consequences[gnomad_field]!='',
-    #                                     hl.float(snv_mt.vep.transcript_consequences[gnomad_field])) 
-    #                             for gnomad_field in gnomad_fields]))
-    
-    # Filter SNV/Indel MT
+    gnomad_fields = [x for x in list(snv_mt.vep.transcript_consequences) if 'gnomAD' in x]
+    snv_mt = snv_mt.annotate_rows(
+        gnomad_popmax_af=hl.max([hl.or_missing(snv_mt.vep.transcript_consequences[gnomad_field]!='',
+                                        hl.float(snv_mt.vep.transcript_consequences[gnomad_field])) 
+                                for gnomad_field in gnomad_fields]))
+
     snv_mt = filter_mt(snv_mt)
 
-    # Filter out empty gene fields
+    # filter out empty gene fields
     snv_mt = snv_mt.annotate_rows(gene=snv_mt['vep']['transcript_consequences']['SYMBOL'])
     snv_mt = snv_mt.filter_rows(snv_mt.gene!='')
 
@@ -169,7 +131,7 @@ if sv_vcf!='NA':
     # filter out BNDs
     sv_mt = sv_mt.filter_rows(sv_mt.info.SVTYPE!='BND') 
 
-    # Annotate genes —— ignore genes for CPX SVs
+    # ignore genes for CPX SVs
     sv_mt = sv_mt.annotate_rows(gene=hl.or_missing(sv_mt.info.SVTYPE!='CPX', 
                                                    hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in sv_gene_fields])))))
     sv_mt = sv_mt.annotate_rows(variant_type='SV')
@@ -184,7 +146,7 @@ if sv_vcf!='NA':
 
     sv_mt = sv_mt.annotate_rows(gene_source=get_predicted_sources_expr(sv_mt, sv_gene_fields))
 
-    # Make "fake" VEP annotations for SV MT formatting
+    # VEP
     if (snv_indel_vcf!='NA'):
         snv_vep_fields = {field: str(snv_mt.vep.transcript_consequences[field].dtype) for field in list(snv_mt.row.vep.transcript_consequences)}
     else:
@@ -219,7 +181,6 @@ if sv_vcf!='NA':
         in_gene_list = (sv_mt.gene_lists.size()>0)
         sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code | in_gene_list)
 
-# Unify SNV/Indel MT and SV MT INFO (row) and entry fields
 if (snv_indel_vcf!='NA') and (sv_vcf!='NA'):
     sv_info_fields, sv_entry_fields = list(sv_mt.row.info), list(sv_mt.entry)
     snv_info_fields, snv_entry_fields = list(snv_mt.row.info), list(snv_mt.entry)
@@ -253,7 +214,6 @@ if (snv_indel_vcf!='NA') and (sv_vcf!='NA'):
     if len(shared_samps)==0:
         shared_samps = ['']
 
-    # Match column order before merging
     def align_mt2_cols_to_mt1(mt1, mt2):
         mt1 = mt1.add_col_index()
         mt2 = mt2.add_col_index()
@@ -274,7 +234,7 @@ elif sv_vcf!='NA':
     variant_types = 'SV'
     merged_mt = sv_mt
 
-# Clean up merged SV VCF with SNV/Indel VCF
+# Merge SV VCF with SNV/Indel VCF
 if sv_vcf!='NA':
     # Change locus to locus_interval to include END for SVs
     merged_mt = merged_mt.annotate_rows(end=hl.if_else(hl.is_defined(merged_mt.info.END2), merged_mt.info.END2, merged_mt.info.END))
@@ -287,9 +247,6 @@ if sv_vcf!='NA':
                                                                               start=merged_mt.locus.position,
                                                                               end=merged_mt.end, reference_genome=build))
     merged_mt = merged_mt.key_rows_by(locus_expr, 'alleles')
-
-# NEW 1/14/2025: Annotate PAR status (moved up from end of script)
-merged_mt = merged_mt.annotate_rows(in_non_par=~(merged_mt.locus.in_autosome_or_par()))
 
 ## EDITED HAIL FUNCTIONS
 # EDITED: don't check locus struct
@@ -564,30 +521,19 @@ def get_mendel_errors(mt, phased_tm, pedigree):
 
 def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     # filter out calls that are hom ref in proband
-    # NEw 1/17/2025: comment out filter_entries before aggregation because filters out CA=1 (NIFS-specific)
-    # tm = tm.filter_entries(tm.proband_entry.GT.is_non_ref())
+    tm = tm.filter_entries(tm.proband_entry.GT.is_non_ref())
 
     phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
     phased_tm = get_mendel_errors(mt, phased_tm, pedigree)
     phased_tm = phased_tm.key_rows_by(locus_expr,'alleles','gene')
 
-    # NEW 1/14/2025: filter_entries before aggregation
-    phased_tm = phased_tm.filter_entries(hl.is_defined(phased_tm.proband_entry.GT))
-    # NEW 1/21/2025: filter by proband GT before aggregating rows (for CA_from_GT edge cases)
-    phased_tm = phased_tm.filter_rows(hl.agg.count_where(hl.is_defined(phased_tm.proband_entry.GT))>0)
     gene_agg_phased_tm = (phased_tm.group_rows_by(phased_tm.gene)
         .aggregate_rows(locus_alleles = hl.agg.collect(phased_tm.row_key),
-                       variant_type = hl.agg.collect_as_set(phased_tm.variant_type),  # SET
-                       variant_source = hl.agg.collect_as_set(phased_tm.variant_source),  # SET
-                       CA_from_GT = hl.agg.collect(phased_tm.info.CA_from_GT) 
-                       )  # NEW 1/14/2025: added variant_source
-                       # NEW 1/21/2025: added CA_from_GT
-        .aggregate_entries(all_locus_alleles=hl.agg.collect(phased_tm.row_key),
-                          proband_PBT_GT = hl.agg.collect(phased_tm.proband_entry.PBT_GT),
-                          proband_GT = hl.agg.collect(phased_tm.proband_entry.GT),
-                        #   proband_CA = hl.agg.collect(phased_tm.proband_entry.CA)  # NEW FOR NIFS CLUSTER, NEW 1/21/2025: commented out proband_CA
-        )).result()
-    
+                       variant_type = hl.agg.collect(phased_tm.variant_type))
+        .aggregate_entries(all_locus_alleles=hl.agg.filter(hl.is_defined(phased_tm.proband_entry.GT),  # EDITED
+                                                       hl.agg.collect(phased_tm.row_key)),
+                          proband_PBT_GT = hl.agg.collect(phased_tm.proband_entry.PBT_GT).filter(hl.is_defined),
+                          proband_GT = hl.agg.collect(phased_tm.proband_entry.GT).filter(hl.is_defined))).result()
     return phased_tm, gene_agg_phased_tm
 
 def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
@@ -604,67 +550,34 @@ def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
         subset_tm = subset_tm.filter_entries(subset_tm.proband_entry.AD[1]>=ad_alt_threshold)
     return subset_mt, subset_tm
 
-def get_non_trio_comphets(mt):  # EDITED FOR NIFS
+def get_non_trio_comphets(mt):
     non_trio_mt, non_trio_tm = get_subset_tm(mt, non_trio_samples, non_trio_pedigree)
     non_trio_phased_tm, non_trio_gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(non_trio_tm, non_trio_mt, non_trio_pedigree)
 
-    # Filter to genes where at least one sample has multiple variants
+    # different criteria for non-trios
     potential_comp_hets_non_trios = non_trio_gene_agg_phased_tm.filter_rows(
             hl.agg.count_where(non_trio_gene_agg_phased_tm.proband_GT.size()>1)>0
     )
-    # Explode by variant (locus_expr, alleles) --> key by locus_expr, alleles, gene
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.explode_rows(potential_comp_hets_non_trios.locus_alleles)
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.key_rows_by(potential_comp_hets_non_trios.locus_alleles[locus_expr], potential_comp_hets_non_trios.locus_alleles.alleles, 'gene')
 
-    # Filter to variants that hit genes with multiple variants
     potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(potential_comp_hets_non_trios.proband_GT.size()>1)
-
-    # NIFS-specific: comphets must have at least one variant in cluster 0 (fetal 0/1, maternal 0/0) 
-    # and one maternally-inherited variant (clusters 1-4)
-    in_cluster0 = (hl.set([0]).intersection(hl.set(potential_comp_hets_non_trios.CA_from_GT)).size()>0)
-    in_maternally_inherited_cluster = (hl.set([1, 2, 3, 4]).intersection(hl.set(potential_comp_hets_non_trios.CA_from_GT)).size()>0)  
-    potential_comp_hets_non_trios = potential_comp_hets_non_trios.filter_entries(
-        in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS     
-    )
-
-    # Annotate non-gene-aggregated TM using potential comphets from gene-aggregated TM 
+    
     non_trio_phased_tm = non_trio_phased_tm.key_rows_by(locus_expr, 'alleles', 'gene')
     non_trio_phased_tm = non_trio_phased_tm.annotate_entries(locus_alleles=  # EDITED
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].all_locus_alleles,
-                                                            proband_GT=
+                                                                      proband_GT=
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_GT,
-                                                            proband_GT_set=hl.set(
+                                                                      proband_GT_set=hl.set(
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_GT),
-                                                            proband_PBT_GT_set=hl.set(
-        potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_PBT_GT),
-        #                                                     proband_CA=  # NEW FOR NIFS, NEW 1/21/2025: commented out proband_CA
-        # potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_CA
-        )
-    
-    # NEW 1/14/2025: Annotate variant_type and variant_source as comma-separated strings of unique values (basically per gene)
-    # NEW 1/21/2025: Annotate CA_from_GT
-    non_trio_phased_tm = non_trio_phased_tm.annotate_rows(variant_type=  
-        hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_type))),
-                                                        variant_source= 
-        hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_source))),
-                                                        CA_from_GT=
-        potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].CA_from_GT
-    )  
-
-    # Apply same NIFS-specific comphet filter on entries to non-gene-aggregated TM
-    in_cluster0 = (hl.set([0]).intersection(hl.set(non_trio_phased_tm.CA_from_GT)).size()>0)
-    in_maternally_inherited_cluster = (hl.set([1, 2, 3, 4]).intersection(hl.set(non_trio_phased_tm.CA_from_GT)).size()>0) 
+                                                                      proband_PBT_GT_set=hl.set(
+        potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_PBT_GT))
     non_trio_phased_tm = non_trio_phased_tm.filter_entries((hl.set(non_trio_phased_tm.locus_alleles).size()>1) &
-                                                    in_cluster0 & in_maternally_inherited_cluster  # NEW FOR NIFS     
-                                                    )  
-    # NEW 1/16/2025: filter out cluster 5 rows for comphets that were "coming along for the ride"
-    non_trio_phased_tm = non_trio_phased_tm.filter_rows(hl.array([0, 1, 2, 3, 4]).contains(non_trio_phased_tm.info.CA_from_GT))
-
-    # Grab rows (variants) from non-gene-aggregated TM, of potential comphets from gene-aggregated TM
+                                                                     (non_trio_phased_tm.proband_GT.size()>1))  # EDITED
     phased_tm_comp_hets_non_trios = non_trio_phased_tm.semi_join_rows(potential_comp_hets_non_trios.rows()).key_rows_by(locus_expr, 'alleles')
-    return phased_tm_comp_hets_non_trios.drop('locus_alleles')
+    return phased_tm_comp_hets_non_trios.drop('locus_alleles')  # EDITED
 
-def get_trio_comphets(mt):  # IRRELEVANT FOR NIFS —— IGNORE
+def get_trio_comphets(mt):
     trio_mt, trio_tm = get_subset_tm(mt, trio_samples, trio_pedigree, keep=True, complete_trios=True)
     trio_phased_tm, trio_gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(trio_tm, trio_mt, trio_pedigree)
 
@@ -688,6 +601,14 @@ def get_trio_comphets(mt):  # IRRELEVANT FOR NIFS —— IGNORE
     trio_phased_tm = trio_phased_tm.filter_entries(trio_phased_tm.proband_PBT_GT_set.size()>1)  
     phased_tm_comp_hets_trios = trio_phased_tm.semi_join_rows(potential_comp_hets_trios.rows()).key_rows_by(locus_expr, 'alleles')
     return phased_tm_comp_hets_trios
+
+def get_transmission(phased_tm_ht):
+    phased_tm_ht = phased_tm_ht.annotate(transmission=hl.if_else(phased_tm_ht.proband_entry.PBT_GT==hl.parse_call('0|0'), 'uninherited',
+            hl.if_else(phased_tm_ht.proband_entry.PBT_GT==hl.parse_call('0|1'), 'inherited_from_mother',
+                        hl.if_else(phased_tm_ht.proband_entry.PBT_GT==hl.parse_call('1|0'), 'inherited_from_father',
+                                hl.or_missing(phased_tm_ht.proband_entry.PBT_GT==hl.parse_call('1|1'), 'inherited_from_both'))))
+    )
+    return phased_tm_ht
 
 # Subset pedigree to samples in VCF, edit parental IDs
 vcf_samples = merged_mt.s.collect()
@@ -742,13 +663,6 @@ gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(mer
 gene_phased_tm = gene_phased_tm.annotate_cols(trio_status=hl.if_else(gene_phased_tm.fam_id=='-9', 'not_in_pedigree', 
                                                    hl.if_else(hl.array(trio_samples).contains(gene_phased_tm.id), 'trio', 'non_trio')))
 
-# NEW 1/13/2025: maternal carrier variants
-# in carrier gene list and in cluster where mother is het (clusters 1-3)
-# NEW 1/21/2025: filter_rows using CA_from_GT
-carrier_genes = pd.read_csv(carrier_gene_list, sep='\t', header=None)[0].tolist()
-mat_carrier = gene_phased_tm.filter_rows((hl.array(carrier_genes).contains(gene_phased_tm.vep.transcript_consequences.SYMBOL)) &
-                           (hl.array([1, 2, 3]).contains(gene_phased_tm.info.CA_from_GT))).key_rows_by(locus_expr, 'alleles').entries()
-
 # XLR only
 xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))   # OMIM XLR
 xlr_phased = xlr_phased_tm.filter_entries((xlr_phased_tm.proband_entry.GT.is_non_ref()) &
@@ -764,28 +678,15 @@ phased_hom_var = phased_hom_var.filter_rows(hl.agg.count_where(
 xlr_phased = xlr_phased.annotate(variant_category='XLR')
 phased_hom_var = phased_hom_var.annotate(variant_category='hom_var')
 merged_comphets = merged_comphets.annotate(variant_category='comphet')
-mat_carrier = mat_carrier.annotate(variant_category='maternal_carrier')
 
-# NEW 1/14/2025: use to_pandas() to bypass ClassTooLargeException in Hail tables union
-# NEW 1/21/2025: replaced proband_CA with CA_from_GT
-# NEW 1/22/2025: use export() and then load in pandas instead of to_pandas() to match formatting with other outputs
-merged_comphets_df = merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set','CA_from_GT').flatten().export('comphets.tsv.gz')
-xlr_phased_df = xlr_phased.flatten().export('xlr.tsv.gz')
-phased_hom_var_df = phased_hom_var.flatten().export('hom_var.tsv.gz')
-mat_carrier_df = mat_carrier.flatten().export('mat_carrier.tsv.gz')
+merged_comphets_xlr_hom_var = merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set').union(xlr_phased).union(phased_hom_var)
 
-merged_comphets_df = pd.read_csv('comphets.tsv.gz', sep='\t')
-xlr_phased_df = pd.read_csv('xlr.tsv.gz', sep='\t')
-phased_hom_var_df = pd.read_csv('hom_var.tsv.gz', sep='\t')
-mat_carrier_df = pd.read_csv('mat_carrier.tsv.gz', sep='\t')
+# Annotate PAR status
+merged_comphets_xlr_hom_var = merged_comphets_xlr_hom_var.annotate(in_non_par=~(merged_comphets_xlr_hom_var.locus.in_autosome_or_par()))
+merged_comphets_xlr_hom_var = get_transmission(merged_comphets_xlr_hom_var)
 
-merged_comphets_xlr_hom_var_mat_carrier_df = pd.concat([merged_comphets_df, xlr_phased_df, phased_hom_var_df, mat_carrier_df])
+output_filename = f"{prefix}_{variant_types}_comp_hets_xlr_hom_var.tsv.gz"
+if len(output_filename)>(os.pathconf('/', 'PC_NAME_MAX')-len('/cromwell_root/.')):  # filename too long
+    output_filename = f"{variant_types}_comp_hets_xlr_hom_var.tsv.gz"
 
-# NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)
-merged_comphets_xlr_hom_var_mat_carrier_df = merged_comphets_xlr_hom_var_mat_carrier_df[merged_comphets_xlr_hom_var_mat_carrier_df.id.astype(str).str.contains('_fetal')]
-
-output_filename = f"{prefix}_{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
-if len(output_filename)>(os.pathconf('/', 'PC_NAME_MAX')-len('/cromwell_root/.')):  # if filename too long
-    output_filename = f"{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
-
-merged_comphets_xlr_hom_var_mat_carrier_df.to_csv(output_filename, sep='\t', index=False)
+merged_comphets_xlr_hom_var.flatten().export(output_filename)

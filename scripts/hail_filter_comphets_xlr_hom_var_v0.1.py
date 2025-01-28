@@ -11,6 +11,9 @@
 - edited mat_carrier filtering to use mother_entry.GT instead of CA for mother het status
 1/28/2025:
 - allow for missing proband_entry.AD (e.g. for SVs)
+- remove OMIM_MIM_number as SNV/Indel annotation
+- variant_source annotation if not including ClinVar
+- dummy variant_source annotation for SVs (TODO: edit with OMIM/ClinVar equivalent after updating SVs!)
 '''
 ###
 
@@ -114,6 +117,9 @@ if snv_indel_vcf!='NA':
         snv_mt = snv_mt.annotate_rows(variant_source=hl.if_else(hl.is_defined(clinvar_mt.rows()[snv_mt.row_key]),  # if in ClinVar
                                                  hl.if_else(hl.is_defined(snv_mt_no_clinvar.rows()[snv_mt.row_key]), 'ClinVar_P/LP_OMIM_recessive',  # if also in omim_recessive_vcf
                                                             'ClinVar_P/LP'), 'OMIM_recessive'))
+    # NEW 1/28/2025: variant_source annotation if not including ClinVar
+    else:
+        snv_mt = snv_mt.annotate_rows(variant_source='OMIM_recessive')
 
     # Explode rows by transcript
     snv_mt = snv_mt.explode_rows(snv_mt.vep.transcript_consequences)
@@ -162,6 +168,9 @@ if sv_vcf!='NA':
 
     sv_mt = sv_mt.explode_rows(sv_mt.gene)
 
+    # NEW 1/28/2025: dummy variant_source annotation for SVs
+    sv_mt = sv_mt.annotate_rows(variant_source='SV')
+
     # get gene source
     def get_predicted_sources_expr(row_expr, sv_gene_fields):
         return hl.array(
@@ -171,10 +180,12 @@ if sv_vcf!='NA':
     sv_mt = sv_mt.annotate_rows(gene_source=get_predicted_sources_expr(sv_mt, sv_gene_fields))
 
     # Make "fake" VEP annotations for SV MT formatting
+    # NEW 1/28/2025: remove OMIM_MIM_number as SNV/Indel annotation
     if (snv_indel_vcf!='NA'):
         snv_vep_fields = {field: str(snv_mt.vep.transcript_consequences[field].dtype) for field in list(snv_mt.row.vep.transcript_consequences)}
     else:
-        snv_vep_fields = {'OMIM_MIM_number': 'array<str>', 'OMIM_inheritance_code': 'str'}
+        # snv_vep_fields = {'OMIM_MIM_number': 'array<str>', 'OMIM_inheritance_code': 'str'}
+        snv_vep_fields = {'OMIM_inheritance_code': 'str'}
     sv_mt = sv_mt.annotate_rows(vep=hl.struct(transcript_consequences=
             {field: hl.missing(dtype) for field, dtype in snv_vep_fields.items()}))
 

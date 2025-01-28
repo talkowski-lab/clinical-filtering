@@ -25,6 +25,7 @@
 1/22/2025:
 - use export() and then load in pandas instead of to_pandas() to match formatting with other outputs
 - filter by proband GT before aggregating rows (for CA_from_GT edge cases)
+# TODO: remove SV/trio_status/etc. irrelevant code
 '''
 ###
 

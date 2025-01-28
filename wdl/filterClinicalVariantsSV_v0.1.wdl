@@ -26,6 +26,8 @@ workflow filterClinicalVariantsSV {
         String hail_docker
         String variant_interpretation_docker
 
+        String annotate_sv_from_intersect_bed_script = ""
+
         Array[String] sv_gene_fields = ["PREDICTED_BREAKEND_EXONIC","PREDICTED_COPY_GAIN","PREDICTED_DUP_PARTIAL",
                 "PREDICTED_INTRAGENIC_EXON_DUP","PREDICTED_INTRONIC","PREDICTED_INV_SPAN","PREDICTED_LOF","PREDICTED_MSV_EXON_OVERLAP",
                 "PREDICTED_NEAREST_TSS","PREDICTED_PARTIAL_EXON_DUP","PREDICTED_PROMOTER","PREDICTED_TSS_DUP","PREDICTED_UTR"]
@@ -74,6 +76,7 @@ workflow filterClinicalVariantsSV {
             genome_build=genome_build,
             hail_docker=hail_docker,
             annot_name=annot_name,
+            annotate_sv_from_intersect_bed_script=annotate_sv_from_intersect_bed_script,
             runtime_attr_override=runtime_attr_annotate
         }    
     }
@@ -211,6 +214,7 @@ task annotateVCFWithBed {
         String annot_name
         String genome_build
         String hail_docker
+        String annotate_sv_from_intersect_bed_script
         RuntimeAttr? runtime_attr_override
     }
 
@@ -244,70 +248,7 @@ task annotateVCFWithBed {
 
     command <<<
     set -eou pipefail
-    cat <<EOF > annotate_vcf.py
-    import datetime
-    import pandas as pd
-    import hail as hl
-    import numpy as np
-    import sys
-    import os
-
-    vcf_file = sys.argv[1]
-    intersect_bed = sys.argv[2]
-    ref_bed_with_header_uri = sys.argv[3]
-    genome_build = sys.argv[4]
-    annot_name = sys.argv[5]
-    cores = sys.argv[6]
-    mem = int(np.floor(float(sys.argv[7])))
-
-    hl.init(min_block_size=128, 
-            local=f"local[*]", 
-            spark_conf={
-                        "spark.driver.memory": f"{int(np.floor(mem*0.8))}g",
-                        "spark.speculation": 'true'
-                        }, 
-            tmp_dir="tmp", local_tmpdir="tmp",
-                        )
-
-    mt = hl.import_vcf(vcf_file, force_bgz=vcf_file.split('.')[-1] in ['gz', 'bgz'], 
-        reference_genome=genome_build, array_elements_required=False, call_fields=[])
-    header = hl.get_vcf_metadata(vcf_file)
-
-    overlap_bed = hl.import_table(intersect_bed, force_bgz=True, no_header=True, types={f"f{i}": 'int' for i in [1,2,6,7]})
-    overlap_bed = overlap_bed.annotate(f1=overlap_bed.f1 + 1,  # adjust for bed 0-based coordinates
-                                    f6=overlap_bed.f6 + 1)
-
-    fields = list(overlap_bed.row)
-    overlap_field = fields[-1]
-
-    overlap_bed = overlap_bed.annotate(sv_len=overlap_bed.f2-overlap_bed.f1, 
-                        ref_len=overlap_bed.f7-overlap_bed.f6)
-    overlap_bed = overlap_bed.annotate(sv_prop=hl.int(overlap_bed[overlap_field]) / overlap_bed.sv_len, 
-                        ref_prop=hl.int(overlap_bed[overlap_field]) / overlap_bed.ref_len)
-
-    # use ref_bed_with_header for annotation column/field names
-    ref_bed_with_header = hl.import_table(ref_bed_with_header_uri)                                    
-    ref_bed_with_header_idx = range(5, len(fields)-1)
-    ref_bed_with_header_mapping = {f"f{ref_bed_with_header_idx[i]}": list(ref_bed_with_header.row)[i].lower().replace(' ', '_') 
-                                    for i in range(len(ref_bed_with_header_idx))} | {'sv_prop': f"{annot_name}_overlap"}
-    overlap_bed = overlap_bed.rename(ref_bed_with_header_mapping)
-
-    overlap_bed = overlap_bed.annotate(locus=hl.locus(overlap_bed.f0, overlap_bed.f1, genome_build))
-    overlap_bed = overlap_bed.annotate(alleles=mt.key_rows_by('locus').rows()[overlap_bed.locus].alleles)
-    overlap_bed = overlap_bed.key_by('locus','alleles')
-
-    # annotate original VCF
-    annot_fields = list(ref_bed_with_header_mapping.values())[3:]
-    mt = mt.annotate_rows(info=mt.info.annotate(
-        **{field: overlap_bed[mt.row_key][field] for field in annot_fields}))
-
-    for field in annot_fields:
-        header['info'][field] = {'Description': '', 'Number': '.', 'Type': 'String'}
-
-    # export annotated VCF
-    hl.export_vcf(mt, os.path.basename(intersect_bed).split('.bed')[0] + '.vcf.bgz', metadata=header, tabix=True)
-    EOF
-
+    curl ~{annotate_sv_from_intersect_bed_script} > annotate_vcf.py
     python3 annotate_vcf.py ~{vcf_file} ~{intersect_bed} ~{ref_bed_with_header} ~{genome_build} \
     ~{annot_name} ~{cpu_cores} ~{memory}
     >>>

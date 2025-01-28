@@ -61,8 +61,8 @@ overlap_bed = overlap_bed.annotate(sv_prop=hl.int(overlap_bed[overlap_field]) / 
 ref_bed_with_header = hl.import_table(ref_bed_with_header_uri)                                    
 ref_bed_with_header_idx = range(5, len(fields)-1)
 ref_bed_with_header_mapping = {f"f{ref_bed_with_header_idx[i]}": list(ref_bed_with_header.row)[i].lower().replace(' ', '_') 
-                                for i in range(len(ref_bed_with_header_idx))} | {'sv_prop': f"{annot_name}_overlap", 'f3': 'rsid'}  
-overlap_bed = overlap_bed.rename(ref_bed_with_header_mapping)
+                                for i in range(len(ref_bed_with_header_idx))} | {'sv_prop': f"{annot_name}_overlap"}  
+overlap_bed = overlap_bed.rename(ref_bed_with_header_mapping | {'f3': 'rsid'})
 
 # annotate alleles from SV VCF
 # NEW 1/28/2025: added using rsid as key for annotating original VCF

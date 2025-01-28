@@ -78,5 +78,8 @@ mt = mt.annotate_rows(info=mt.info.annotate(
 for field in annot_fields:
     header['info'][field] = {'Description': f"{field} from {annot_name}.", 'Number': '.', 'Type': 'String'}
 
+# revert to locus, alleles row key for export_vcf
+mt = mt.key_rows_by('locus', 'alleles')
+
 # export annotated VCF
 hl.export_vcf(mt, os.path.basename(intersect_bed).split('.bed')[0] + '.vcf.bgz', metadata=header, tabix=True)

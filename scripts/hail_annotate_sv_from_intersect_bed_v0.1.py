@@ -8,6 +8,7 @@
 - added description of new fields from BED to VCF header
 - added renaming f3 to rsid to match SV VCF
 - added using rsid as key for annotating original VCF
+- adjust number_of_overlapping_BPs by subtracting 1 to match VCF indexing
 '''
 ###
 
@@ -51,10 +52,11 @@ fields = list(overlap_bed.row)
 overlap_field = fields[-1]  # last column is always number_of_overlapping_BPs (from -wao flag in bedtools intersect)
 
 # calculate proportion of overlap
+# NEW 1/28/2025: adjust number_of_overlapping_BPs by subtracting 1 to match VCF indexing
 overlap_bed = overlap_bed.annotate(sv_len=overlap_bed.f2-overlap_bed.f1, 
                     ref_len=overlap_bed.f7-overlap_bed.f6)
-overlap_bed = overlap_bed.annotate(sv_prop=hl.int(overlap_bed[overlap_field]) / overlap_bed.sv_len, 
-                    ref_prop=hl.int(overlap_bed[overlap_field]) / overlap_bed.ref_len)
+overlap_bed = overlap_bed.annotate(sv_prop=(hl.int(overlap_bed[overlap_field])-1) / overlap_bed.sv_len, 
+                    ref_prop=(hl.int(overlap_bed[overlap_field])-1) / overlap_bed.ref_len)
 
 # use ref_bed_with_header for annotation column/field names
 # NEW 1/28/2025: added renaming f3 to rsid to match SV VCF

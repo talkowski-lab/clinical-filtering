@@ -9,6 +9,8 @@
 - edited get_non_trio_comphets to remove NIFS-specific criteria
 - added back filter_entries before aggregation (non-NIFS-specific) in phase_by_transmission_aggregate_by_gene
 - edited mat_carrier filtering to use mother_entry.GT instead of CA for mother het status
+1/28/2025:
+- allow for missing proband_entry.AD (e.g. for SVs)
 '''
 ###
 
@@ -698,8 +700,10 @@ merged_tm = hl.trio_matrix(merged_mt, pedigree, complete_trios=False)
 
 # filter by AD of alternate allele in proband
 # TODO: might filter out all if AD is empty (e.g. all SVs after merging)
+# NEW 1/28/2025: allow for missing proband_entry.AD (e.g. for SVs)
 if 'AD' in list(merged_mt.entry):
-    merged_tm = merged_tm.filter_entries(merged_tm.proband_entry.AD[1]>=ad_alt_threshold)
+    merged_tm = merged_tm.filter_entries((merged_tm.proband_entry.AD[1]>=ad_alt_threshold) |
+                                         (hl.is_missing(merged_tm.proband_entry.AD)))
 
 gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(merged_tm, merged_mt, pedigree)
 gene_phased_tm = gene_phased_tm.annotate_cols(trio_status=hl.if_else(gene_phased_tm.fam_id=='-9', 'not_in_pedigree', 

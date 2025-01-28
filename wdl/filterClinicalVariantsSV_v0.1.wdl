@@ -26,7 +26,7 @@ workflow filterClinicalVariantsSV {
         String hail_docker
         String variant_interpretation_docker
 
-        String annotate_sv_from_intersect_bed_script = ""
+        String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
 
         Array[String] sv_gene_fields = ["PREDICTED_BREAKEND_EXONIC","PREDICTED_COPY_GAIN","PREDICTED_DUP_PARTIAL",
                 "PREDICTED_INTRAGENIC_EXON_DUP","PREDICTED_INTRONIC","PREDICTED_INV_SPAN","PREDICTED_LOF","PREDICTED_MSV_EXON_OVERLAP",

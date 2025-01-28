@@ -6,7 +6,7 @@
 '''
 1/27/2025:
 - removed all code related to CA (NIFS-specific)
-- edited gencc_omim_tm filtering to use mother_entry.GT instead of CA for mother het status
+- edited gencc_omim_tm filtering to use mother_entry.GT instead of CA for mother het status, filter by non-ref GT in proband
 - removed "# NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)" code logic for outputs (NIFS-specific)
 '''
 ###
@@ -132,7 +132,8 @@ clinvar_tm = filter_mt(clinvar_tm, filter_csq=False, filter_impact=False)  # fil
 gencc_omim_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
 # NEW 1/27/2025: grab anything in GenCC_OMIM gene list and het in mother
 gencc_omim_tm = gencc_omim_tm.filter_rows(gencc_omim_tm.vep.transcript_consequences.OMIM_inheritance_code!='')
-gencc_omim_tm = gencc_omim_tm.filter_entries(gencc_omim_tm.mother_entry.GT.is_het())
+gencc_omim_tm = gencc_omim_tm.filter_entries((gencc_omim_tm.mother_entry.GT.is_het()) & 
+                                             (gencc_omim_tm.proband_entry.GT.is_non_ref()))
 gencc_omim_tm = gencc_omim_tm.annotate_rows(variant_category='GenCC_OMIM')
 gencc_omim_tm = filter_mt(gencc_omim_tm, filter_csq=False, filter_impact=False)  # filter to CANONICAL and/or MANE_PLUS_CLINICAL
 

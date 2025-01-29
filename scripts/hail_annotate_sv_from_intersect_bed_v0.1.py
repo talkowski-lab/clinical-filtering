@@ -11,6 +11,7 @@
 - adjust number_of_overlapping_BPs by subtracting 1 to match VCF indexing
 1/29/2025:
 - filter out rows/regions with zero overlap
+- combine multiple rows for same rsid SV
 '''
 ###
 
@@ -77,8 +78,12 @@ overlap_bed = overlap_bed.rename(ref_bed_with_header_mapping | {'f3': 'rsid'})
 overlap_bed = overlap_bed.key_by('rsid')
 mt = mt.key_rows_by('rsid')
 
-# annotate original VCF
+# NEW 1/29/2025: combine multiple rows for same rsid SV
 annot_fields = list(ref_bed_with_header_mapping.values())[3:]
+overlap_bed = (overlap_bed.group_by(overlap_bed.rsid)
+        .aggregate(**{field: hl.agg.collect(overlap_bed[field]) for field in annot_fields}))
+
+# annotate original VCF
 mt = mt.annotate_rows(info=mt.info.annotate(
     **{field: overlap_bed[mt.row_key][field] for field in annot_fields}))
 

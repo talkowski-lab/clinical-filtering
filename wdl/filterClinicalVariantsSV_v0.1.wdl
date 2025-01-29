@@ -17,7 +17,13 @@ workflow filterClinicalVariantsSV {
         File vcf_file  # NOTE: might have to run renameVCFSamples as upstream step if SV sample IDs don't match SNV/Indels!
         File vcf_idx
         File ped_uri
-        # File? gene_list  # 1/7/2025: added multiple gene list filtering to hail_filter_comphets_xlr_hom_var_v0.1.py
+
+        File gene_list_tsv
+        File omim_uri
+        File constrained_uri
+        File prec_uri
+        File hi_uri
+        File ts_uri
 
         File annot_beds_with_header_tsv
 
@@ -27,13 +33,24 @@ workflow filterClinicalVariantsSV {
         String variant_interpretation_docker
 
         String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
+        String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_gene_level_v0.1.py"
 
         Array[String] sv_gene_fields = ["PREDICTED_BREAKEND_EXONIC","PREDICTED_COPY_GAIN","PREDICTED_DUP_PARTIAL",
                 "PREDICTED_INTRAGENIC_EXON_DUP","PREDICTED_INTRONIC","PREDICTED_INV_SPAN","PREDICTED_LOF","PREDICTED_MSV_EXON_OVERLAP",
                 "PREDICTED_NEAREST_TSS","PREDICTED_PARTIAL_EXON_DUP","PREDICTED_PROMOTER","PREDICTED_TSS_DUP","PREDICTED_UTR"]
+        Array[String] permissive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN",
+                         "PREDICTED_PARTIAL_EXON_DUP", "PREDICTED_DUP_PARTIAL", "PREDICTED_INTRONIC",
+                         "PREDICTED_INV_SPAN", "PREDICTED_UTR", "PREDICTED_PROMOTER", "PREDICTED_BREAKEND_EXONIC"]
+        Array[String] restrictive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN"]
+
         Float bed_overlap_threshold=0.5
         Float gnomad_af_threshold=0.05
         Int size_threshold=500
+        Float dom_af_threshold=0.001
+        Float rec_af_threshold=0.01
+        Float gnomad_af_dom_threshold=0.01
+        Float gnomad_af_rec_threshold=0.01
+        String gnomad_af_field='gnomad_v4.1_sv_AF'
 
         RuntimeAttr? runtime_attr_bcftools
         RuntimeAttr? runtime_attr_annotate
@@ -92,9 +109,32 @@ workflow filterClinicalVariantsSV {
         runtime_attr_override=runtime_attr_bcftools
     }
 
-    call filterVCF {
+    call annotateGeneLevelVCF {
         input:
         vcf_file=combineBedAnnotations.combined_vcf,
+        gene_list_tsv=gene_list_tsv,
+        omim_uri=omim_uri,
+        constrained_uri=constrained_uri,
+        prec_uri=prec_uri,
+        hi_uri=hi_uri,
+        ts_uri=ts_uri,
+        sv_gene_fields=sv_gene_fields,
+        permissive_csq_fields=permissive_csq_fields,
+        restrictive_csq_fields=restrictive_csq_fields,
+        size_threshold=size_threshold,
+        dom_af_threshold=dom_af_threshold,
+        rec_af_threshold=rec_af_threshold,
+        gnomad_af_dom_threshold=gnomad_af_dom_threshold,
+        gnomad_af_rec_threshold=gnomad_af_rec_threshold,
+        gnomad_af_field=gnomad_af_field,
+        genome_build=genome_build,
+        hail_docker=hail_docker,
+        annotate_sv_gene_level_script=annotate_sv_gene_level_script
+    }
+
+    call filterVCF {
+        input:
+        vcf_file=annotateGeneLevelVCF.annotated_vcf,
         ped_uri=ped_uri,
         genome_build=genome_build,
         hail_docker=hail_docker,
@@ -318,6 +358,81 @@ task combineBedAnnotations {
         File combined_vcf = basename(preannotated_vcf, file_ext) + '.combined.annotations.vcf.gz'
         File combined_vcf_idx = basename(preannotated_vcf, file_ext) + '.combined.annotations.vcf.gz.tbi'
     }    
+}
+
+task annotateGeneLevelVCF {
+    input {
+        File vcf_file
+        File gene_list_tsv
+        File omim_uri
+        File constrained_uri
+        File prec_uri
+        File hi_uri
+        File ts_uri
+
+        Array[String] sv_gene_fields
+        Array[String] permissive_csq_fields
+        Array[String] restrictive_csq_fields
+        
+        Float size_threshold
+        Float dom_af_threshold
+        Float rec_af_threshold
+        Float gnomad_af_dom_threshold
+        Float gnomad_af_rec_threshold
+        
+        String gnomad_af_field
+        String genome_build
+        String hail_docker
+        String annotate_sv_gene_level_script
+        RuntimeAttr? runtime_attr_override
+    }
+
+    Float input_size = size([vcf_file], 'GB')
+    Float base_disk_gb = 10.0
+    Float input_disk_scale = 5.0
+
+    RuntimeAttr runtime_default = object {
+        mem_gb: 4,
+        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
+        cpu_cores: 1,
+        preemptible_tries: 3,
+        max_retries: 1,
+        boot_disk_gb: 10
+    }
+
+    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
+
+    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
+    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
+    
+    runtime {
+        memory: "~{memory} GB"
+        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
+        cpu: cpu_cores
+        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
+        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
+        docker: hail_docker
+        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
+    }
+    
+    String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
+    String output_filename = basename(vcf_file, file_ext) + '.annot.genes.vcf.bgz'
+
+    command <<<
+    set -eou pipefail
+    curl ~{annotate_sv_gene_level_script} > annotate_vcf.py
+    python3 annotate_vcf.py -i ~{vcf_file} -o ~{output_filename} -l ~{gene_list_tsv} -s ~{size_threshold} \
+        --omim ~{omim_uri} --cores ~{cpu_cores} --mem ~{memory} --build ~{genome_build} \
+        --sv-gene-fields ~{sep=',' sv_gene_fields} --permissive-csq-fields ~{sep=',' permissive_csq_fields} \
+        --restrictive-csq-fields ~{sep=',' restrictive_csq_fields} --constrained_uri ~{constrained_uri} \
+        --prec-uri ~{prec_uri} --hi-uri ~{hi_uri} --ts-uri ~{ts_uri} --dom-af ~{dom_af_threshold} --rec-af ~{rec_af_threshold} \
+        --gnomad-dom-af ~{gnomad_af_dom_threshold} --gnomad-rec-af ~{gnomad_af_rec_threshold} --gnomad-af-field ~{gnomad_af_field}
+    >>>
+
+    output {
+        File annotated_vcf = output_filename
+        File annotated_vcf_idx = output_filename + '.tbi'
+    }
 }
 
 task removeGenotypes { 

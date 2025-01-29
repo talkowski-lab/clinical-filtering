@@ -9,6 +9,8 @@
 - added renaming f3 to rsid to match SV VCF
 - added using rsid as key for annotating original VCF
 - adjust number_of_overlapping_BPs by subtracting 1 to match VCF indexing
+1/29/2025:
+- filter out rows/regions with zero overlap
 '''
 ###
 
@@ -51,13 +53,14 @@ overlap_bed = overlap_bed.annotate(f1=overlap_bed.f1 + 1,  # adjust for bed 0-ba
 fields = list(overlap_bed.row)
 overlap_field = fields[-1]  # last column is always number_of_overlapping_BPs (from -wao flag in bedtools intersect)
 
+# NEW 1/29/2025: filter out rows/regions with zero overlap
+overlap_bed = overlap_bed.filter(hl.int(overlap_bed[overlap_field])>0)
+
 # calculate proportion of overlap
 # NEW 1/28/2025: adjust number_of_overlapping_BPs by subtracting 1 to match VCF indexing
 overlap_bed = overlap_bed.annotate(sv_len=overlap_bed.f2-overlap_bed.f1, 
                     ref_len=overlap_bed.f7-overlap_bed.f6,
-                    number_of_overlapping_BPs=hl.if_else(hl.int(overlap_bed[overlap_field])>0,
-                                                         hl.int(overlap_bed[overlap_field])-1,
-                                                         hl.int(overlap_bed[overlap_field])))
+                    number_of_overlapping_BPs=hl.int(overlap_bed[overlap_field])-1)
 overlap_bed = overlap_bed.annotate(sv_prop=overlap_bed.number_of_overlapping_BPs / overlap_bed.sv_len, 
                     ref_prop=overlap_bed.number_of_overlapping_BPs / overlap_bed.ref_len)
 

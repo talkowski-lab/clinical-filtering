@@ -129,7 +129,8 @@ workflow filterClinicalVariantsSV {
         gnomad_af_field=gnomad_af_field,
         genome_build=genome_build,
         hail_docker=hail_docker,
-        annotate_sv_gene_level_script=annotate_sv_gene_level_script
+        annotate_sv_gene_level_script=annotate_sv_gene_level_script,
+        runtime_attr_override=runtime_attr_annotate
     }
 
     call filterVCF {

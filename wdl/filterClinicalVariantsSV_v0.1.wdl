@@ -34,6 +34,7 @@ workflow filterClinicalVariantsSV {
 
         String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
         String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_gene_level_v0.1.py"
+        String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_sv_v0.1.py"
 
         Array[String] sv_gene_fields = ["PREDICTED_BREAKEND_EXONIC","PREDICTED_COPY_GAIN","PREDICTED_DUP_PARTIAL",
                 "PREDICTED_INTRAGENIC_EXON_DUP","PREDICTED_INTRONIC","PREDICTED_INV_SPAN","PREDICTED_LOF","PREDICTED_MSV_EXON_OVERLAP",
@@ -44,7 +45,6 @@ workflow filterClinicalVariantsSV {
         Array[String] restrictive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN"]
 
         Float bed_overlap_threshold=0.5
-        Float gnomad_af_threshold=0.05
         Int size_threshold=500000  # in BP
         Float dom_af_threshold=0.001
         Float rec_af_threshold=0.01
@@ -141,14 +141,18 @@ workflow filterClinicalVariantsSV {
         ped_uri=ped_uri,
         genome_build=genome_build,
         hail_docker=hail_docker,
-        gnomad_af_threshold=gnomad_af_threshold,
+        filter_clinical_sv_script=filter_clinical_sv_script,
         runtime_attr_override=runtime_attr_filter_vcf
     }
 
     output {
         File sv_pathogenic_tsv = filterVCF.sv_pathogenic_tsv
-        File sv_filtered_vcf = filterVCF.sv_filtered_vcf
-        File sv_filtered_vcf_idx = filterVCF.sv_filtered_vcf_idx
+        File sv_genomic_disorders_tsv = filterVCF.sv_genomic_disorders_tsv
+        File sv_large_regions_tsv = filterVCF.sv_large_regions_tsv
+        File sv_dominant_tsv = filterVCF.sv_dominant_tsv
+        File sv_recessive_tsv = filterVCF.sv_recessive_tsv
+        File sv_flagged_vcf = annotateGeneLevelVCF.annotated_vcf
+        File sv_flagged_vcf_idx = annotateGeneLevelVCF.annotated_vcf_idx
     }
 }
 
@@ -544,7 +548,7 @@ task filterVCF {
         File ped_uri
         String genome_build
         String hail_docker
-        Float gnomad_af_threshold
+        String filter_clinical_sv_script
         RuntimeAttr? runtime_attr_override
     }
 
@@ -578,88 +582,16 @@ task filterVCF {
 
     command <<<
     set -eou pipefail
-    cat <<EOF > filter_vcf.py
-    import datetime
-    import pandas as pd
-    import hail as hl
-    import numpy as np
-    import sys
-    import os
-
-    vcf_file = sys.argv[1]
-    ped_uri = sys.argv[2]
-    genome_build = sys.argv[3]
-    gnomad_af_threshold = float(sys.argv[4])
-    cores = sys.argv[5]
-    mem = int(np.floor(float(sys.argv[6])))
-
-    hl.init(min_block_size=128, 
-            local=f"local[*]", 
-            spark_conf={
-                        "spark.driver.memory": f"{int(np.floor(mem*0.8))}g",
-                        "spark.speculation": 'true'
-                        }, 
-            tmp_dir="tmp", local_tmpdir="tmp",
-                        )
-
-    def get_transmission(phased_tm):
-        phased_tm = phased_tm.annotate_entries(transmission=hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|0'), 'uninherited',
-                hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|1'), 'inherited_from_mother',
-                            hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|0'), 'inherited_from_father',
-                                    hl.or_missing(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|1'), 'inherited_from_both'))))
-        )
-        return phased_tm
-
-    mt = hl.import_vcf(vcf_file, force_bgz=vcf_file.split('.')[-1] in ['gz', 'bgz'], 
-        reference_genome=genome_build, array_elements_required=False, call_fields=[])
-    header = hl.get_vcf_metadata(vcf_file)
-
-    # Phasing
-    tmp_ped = pd.read_csv(ped_uri, sep='\t').iloc[:,:6]
-    cropped_ped_uri = f"{os.path.basename(ped_uri).split('.ped')[0]}_crop.ped"
-    tmp_ped.to_csv(cropped_ped_uri, sep='\t', index=False)
-    pedigree = hl.Pedigree.read(cropped_ped_uri, delimiter='\t')
-
-    tm = hl.trio_matrix(mt, pedigree, complete_trios=False)
-    phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
-
-    # grab Pathogenic only
-    path_tm = phased_tm.filter_rows((phased_tm.info.clinical_interpretation[0].matches('athogenic')) |  # ClinVar P/LP
-                (hl.is_defined(phased_tm.info.dbvar_pathogenic[0])) |  # dbVar Pathogenic
-                (hl.is_defined(phased_tm.info.gd_sv_name[0])))  # GD region  
-    
-    path_tm = path_tm.filter_entries((path_tm.proband_entry.GT.is_non_ref()) | 
-                                    (path_tm.mother_entry.GT.is_non_ref()) |
-                                    (path_tm.father_entry.GT.is_non_ref()))
-    path_tm = path_tm.annotate_rows(variant_category='P/LP')
-    path_tm = get_transmission(path_tm)
-
-    # Mendel errors
-    all_errors, per_fam, per_sample, per_variant = hl.mendel_errors(mt['GT'], pedigree)
-    all_errors_mt = all_errors.key_by().to_matrix_table(row_key=['locus','alleles'], col_key=['s'], row_fields=['fam_id'])
-    path_tm = path_tm.annotate_entries(mendel_code=all_errors_mt[path_tm.row_key, path_tm.col_key].mendel_code)
-
-    # filter
-    gnomad_fields = [x for x in list(mt.info) if 'gnomad' in x.lower() 
-                    and 'ac' not in x.lower() and 'an' not in x.lower() 
-                    and 'af' in x.lower()]
-    mt = mt.annotate_rows(gnomad_popmax_af=hl.max([mt.info[field] for field in gnomad_fields]))
-
-    filt_mt = mt.filter_rows(mt.gnomad_popmax_af <= gnomad_af_threshold)
-
-    # export P/LP TSV
-    path_tm.entries().flatten().export(os.path.basename(vcf_file).split('.vcf')[0] + '_path_variants.tsv.gz', delimiter='\t')
-
-    # export filtered VCF
-    hl.export_vcf(filt_mt, os.path.basename(vcf_file).split('.vcf')[0] + '.filtered.vcf.bgz', metadata=header, tabix=True)
-    EOF
-    python3 filter_vcf.py ~{vcf_file} ~{ped_uri} ~{genome_build} ~{gnomad_af_threshold} ~{cpu_cores} ~{memory}
+    cat ~{filter_clinical_sv_script} > filter_vcf.py
+    python3 filter_vcf.py -i ~{vcf_file} --ped ~{ped_uri} --cores ~{cpu_cores} --mem ~{memory} --build ~{genome_build}
     >>>
 
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
     output {
         File sv_pathogenic_tsv = basename(vcf_file, file_ext) + '_path_variants.tsv.gz'
-        File sv_filtered_vcf = basename(vcf_file, file_ext) + '.filtered.vcf.bgz'
-        File sv_filtered_vcf_idx = basename(vcf_file, file_ext) + '.filtered.vcf.bgz.tbi'
+        File sv_genomic_disorders_tsv = basename(vcf_file, file_ext) + '_GD_variants.tsv.gz'
+        File sv_large_regions_tsv = basename(vcf_file, file_ext) + '_large_regions_variants.tsv.gz'
+        File sv_dominant_tsv = basename(vcf_file, file_ext) + '_dominant_variants.tsv.gz'
+        File sv_recessive_tsv = basename(vcf_file, file_ext) + '_recessive_variants.tsv.gz'
     }
 }

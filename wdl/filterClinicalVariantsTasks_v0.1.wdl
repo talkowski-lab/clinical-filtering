@@ -149,12 +149,9 @@ task filterCompHetsXLRHomVar {
         String sv_vcf
         File ped_uri
         File carrier_gene_list
-        String omim_uri
-        String rec_gene_list_tsv
 
         Int ad_alt_threshold
 
-        Array[String] sv_gene_fields
         String genome_build
 
         String filter_comphets_xlr_hom_var_script
@@ -200,8 +197,8 @@ task filterCompHetsXLRHomVar {
 
     command {
         curl ~{filter_comphets_xlr_hom_var_script} > filter_vcf.py
-        python3 filter_vcf.py ~{snv_indel_vcf} ~{clinvar_vcf} ~{sv_vcf} ~{ped_uri} ~{prefix} ~{omim_uri} \
-            ~{sep=',' sv_gene_fields} ~{genome_build} ~{cpu_cores} ~{memory} ~{ad_alt_threshold} ~{rec_gene_list_tsv} ~{carrier_gene_list}
+        python3 filter_vcf.py ~{snv_indel_vcf} ~{clinvar_vcf} ~{sv_vcf} ~{ped_uri} ~{prefix} ~{genome_build} \
+        ~{cpu_cores} ~{memory} ~{ad_alt_threshold} ~{carrier_gene_list}
     }
 
     output {

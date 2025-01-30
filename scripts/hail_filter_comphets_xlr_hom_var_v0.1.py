@@ -46,11 +46,11 @@ clinvar_vcf = sys.argv[2]
 sv_vcf = sys.argv[3]
 ped_uri = sys.argv[4]
 prefix = sys.argv[5]
-build = sys.argv[8]
-cores = sys.argv[9]  # string
-mem = int(np.floor(float(sys.argv[10])))
-ad_alt_threshold = int(sys.argv[11])
-carrier_gene_list = sys.argv[13]
+build = sys.argv[6]
+cores = sys.argv[7]  # string
+mem = int(np.floor(float(sys.argv[8])))
+ad_alt_threshold = int(sys.argv[9])
+carrier_gene_list = sys.argv[10]
 
 hl.init(min_block_size=128, 
         local=f"local[*]", 

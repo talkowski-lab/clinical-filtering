@@ -104,13 +104,10 @@ workflow filterClinicalCompHets {
                 clinvar_vcf=select_first([subsetVCFSamplesSNVIndelsClinVar.vcf_subset, 'NA']),
                 sv_vcf=select_first([subsetVCFSamplesSVs.vcf_subset, 'NA']),
                 ped_uri=select_first([addSVSamplesToPed.output_ped, ped_uri]),
-                omim_uri=omim_uri,
-                sv_gene_fields=sv_gene_fields,
                 filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
                 genome_build=genome_build,
                 hail_docker=hail_docker,
                 ad_alt_threshold=ad_alt_threshold,
-                rec_gene_list_tsv=rec_gene_list_tsv,
                 runtime_attr_override=runtime_attr_filter_comphets
         }
     }

@@ -34,17 +34,29 @@ workflow filterClinicalVariants {
         File hi_uri
         File ts_uri
 
-        String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
-        String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_gene_level_v0.1.py"
-        String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_sv_v0.1.py"
+        # ONLY OPTIONAL INPUTS THAT NEED TO BE PROVIDED IN THIS WORKFLOW BECAUSE THEY'RE USED BY MULTIPLE WORKFLOWS
+        Int ad_alt_threshold=3
+        String genome_build='GRCh38'
+        String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
+        String dom_gene_list_tsv='NA'
 
-        Array[String] sv_gene_fields = ["PREDICTED_BREAKEND_EXONIC","PREDICTED_COPY_GAIN","PREDICTED_DUP_PARTIAL",
-                "PREDICTED_INTRAGENIC_EXON_DUP","PREDICTED_INTRONIC","PREDICTED_INV_SPAN","PREDICTED_LOF","PREDICTED_MSV_EXON_OVERLAP",
-                "PREDICTED_NEAREST_TSS","PREDICTED_PARTIAL_EXON_DUP","PREDICTED_PROMOTER","PREDICTED_TSS_DUP","PREDICTED_UTR"]
-        Array[String] permissive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN",
-                         "PREDICTED_PARTIAL_EXON_DUP", "PREDICTED_DUP_PARTIAL", "PREDICTED_INTRONIC",
-                         "PREDICTED_INV_SPAN", "PREDICTED_UTR", "PREDICTED_PROMOTER", "PREDICTED_BREAKEND_EXONIC"]
-        Array[String] restrictive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN"]
+        String cohort_prefix
+        String hail_docker
+        String sv_base_mini_docker
+        String variant_interpretation_docker  # for SVs, svtk vcf2bed
+
+        ## SV inputs that are optional and already have defaults in the imported workflow
+        # String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
+        # String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_gene_level_v0.1.py"
+        # String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_sv_v0.1.py"
+
+        # Array[String] sv_gene_fields = ["PREDICTED_BREAKEND_EXONIC","PREDICTED_COPY_GAIN","PREDICTED_DUP_PARTIAL",
+        #         "PREDICTED_INTRAGENIC_EXON_DUP","PREDICTED_INTRONIC","PREDICTED_INV_SPAN","PREDICTED_LOF","PREDICTED_MSV_EXON_OVERLAP",
+        #         "PREDICTED_NEAREST_TSS","PREDICTED_PARTIAL_EXON_DUP","PREDICTED_PROMOTER","PREDICTED_TSS_DUP","PREDICTED_UTR"]
+        # Array[String] permissive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN",
+        #                  "PREDICTED_PARTIAL_EXON_DUP", "PREDICTED_DUP_PARTIAL", "PREDICTED_INTRONIC",
+        #                  "PREDICTED_INV_SPAN", "PREDICTED_UTR", "PREDICTED_PROMOTER", "PREDICTED_BREAKEND_EXONIC"]
+        # Array[String] restrictive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN"]
 
         # Float bed_overlap_threshold=0.5
         # Int size_threshold=500000  # in BP
@@ -55,17 +67,7 @@ workflow filterClinicalVariants {
         # Float gnomad_popmax_af_threshold=0.05
         # String gnomad_af_field='gnomad_v4.1_sv_AF'
 
-        String cohort_prefix
-        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_v0.1.py"
-        String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_v0.1.py"
-        String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_v0.1.py"
-
-        String hail_docker
-        String sv_base_mini_docker
-        String variant_interpretation_docker  # for SVs, svtk vcf2bed
-
-        Int ad_alt_threshold=3
-
+        ## SNV/Indel inputs that are optional and already have defaults in the imported workflow
         # Float spliceAI_threshold=0.95
         # Float af_threshold=0.1  # NIFS-specific
         # Float gnomad_af_threshold=0.05
@@ -77,14 +79,13 @@ workflow filterClinicalVariants {
         # Float gnomad_af_dom_threshold=0.001
         # Float loeuf_v2_threshold=0.35
         # Float loeuf_v4_threshold=0.6
-
-        String genome_build='GRCh38'
-
+        
         # Boolean pass_filter=false
         # Boolean include_not_omim=true  # NIFS-specific
 
-        String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
-        String dom_gene_list_tsv='NA'
+        # String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_v0.1.py"
+        # String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_v0.1.py"
+        # String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_v0.1.py"
     }
     
     # SNV/Indel
@@ -94,11 +95,14 @@ workflow filterClinicalVariants {
             annot_vcf_files=select_first([annot_vcf_files]),
             ped_uri=ped_uri,
             cohort_prefix=cohort_prefix,
-            filter_clinical_variants_snv_indel_script=filter_clinical_variants_snv_indel_script,
-            filter_clinical_variants_snv_indel_omim_script=filter_clinical_variants_snv_indel_omim_script,
             hail_docker=hail_docker,
             sv_base_mini_docker=sv_base_mini_docker,
             ad_alt_threshold=ad_alt_threshold,
+            genome_build=genome_build,
+            rec_gene_list_tsv=rec_gene_list_tsv,
+            dom_gene_list_tsv=dom_gene_list_tsv
+            # filter_clinical_variants_snv_indel_script=filter_clinical_variants_snv_indel_script,
+            # filter_clinical_variants_snv_indel_omim_script=filter_clinical_variants_snv_indel_omim_script,
             # spliceAI_threshold=spliceAI_threshold,
             # af_threshold=af_threshold,
             # gnomad_af_threshold=gnomad_af_threshold,
@@ -110,12 +114,9 @@ workflow filterClinicalVariants {
             # gnomad_af_dom_threshold=gnomad_af_dom_threshold,
             # loeuf_v2_threshold=loeuf_v2_threshold,
             # loeuf_v4_threshold=loeuf_v4_threshold,
-            genome_build=genome_build,
             # families_per_chunk=families_per_chunk,
             # pass_filter=pass_filter,
             # include_not_omim=include_not_omim,
-            rec_gene_list_tsv=rec_gene_list_tsv,
-            dom_gene_list_tsv=dom_gene_list_tsv
         }
     }
 
@@ -137,12 +138,12 @@ workflow filterClinicalVariants {
             genome_build=genome_build,
             hail_docker=hail_docker,
             variant_interpretation_docker=variant_interpretation_docker,
-            annotate_sv_from_intersect_bed_script=annotate_sv_from_intersect_bed_script,
-            annotate_sv_gene_level_script=annotate_sv_gene_level_script,
-            filter_clinical_sv_script=filter_clinical_sv_script,
-            sv_gene_fields=sv_gene_fields,
-            permissive_csq_fields=permissive_csq_fields,
-            restrictive_csq_fields=restrictive_csq_fields,
+            # annotate_sv_from_intersect_bed_script=annotate_sv_from_intersect_bed_script,
+            # annotate_sv_gene_level_script=annotate_sv_gene_level_script,
+            # filter_clinical_sv_script=filter_clinical_sv_script,
+            # sv_gene_fields=sv_gene_fields,
+            # permissive_csq_fields=permissive_csq_fields,
+            # restrictive_csq_fields=restrictive_csq_fields,
             # bed_overlap_threshold=bed_overlap_threshold,
             # size_threshold=size_threshold,
             # dom_af_threshold=dom_af_threshold,
@@ -161,11 +162,11 @@ workflow filterClinicalVariants {
             clinvar_vcf=select_first([filterClinicalVariantsSNVIndel.clinvar_vcf, 'NA']),
             sv_flagged_vcf=select_first([filterClinicalVariantsSV.sv_flagged_vcf, 'NA']),
             ped_uri=ped_uri,
-            filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
             genome_build=genome_build,
             hail_docker=hail_docker,
             carrier_gene_list=carrier_gene_list,
             ad_alt_threshold=ad_alt_threshold
+            # filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
     }
 
     output {

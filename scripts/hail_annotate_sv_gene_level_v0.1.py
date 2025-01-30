@@ -7,6 +7,7 @@
 '''
 1/30/2025:
 - added gnomAD_popmax_AF to INFO and gnomad_popmax_freq flag
+- changed gene_lists annotation to gene_list in INFO to match SNV/Indels
 '''
 ###
 
@@ -106,25 +107,25 @@ sv_gene_mt = sv_gene_mt.annotate_rows(
 # Annotate gene list(s)
 if gene_list_tsv!='NA':
     gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
-    gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
+    gene_list = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
                 for gene_list_name, uri in gene_list_uris.items()}
 
     sv_gene_mt = sv_gene_mt.annotate_rows(
-        gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(sv_gene_mt.info.genes), gene_list_name) 
-            for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
+        gene_list=hl.array([hl.or_missing(hl.array(gene_list).contains(sv_gene_mt.info.genes), gene_list_name) 
+            for gene_list_name, gene_list in gene_list.items()]).filter(hl.is_defined))
 
-# Convert gene_source, gene_lists annotations from array<str> to &-delimited str
+# Convert gene_source, gene_list annotations from array<str> to &-delimited str
 sv_gene_mt = sv_gene_mt.annotate_rows(
                         gene_source = hl.or_missing(sv_gene_mt.gene_source.size()>0,
                                                     hl.str('&').join(sv_gene_mt.gene_source)),
-                        gene_lists = hl.or_missing(sv_gene_mt.gene_lists.size()>0,
-                                                    hl.str('&').join(sv_gene_mt.gene_lists)))
+                        gene_list = hl.or_missing(sv_gene_mt.gene_list.size()>0,
+                                                    hl.str('&').join(sv_gene_mt.gene_list)))
 
 # Aggregate gene-level annotations by unique rsid
 sv_gene_agg_mt = (sv_gene_mt.group_rows_by(sv_gene_mt.rsid)
         .aggregate_rows(gene_source = hl.agg.collect(sv_gene_mt.gene_source),
                         OMIM_inheritance_code = hl.agg.collect(sv_gene_mt.OMIM_inheritance_code),
-                        gene_lists = hl.agg.collect(sv_gene_mt.gene_lists))).result()
+                        gene_list = hl.agg.collect(sv_gene_mt.gene_list))).result()
 
 # Annotate original sv_mt INFO with gene-level annotations
 gene_level_annotations = [field for field in list(sv_gene_agg_mt.row) if field!='rsid']  # exclude rsid
@@ -163,7 +164,7 @@ info=sv_mt.info.annotate(
 # Add flag for any genes in gene lists (from gene_list_tsv) and any genes in OMIM
 sv_mt = sv_mt.annotate_rows(
     info=sv_mt.info.annotate(
-        any_genelist=sv_mt.info.gene_lists.filter(hl.is_defined).size()>0,
+        any_genelist=sv_mt.info.gene_list.filter(hl.is_defined).size()>0,
         any_omim=sv_mt.info.OMIM_inheritance_code.filter(hl.is_defined).size()>0
     )
 )
@@ -206,7 +207,7 @@ header['info']['restrictive_csq'] = {'Description': f"All genes from {', '.join(
 header['info']['permissive_csq'] = {'Description': f"All genes from {', '.join(permissive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
 header['info']['gene_source'] = {'Description': f"Sources for genes in genes field, considered fields: {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}
 header['info']['OMIM_inheritance_code'] = {'Description': f"Inheritance codes from {os.path.basename(omim_uri)}.", 'Number': '.', 'Type': 'String'}
-header['info']['gene_lists'] = {'Description': f"Gene lists for each gene in genes field (&-delimited for multiple gene lists) from {os.path.basename(gene_list_tsv)}.", 'Number': '.', 'Type': 'String'}
+header['info']['gene_list'] = {'Description': f"Gene lists for each gene in genes field (&-delimited for multiple gene lists) from {os.path.basename(gene_list_tsv)}.", 'Number': '.', 'Type': 'String'}
 header['info']['constrained_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(constrained_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['prec_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(prec_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['hi_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(hi_uri)}.", 'Number': '.', 'Type': 'String'}

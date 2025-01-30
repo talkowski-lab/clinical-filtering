@@ -45,7 +45,7 @@ workflow filterClinicalVariantsSV {
 
         Float bed_overlap_threshold=0.5
         Float gnomad_af_threshold=0.05
-        Int size_threshold=500
+        Int size_threshold=500000  # in BP
         Float dom_af_threshold=0.001
         Float rec_af_threshold=0.01
         Float gnomad_af_dom_threshold=0.01

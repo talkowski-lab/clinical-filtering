@@ -186,14 +186,14 @@ sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(gnomAD_popmax_AF=hl.max([sv
 sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(gnomad_popmax_freq=sv_mt.info.gnomAD_popmax_AF<=gnomad_popmax_af_threshold))
 
 # SVLEN flag
-suffixes = ['BP', 'KB', 'MB', 'GB', 'TB', 'PB']
+suffixes = ['bp', 'kbp', 'mbp', 'gbp', 'tbp', 'pbp']
 def humansize(bps):
     i = 0
     while bps >= 1000 and i < len(suffixes)-1:
         bps /= 1000.
         i += 1
     f = ('%.2f' % bps).rstrip('0').rstrip('.')
-    return '%s_%s' % (f, suffixes[i])
+    return '%s%s' % (f, suffixes[i])
 
 size_threshold_field = f"passes_SVLEN_filter_{humansize(size_threshold)}"
 # Flag size threshold

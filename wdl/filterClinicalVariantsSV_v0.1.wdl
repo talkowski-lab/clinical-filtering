@@ -582,7 +582,7 @@ task filterVCF {
 
     command <<<
     set -eou pipefail
-    cat ~{filter_clinical_sv_script} > filter_vcf.py
+    curl ~{filter_clinical_sv_script} > filter_vcf.py
     python3 filter_vcf.py -i ~{vcf_file} --ped ~{ped_uri} --cores ~{cpu_cores} --mem ~{memory} --build ~{genome_build}
     >>>
 

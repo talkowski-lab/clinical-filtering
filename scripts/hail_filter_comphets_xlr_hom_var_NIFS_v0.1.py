@@ -25,7 +25,7 @@
 1/22/2025:
 - use export() and then load in pandas instead of to_pandas() to match formatting with other outputs
 - filter by proband GT before aggregating rows (for CA_from_GT edge cases)
-# TODO: remove SV/trio_status/etc. irrelevant code
+TODO: remove SV/trio_status/etc. irrelevant code
 '''
 ###
 
@@ -630,7 +630,7 @@ def get_non_trio_comphets(mt):  # EDITED FOR NIFS
 
     # Annotate non-gene-aggregated TM using potential comphets from gene-aggregated TM 
     non_trio_phased_tm = non_trio_phased_tm.key_rows_by(locus_expr, 'alleles', 'gene')
-    non_trio_phased_tm = non_trio_phased_tm.annotate_entries(locus_alleles=  # EDITED
+    non_trio_phased_tm = non_trio_phased_tm.annotate_entries(locus_alleles= 
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].all_locus_alleles,
                                                             proband_GT=
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_GT,

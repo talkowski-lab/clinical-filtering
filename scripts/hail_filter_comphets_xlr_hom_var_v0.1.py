@@ -14,6 +14,8 @@
 - remove OMIM_MIM_number as SNV/Indel annotation
 - variant_source annotation if not including ClinVar
 - dummy variant_source annotation for SVs (TODO: edit with OMIM/ClinVar equivalent after updating SVs!)
+1/30/2025:
+- added comments to get_trio_comphets, added variant_type and variant_source annotations to trio_phased_tm
 '''
 ###
 
@@ -141,18 +143,7 @@ if snv_indel_vcf!='NA':
 
     snv_mt = snv_mt.annotate_rows(variant_type='SNV/Indel', 
                                   gene_source=['vep'])
-    
-    # NEW 1/7/2025
-    # Annotate by gene list(s)
-    if rec_gene_list_tsv!='NA':
-        gene_list_uris = pd.read_csv(rec_gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
-        gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
-                    for gene_list_name, uri in gene_list_uris.items()}
-
-        snv_mt = snv_mt.annotate_rows(
-            gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(snv_mt.gene), gene_list_name) 
-                for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
-    
+        
 # Load SV VCF
 if sv_vcf!='NA':
     locus_expr = 'locus_interval'
@@ -198,23 +189,12 @@ if sv_vcf!='NA':
         OMIM_inheritance_code=hl.if_else(hl.is_defined(omim[sv_mt.row_key]), omim[sv_mt.row_key].inheritance_code, ''))))
     sv_mt = sv_mt.key_rows_by('locus', 'alleles')
 
-    # NEW 1/7/2025 
-    # Annotate and filter by gene list(s)
-    if rec_gene_list_tsv!='NA':
-        gene_list_uris = pd.read_csv(rec_gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
-        gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
-                    for gene_list_name, uri in gene_list_uris.items()}
-
-        sv_mt = sv_mt.annotate_rows(
-            gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(sv_mt.gene), gene_list_name) 
-                for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
-
-        # OMIM recessive code
-        omim_rec_code = (sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('2'))
-        # OMIM XLR code
-        omim_xlr_code = (sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))
-        in_gene_list = (sv_mt.gene_lists.size()>0)
-        sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code | in_gene_list)
+    # OMIM recessive code
+    omim_rec_code = (sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('2'))
+    # OMIM XLR code
+    omim_xlr_code = (sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))
+    in_gene_list = (sv_mt.gene_lists.size()>0)
+    sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code | in_gene_list)
 
 # Unify SNV/Indel MT and SV MT INFO (row) and entry fields
 if (snv_indel_vcf!='NA') and (sv_vcf!='NA'):
@@ -615,7 +595,7 @@ def get_non_trio_comphets(mt):
    
     # Annotate non-gene-aggregated TM using potential comphets from gene-aggregated TM 
     non_trio_phased_tm = non_trio_phased_tm.key_rows_by(locus_expr, 'alleles', 'gene')
-    non_trio_phased_tm = non_trio_phased_tm.annotate_entries(locus_alleles=  # EDITED
+    non_trio_phased_tm = non_trio_phased_tm.annotate_entries(locus_alleles=  
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].all_locus_alleles,
                                                             proband_GT=
         potential_comp_hets_non_trios[non_trio_phased_tm.row_key, non_trio_phased_tm.col_key].proband_GT,
@@ -627,7 +607,7 @@ def get_non_trio_comphets(mt):
 
     # Filter non-gene-aggregated TM to variants that hit genes with multiple unique variants
     non_trio_phased_tm = non_trio_phased_tm.filter_entries((hl.set(non_trio_phased_tm.locus_alleles).size()>1) &
-                                                                     (non_trio_phased_tm.proband_GT.size()>1))  # EDITED
+                                                                     (non_trio_phased_tm.proband_GT.size()>1))  
     
     # NEW 1/14/2025: Annotate variant_type and variant_source as comma-separated strings of unique values (basically per gene)
     non_trio_phased_tm = non_trio_phased_tm.annotate_rows(variant_type=  
@@ -637,31 +617,45 @@ def get_non_trio_comphets(mt):
     )
     # Grab rows (variants) from non-gene-aggregated TM, of potential comphets from gene-aggregated TM
     phased_tm_comp_hets_non_trios = non_trio_phased_tm.semi_join_rows(potential_comp_hets_non_trios.rows()).key_rows_by(locus_expr, 'alleles')
-    return phased_tm_comp_hets_non_trios.drop('locus_alleles')  # EDITED
+    return phased_tm_comp_hets_non_trios.drop('locus_alleles')  
 
 def get_trio_comphets(mt):
-    # TODO: meaningful comments
     trio_mt, trio_tm = get_subset_tm(mt, trio_samples, trio_pedigree, keep=True, complete_trios=True)
     trio_phased_tm, trio_gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(trio_tm, trio_mt, trio_pedigree)
 
-    # different criteria for trios (requires phasing)
+    # Filter to genes where at least one sample has multiple *phased* variants
     potential_comp_hets_trios = trio_gene_agg_phased_tm.filter_rows(
         hl.agg.count_where(hl.set(trio_gene_agg_phased_tm.proband_PBT_GT).size()>1)>0
     )
+    # Explode by variant (locus_expr, alleles) --> key by locus_expr, alleles, gene
     potential_comp_hets_trios = potential_comp_hets_trios.explode_rows(potential_comp_hets_trios.locus_alleles)
     potential_comp_hets_trios = potential_comp_hets_trios.key_rows_by(potential_comp_hets_trios.locus_alleles[locus_expr], potential_comp_hets_trios.locus_alleles.alleles, 'gene')
 
+    # Filter to variants that hit genes with multiple *phased* variants
     potential_comp_hets_trios = potential_comp_hets_trios.filter_entries(hl.set(potential_comp_hets_trios.proband_PBT_GT).size()>1)
 
+    # Annotate non-gene-aggregated TM using potential comphets from gene-aggregated TM 
     trio_phased_tm = trio_phased_tm.key_rows_by(locus_expr, 'alleles', 'gene')
-    trio_phased_tm = trio_phased_tm.annotate_entries(proband_GT=
+    trio_phased_tm = trio_phased_tm.annotate_entries(locus_alleles=  
+        potential_comp_hets_trios[trio_phased_tm.row_key, trio_phased_tm.col_key].all_locus_alleles,
+                                                            proband_GT=
         potential_comp_hets_trios[trio_phased_tm.row_key, trio_phased_tm.col_key].proband_GT,
-                                                               proband_GT_set=hl.set(
+                                                            proband_GT_set=hl.set(
         potential_comp_hets_trios[trio_phased_tm.row_key, trio_phased_tm.col_key].proband_GT),
-                                                               proband_PBT_GT_set=hl.set(
-        potential_comp_hets_trios[trio_phased_tm.row_key, trio_phased_tm.col_key].proband_PBT_GT))
-
+                                                            proband_PBT_GT_set=hl.set(
+        potential_comp_hets_trios[trio_phased_tm.row_key, trio_phased_tm.col_key].proband_PBT_GT),
+    )
+    
+    # Filter non-gene-aggregated TM to variants that hit genes with multiple unique variants *that are in trans*
     trio_phased_tm = trio_phased_tm.filter_entries(trio_phased_tm.proband_PBT_GT_set.size()>1)  
+
+    # NEW 1/30/2025: (from get_trio_comphets) Annotate variant_type and variant_source as comma-separated strings of unique values (basically per gene)
+    trio_phased_tm = trio_phased_tm.annotate_rows(variant_type=  
+        hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_trios.rows()[trio_phased_tm.row_key].variant_type))),
+                                                        variant_source= 
+        hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_trios.rows()[trio_phased_tm.row_key].variant_source))),
+    )
+    # Grab rows (variants) from non-gene-aggregated TM, of potential comphets from gene-aggregated TM    
     phased_tm_comp_hets_trios = trio_phased_tm.semi_join_rows(potential_comp_hets_trios.rows()).key_rows_by(locus_expr, 'alleles')
     return phased_tm_comp_hets_trios
 

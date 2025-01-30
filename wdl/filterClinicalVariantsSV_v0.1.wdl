@@ -425,7 +425,7 @@ task annotateGeneLevelVCF {
     python3 annotate_vcf.py -i ~{vcf_file} -o ~{output_filename} -l ~{gene_list_tsv} -s ~{size_threshold} \
         --omim ~{omim_uri} --cores ~{cpu_cores} --mem ~{memory} --build ~{genome_build} \
         --sv-gene-fields ~{sep=',' sv_gene_fields} --permissive-csq-fields ~{sep=',' permissive_csq_fields} \
-        --restrictive-csq-fields ~{sep=',' restrictive_csq_fields} --constrained_uri ~{constrained_uri} \
+        --restrictive-csq-fields ~{sep=',' restrictive_csq_fields} --constrained-uri ~{constrained_uri} \
         --prec-uri ~{prec_uri} --hi-uri ~{hi_uri} --ts-uri ~{ts_uri} --dom-af ~{dom_af_threshold} --rec-af ~{rec_af_threshold} \
         --gnomad-dom-af ~{gnomad_af_dom_threshold} --gnomad-rec-af ~{gnomad_af_rec_threshold} --gnomad-af-field ~{gnomad_af_field}
     >>>

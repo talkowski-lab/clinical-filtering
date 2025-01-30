@@ -127,6 +127,7 @@ workflow filterClinicalVariantsSV {
         rec_af_threshold=rec_af_threshold,
         gnomad_af_dom_threshold=gnomad_af_dom_threshold,
         gnomad_af_rec_threshold=gnomad_af_rec_threshold,
+        gnomad_popmax_af_threshold=gnomad_popmax_af_threshold,
         gnomad_af_field=gnomad_af_field,
         genome_build=genome_build,
         hail_docker=hail_docker,

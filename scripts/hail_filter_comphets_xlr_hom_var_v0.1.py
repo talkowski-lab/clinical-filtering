@@ -16,6 +16,10 @@
 - dummy variant_source annotation for SVs (TODO: edit with OMIM/ClinVar equivalent after updating SVs!)
 1/30/2025:
 - added comments to get_trio_comphets, added variant_type and variant_source annotations to trio_phased_tm
+- allow for missing proband_entry.AD (e.g. for SVs) in get_subset_tm
+- removed omim_uri, sv_gene_fields, rec_gene_list_tsv (annotation task added to filterClinicalVariantsSV_v0.1.wdl)
+- flatten INFO and vep.transcript_consequences fields
+- filter out rows where CHR2 is not the same chromosome (SV spans multiple chromosomes)
 '''
 ###
 
@@ -42,13 +46,10 @@ clinvar_vcf = sys.argv[2]
 sv_vcf = sys.argv[3]
 ped_uri = sys.argv[4]
 prefix = sys.argv[5]
-omim_uri = sys.argv[6]
-sv_gene_fields = sys.argv[7].split(',') 
 build = sys.argv[8]
 cores = sys.argv[9]  # string
 mem = int(np.floor(float(sys.argv[10])))
 ad_alt_threshold = int(sys.argv[11])
-rec_gene_list_tsv = sys.argv[12]
 carrier_gene_list = sys.argv[13]
 
 hl.init(min_block_size=128, 
@@ -143,7 +144,25 @@ if snv_indel_vcf!='NA':
 
     snv_mt = snv_mt.annotate_rows(variant_type='SNV/Indel', 
                                   gene_source=['vep'])
-        
+    
+    # NEW 1/30/2025: flatten INFO and vep.transcript_consequences fields
+    snv_info_fields = list(snv_mt.info)
+    vep_fields = list(snv_mt.vep.transcript_consequences)
+
+    # Check for conflicting INFO fields with FORMAT fields (e.g. DP)
+    conflicting_snv_info_fields = list(np.intersect1d(snv_info_fields, list(snv_mt.entry)))
+    # Check for conflicting INFO and VEP fields (e.g. AF)
+    conflicting_vep_fields = list(np.intersect1d(snv_info_fields, vep_fields))
+    # Retain original field order
+    new_info_field_map = {og_field: f"info.{og_field}" if og_field in conflicting_snv_info_fields 
+                          else og_field for og_field in snv_info_fields}
+    new_vep_field_map = {og_field: f"vep.{og_field}" if og_field in conflicting_vep_fields 
+                          else og_field for og_field in vep_fields}
+    
+    snv_mt = snv_mt.annotate_rows(**{new_field: snv_mt.info[og_field] for og_field, new_field in new_info_field_map.items()} | 
+                    {new_field: snv_mt.vep.transcript_consequences[og_field] for og_field, new_field in new_vep_field_map.items()})\
+            .drop('vep', 'info')
+    
 # Load SV VCF
 if sv_vcf!='NA':
     locus_expr = 'locus_interval'
@@ -151,61 +170,53 @@ if sv_vcf!='NA':
 
     # filter out BNDs
     sv_mt = sv_mt.filter_rows(sv_mt.info.SVTYPE!='BND') 
-
-    # Annotate genes —— ignore genes for CPX SVs
-    sv_mt = sv_mt.annotate_rows(gene=hl.or_missing(sv_mt.info.SVTYPE!='CPX', 
-                                                   hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in sv_gene_fields])))))
+    # NEW 1/30/2025: filter out rows where CHR2 is not the same chromosome (SV spans multiple chromosomes)
+    sv_mt = sv_mt.filter_rows(sv_mt.info.CHR2==sv_mt.locus.contig)
+    
     sv_mt = sv_mt.annotate_rows(variant_type='SV')
 
-    sv_mt = sv_mt.explode_rows(sv_mt.gene)
+    # NEW 1/30/2025: flatten INFO fields
+    sv_info_fields = list(sv_mt.info)
 
+    # Check for conflicting INFO fields with FORMAT fields (e.g. DP)
+    conflicting_sv_info_fields = list(np.intersect1d(sv_info_fields, list(sv_mt.entry)))
+    # Retain original field order
+    new_info_field_map = {og_field: f"info.{og_field}" if og_field in conflicting_sv_info_fields 
+                          else og_field for og_field in sv_info_fields}
+    sv_mt = sv_mt.annotate_rows(**{new_field: sv_mt.info[og_field] for og_field, new_field in new_info_field_map.items()})\
+            .drop('info')
+    
+    # NEW 1/30/2025: combine gene-level annotations in INFO where there is a value for each gene
+    # Annotate gene to match SNV/Indels (to explode on and keep original genes annotation)
+    sv_mt = sv_mt.annotate_rows(gene=sv_mt.genes)
+    gene_fields = ['gene', 'OMIM_inheritance_code', 'gene_list']
+
+    sv_mt = sv_mt.annotate_rows(gene_level=hl.zip(*[sv_mt[field] for field in gene_fields])\
+            .map(lambda x: hl.struct(**{field: x[i] 
+                                        for i, field in enumerate(gene_fields)})))\
+        .explode_rows('gene_level')
+    sv_mt = sv_mt.annotate_rows(**{field: sv_mt.gene_level[field] for field in gene_fields}).drop('gene_level')
+   
     # NEW 1/28/2025: dummy variant_source annotation for SVs
     sv_mt = sv_mt.annotate_rows(variant_source='SV')
 
-    # get gene source
-    def get_predicted_sources_expr(row_expr, sv_gene_fields):
-        return hl.array(
-            [hl.or_missing(hl.array(row_expr.info[col]).contains(row_expr.gene), col) for col in sv_gene_fields]
-        ).filter(hl.is_defined)
-
-    sv_mt = sv_mt.annotate_rows(gene_source=get_predicted_sources_expr(sv_mt, sv_gene_fields))
-
-    # Make "fake" VEP annotations for SV MT formatting
-    # NEW 1/28/2025: remove OMIM_MIM_number as SNV/Indel annotation
-    if (snv_indel_vcf!='NA'):
-        snv_vep_fields = {field: str(snv_mt.vep.transcript_consequences[field].dtype) for field in list(snv_mt.row.vep.transcript_consequences)}
-    else:
-        # snv_vep_fields = {'OMIM_MIM_number': 'array<str>', 'OMIM_inheritance_code': 'str'}
-        snv_vep_fields = {'OMIM_inheritance_code': 'str'}
-    sv_mt = sv_mt.annotate_rows(vep=hl.struct(transcript_consequences=
-            {field: hl.missing(dtype) for field, dtype in snv_vep_fields.items()}))
-
-    # Annotate OMIM in SVs
-    omim = hl.import_table(omim_uri).key_by('approvedGeneSymbol')
-    sv_mt = sv_mt.key_rows_by('gene')
-    sv_mt = sv_mt.annotate_rows(vep=sv_mt.vep.annotate(
-        transcript_consequences=sv_mt.vep.transcript_consequences.annotate(
-        # OMIM_MIM_number=hl.if_else(hl.is_defined(omim[sv_mt.row_key]), omim[sv_mt.row_key].mimNumber, ''),
-        OMIM_inheritance_code=hl.if_else(hl.is_defined(omim[sv_mt.row_key]), omim[sv_mt.row_key].inheritance_code, ''))))
-    sv_mt = sv_mt.key_rows_by('locus', 'alleles')
-
     # OMIM recessive code
-    omim_rec_code = (sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('2'))
+    omim_rec_code = (sv_mt.OMIM_inheritance_code.matches('2'))
     # OMIM XLR code
-    omim_xlr_code = (sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))
-    in_gene_list = (sv_mt.gene_lists.size()>0)
-    sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code | in_gene_list)
+    omim_xlr_code = (sv_mt.OMIM_inheritance_code.matches('4'))
+    sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code)
 
-# Unify SNV/Indel MT and SV MT INFO (row) and entry fields
+# Unify SNV/Indel MT and SV MT row and entry fields
+# NEW 1/30/2025: adjusted for INFO field flattened above
 if (snv_indel_vcf!='NA') and (sv_vcf!='NA'):
-    sv_info_fields, sv_entry_fields = list(sv_mt.row.info), list(sv_mt.entry)
-    snv_info_fields, snv_entry_fields = list(snv_mt.row.info), list(snv_mt.entry)
+    sv_row_fields, sv_entry_fields = list(sv_mt.row), list(sv_mt.entry)
+    snv_row_fields, snv_entry_fields = list(snv_mt.row), list(snv_mt.entry)
 
     sv_missing_entry_fields = {field: str(snv_mt[field].dtype) for field in np.setdiff1d(snv_entry_fields, sv_entry_fields)}
     snv_missing_entry_fields = {field: str(sv_mt[field].dtype) for field in np.setdiff1d(sv_entry_fields, snv_entry_fields)}
 
-    sv_missing_info_fields = {field: str(snv_mt.info[field].dtype) for field in np.setdiff1d(snv_info_fields, sv_info_fields)}
-    snv_missing_info_fields = {field: str(sv_mt.info[field].dtype) for field in np.setdiff1d(sv_info_fields, snv_info_fields)}
+    sv_missing_row_fields = {field: str(snv_mt[field].dtype) for field in np.setdiff1d(snv_row_fields, sv_row_fields)}
+    snv_missing_row_fields = {field: str(sv_mt[field].dtype) for field in np.setdiff1d(sv_row_fields, snv_row_fields)}
 
     sv_mt = sv_mt.annotate_entries(**{field: hl.missing(dtype) for field, dtype in sv_missing_entry_fields.items()})
     snv_mt = snv_mt.annotate_entries(**{field: hl.missing(dtype) for field, dtype in snv_missing_entry_fields.items()})
@@ -213,11 +224,8 @@ if (snv_indel_vcf!='NA') and (sv_vcf!='NA'):
     sv_mt = sv_mt.select_entries(*sorted(list(sv_mt.entry)))
     snv_mt = snv_mt.select_entries(*sorted(list(snv_mt.entry)))
 
-    sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(**{field: hl.missing(dtype) for field, dtype in sv_missing_info_fields.items()}))
-    snv_mt = snv_mt.annotate_rows(info=snv_mt.info.annotate(**{field: hl.missing(dtype) for field, dtype in snv_missing_info_fields.items()}))
-
-    sv_mt = sv_mt.annotate_rows(info=sv_mt.info.select(*sorted(list(sv_mt.info))))
-    snv_mt = snv_mt.annotate_rows(info=snv_mt.info.select(*sorted(list(snv_mt.info))))
+    sv_mt = sv_mt.annotate_rows(**{field: hl.missing(dtype) for field, dtype in sv_missing_row_fields.items()})
+    snv_mt = snv_mt.annotate_rows(**{field: hl.missing(dtype) for field, dtype in snv_missing_row_fields.items()})
 
     sv_mt = sv_mt.key_rows_by().select_rows(*sorted(list(sv_mt.row))).key_rows_by('locus','alleles')
     snv_mt = snv_mt.key_rows_by().select_rows(*sorted(list(snv_mt.row))).key_rows_by('locus','alleles')
@@ -252,11 +260,12 @@ elif sv_vcf!='NA':
     merged_mt = sv_mt
 
 # Clean up merged SV VCF with SNV/Indel VCF
+# NEW 1/30/2025: adjusted for INFO field flattened above
 if sv_vcf!='NA':
     # Change locus to locus_interval to include END for SVs
-    merged_mt = merged_mt.annotate_rows(end=hl.if_else(hl.is_defined(merged_mt.info.END2), merged_mt.info.END2, merged_mt.info.END))
+    merged_mt = merged_mt.annotate_rows(end=hl.if_else(hl.is_defined(merged_mt.END2), merged_mt.END2, merged_mt.END))
     # Account for INS having same END but different SVLEN
-    merged_mt = merged_mt.annotate_rows(end=hl.if_else(merged_mt.info.SVTYPE=='INS', merged_mt.end + merged_mt.info.SVLEN, merged_mt.end))
+    merged_mt = merged_mt.annotate_rows(end=hl.if_else(merged_mt.SVTYPE=='INS', merged_mt.end + merged_mt.SVLEN, merged_mt.end))
     # Account for empty END for SNV/Indels
     merged_mt = merged_mt.annotate_rows(end=hl.if_else(merged_mt.variant_type=='SNV/Indel', merged_mt.locus.position, merged_mt.end))
     merged_mt = merged_mt.key_rows_by()
@@ -574,8 +583,10 @@ def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
 
     subset_tm = hl.trio_matrix(subset_mt, pedigree, complete_trios=complete_trios)
     # filter by AD of alternate allele in proband
+    # NEW 1/30/2025: allow for missing proband_entry.AD (e.g. for SVs)
     if 'AD' in list(subset_mt.entry):
-        subset_tm = subset_tm.filter_entries(subset_tm.proband_entry.AD[1]>=ad_alt_threshold)
+        subset_tm = subset_tm.filter_entries((subset_tm.proband_entry.AD[1]>=ad_alt_threshold) |
+                                                    (hl.is_missing(subset_tm.proband_entry.AD)))
     return subset_mt, subset_tm
 
 def get_non_trio_comphets(mt):
@@ -657,7 +668,7 @@ def get_trio_comphets(mt):
     )
     # Grab rows (variants) from non-gene-aggregated TM, of potential comphets from gene-aggregated TM    
     phased_tm_comp_hets_trios = trio_phased_tm.semi_join_rows(potential_comp_hets_trios.rows()).key_rows_by(locus_expr, 'alleles')
-    return phased_tm_comp_hets_trios
+    return phased_tm_comp_hets_trios.drop('locus_alleles')  
 
 # Subset pedigree to samples in VCF, edit parental IDs
 vcf_samples = merged_mt.s.collect()
@@ -704,7 +715,6 @@ if len(trio_samples)==0:
 merged_tm = hl.trio_matrix(merged_mt, pedigree, complete_trios=False)
 
 # filter by AD of alternate allele in proband
-# TODO: might filter out all if AD is empty (e.g. all SVs after merging)
 # NEW 1/28/2025: allow for missing proband_entry.AD (e.g. for SVs)
 if 'AD' in list(merged_mt.entry):
     merged_tm = merged_tm.filter_entries((merged_tm.proband_entry.AD[1]>=ad_alt_threshold) |
@@ -715,13 +725,15 @@ gene_phased_tm = gene_phased_tm.annotate_cols(trio_status=hl.if_else(gene_phased
                                                    hl.if_else(hl.array(trio_samples).contains(gene_phased_tm.id), 'trio', 'non_trio')))
 
 # NEW 1/13/2025: maternal carrier variants
+# NEW 1/30/2025: edited gene_phased_tm.vep.transcript_consequences.SYMBOL --> gene_phased_tm.gene,
+# gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code --> gene_phased_tm.OMIM_inheritance_code
 # in carrier gene list and mother is het
 carrier_genes = pd.read_csv(carrier_gene_list, sep='\t', header=None)[0].tolist()
-mat_carrier = gene_phased_tm.filter_rows(hl.array(carrier_genes).contains(gene_phased_tm.vep.transcript_consequences.SYMBOL))
+mat_carrier = gene_phased_tm.filter_rows(hl.array(carrier_genes).contains(gene_phased_tm.gene))
 mat_carrier = mat_carrier.filter_entries(mat_carrier.mother_entry.GT.is_het()).key_rows_by(locus_expr, 'alleles').entries()
 
 # XLR only
-xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))   # OMIM XLR
+xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm.OMIM_inheritance_code.matches('4'))   # OMIM XLR
 xlr_phased = xlr_phased_tm.filter_entries((xlr_phased_tm.proband_entry.GT.is_non_ref()) &
                             (~xlr_phased_tm.is_female)).key_rows_by(locus_expr, 'alleles').entries()
 

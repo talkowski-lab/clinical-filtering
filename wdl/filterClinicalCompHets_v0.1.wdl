@@ -17,13 +17,11 @@ workflow filterClinicalCompHets {
     input {
         String omim_recessive_vcf='NA'
         String clinvar_vcf='NA'
-        String sv_filtered_vcf='NA'
+        String sv_flagged_vcf='NA'
         File ped_uri
-        File omim_uri
+        File carrier_gene_list
+
         String cohort_prefix
-        Array[String] sv_gene_fields = ["PREDICTED_BREAKEND_EXONIC","PREDICTED_COPY_GAIN","PREDICTED_DUP_PARTIAL", 
-        "PREDICTED_INTRAGENIC_EXON_DUP","PREDICTED_INTRONIC","PREDICTED_LOF","PREDICTED_MSV_EXON_OVERLAP", 
-        "PREDICTED_PARTIAL_EXON_DUP","PREDICTED_PROMOTER","PREDICTED_TSS_DUP","PREDICTED_UTR"]
 
         Int ad_alt_threshold=3
 
@@ -35,8 +33,6 @@ workflow filterClinicalCompHets {
         String genome_build='GRCh38'
         Int families_per_chunk=500
 
-        String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
-
         RuntimeAttr? runtime_attr_split_families
         RuntimeAttr? runtime_attr_subset_vcfs_snv_indel
         RuntimeAttr? runtime_attr_subset_vcfs_sv
@@ -44,11 +40,11 @@ workflow filterClinicalCompHets {
         RuntimeAttr? runtime_attr_merge_results
     }
 
-    if (sv_filtered_vcf!='NA') {
+    if (sv_flagged_vcf!='NA') {
         call addSVSamplesToPed {
             input:
             ped_uri=ped_uri,
-            vcf_file=select_first([sv_filtered_vcf]),
+            vcf_file=select_first([sv_flagged_vcf]),
             genome_build=genome_build,
             hail_docker=hail_docker,
             runtime_attr_override=runtime_attr_subset_vcfs_sv
@@ -87,11 +83,11 @@ workflow filterClinicalCompHets {
             }
         }
 
-        if (sv_filtered_vcf!='NA') {
+        if (sv_flagged_vcf!='NA') {
             call helpers.subsetVCFSamplesHail as subsetVCFSamplesSVs {
                 input:
                     samples_file=sample_file,
-                    vcf_file=select_first([sv_filtered_vcf]),
+                    vcf_file=select_first([sv_flagged_vcf]),
                     hail_docker=hail_docker,
                     genome_build=genome_build,
                     runtime_attr_override=runtime_attr_subset_vcfs_sv
@@ -108,12 +104,13 @@ workflow filterClinicalCompHets {
                 genome_build=genome_build,
                 hail_docker=hail_docker,
                 ad_alt_threshold=ad_alt_threshold,
+                carrier_gene_list=carrier_gene_list,
                 runtime_attr_override=runtime_attr_filter_comphets
         }
     }
 
     String variant_types_ = if omim_recessive_vcf!='NA' then 'SV_SNV_Indel' else 'SV'
-    String variant_types = if sv_filtered_vcf!='NA' then variant_types_ else 'SNV_Indel'
+    String variant_types = if sv_flagged_vcf!='NA' then variant_types_ else 'SNV_Indel'
     call helpers.mergeResultsPython as mergeCompHetsXLRHomVar {
         input:
             tsvs=filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv,

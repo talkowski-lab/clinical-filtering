@@ -375,7 +375,7 @@ task annotateGeneLevelVCF {
         Array[String] permissive_csq_fields
         Array[String] restrictive_csq_fields
         
-        Float size_threshold
+        Int size_threshold
         Float dom_af_threshold
         Float rec_af_threshold
         Float gnomad_af_dom_threshold

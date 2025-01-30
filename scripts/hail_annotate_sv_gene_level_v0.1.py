@@ -56,10 +56,10 @@ constrained_uri = args.constrained_uri
 prec_uri = args.prec_uri
 hi_uri = args.hi_uri
 ts_uri = args.ts_uri
-dom_af_threshold = args.dom_af_threshold
-rec_af_threshold = args.rec_af_threshold
-gnomad_af_dom_threshold = args.gnomad_af_dom_threshold
-gnomad_af_rec_threshold = args.gnomad_af_rec_threshold
+dom_af_threshold = float(args.dom_af_threshold)
+rec_af_threshold = float(args.rec_af_threshold)
+gnomad_af_dom_threshold = float(args.gnomad_af_dom_threshold)
+gnomad_af_rec_threshold = float(args.gnomad_af_rec_threshold)
 gnomad_af_field = args.gnomad_af_field
 
 hl.init(min_block_size=128, 

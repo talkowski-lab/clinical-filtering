@@ -189,6 +189,27 @@ sv_mt = sv_mt.annotate_rows(
         )
 )
 
-# TODO: Update header with all new annotations and flags
+# Update header with all new annotations and flags
+# Annotations
+header['info']['genes'] = {'Description': f"All genes from {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}
+header['info']['restrictive_csq'] = {'Description': f"All genes from {', '.join(restrictive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
+header['info']['permissive_csq'] = {'Description': f"All genes from {', '.join(permissive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
+header['info']['gene_source'] = {'Description': f"Sources for genes in genes field, considered fields: {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}
+header['info']['OMIM_inheritance_code'] = {'Description': f"Inheritance codes from {os.path.basename(omim_uri)}.", 'Number': '.', 'Type': 'String'}
+header['info']['gene_lists'] = {'Description': f"Gene lists for each gene in genes field (&-delimited for multiple gene lists) from {os.path.basename(gene_list_tsv)}.", 'Number': '.', 'Type': 'String'}
+header['info']['constrained_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(constrained_uri)}.", 'Number': '.', 'Type': 'String'}
+header['info']['prec_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(prec_uri)}.", 'Number': '.', 'Type': 'String'}
+header['info']['hi_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(hi_uri)}.", 'Number': '.', 'Type': 'String'}
+header['info']['ts_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(ts_uri)}.", 'Number': '.', 'Type': 'String'}
+# Flags
+header['info']['any_constrained'] = {'Description': f"Any gene in genes field is in {os.path.basename(constrained_uri)}.", 'Number': '0', 'Type': 'Flag'}
+header['info']['any_prec'] = {'Description': f"Any gene in genes field is in {os.path.basename(prec_uri)}.", 'Number': '0', 'Type': 'Flag'}
+header['info']['any_hi'] = {'Description': f"Any gene in genes field is in {os.path.basename(hi_uri)}.", 'Number': '0', 'Type': 'Flag'}
+header['info']['any_ts'] = {'Description': f"Any gene in genes field is in {os.path.basename(ts_uri)}.", 'Number': '0', 'Type': 'Flag'}
+header['info']['any_genelist'] = {'Description': f"Any gene in genes field is in gene lists from {os.path.basename(gene_list_tsv)}.", 'Number': '0', 'Type': 'Flag'}
+header['info']['any_omim'] = {'Description': f"Any gene in genes field is in {os.path.basename(omim_uri)}.", 'Number': '0', 'Type': 'Flag'}
 header['info'][size_threshold_field] = {'Description': f"Passes SVLEN size filter of {humansize(size_threshold).replace('_', ' ')}.", 'Number': '0', 'Type': 'Flag'}
+header['info']['dominant_freq'] = {'Description': f"Passes cohort AF <= {dom_af_threshold} AND gnomAD AF <= {gnomad_af_dom_threshold}.", 'Number': '0', 'Type': 'Flag'}
+header['info']['recessive_freq'] = {'Description': f"Passes cohort AF <= {rec_af_threshold} AND gnomAD AF <= {gnomad_af_rec_threshold}.", 'Number': '0', 'Type': 'Flag'}
+
 hl.export_vcf(sv_mt, output_filename, metadata=header, tabix=True)

@@ -5,7 +5,8 @@
 
 ## CHANGE LOG:
 '''
-
+1/30/2025:
+- added gnomAD_popmax_AF to INFO and gnomad_popmax_freq flag
 '''
 ###
 
@@ -38,6 +39,7 @@ parser.add_argument('--rec-af', dest='rec_af_threshold', help='Cohort AF thresho
 parser.add_argument('--gnomad-dom-af', dest='gnomad_af_dom_threshold', help='gnomAD AF threshold for dominants')
 parser.add_argument('--gnomad-rec-af', dest='gnomad_af_rec_threshold', help='gnomAD AF threshold for recessives')
 parser.add_argument('--gnomad-af-field', dest='gnomad_af_field', help='Field for gnomAD AFs in INFO')
+parser.add_argument('--gnomad-popmax-af', dest='gnomad_popmax_af_threshold', help='gnomAD popmax AF threshold')
 
 args = parser.parse_args()
 
@@ -61,6 +63,7 @@ rec_af_threshold = float(args.rec_af_threshold)
 gnomad_af_dom_threshold = float(args.gnomad_af_dom_threshold)
 gnomad_af_rec_threshold = float(args.gnomad_af_rec_threshold)
 gnomad_af_field = args.gnomad_af_field
+gnomad_popmax_af_threshold = float(args.gnomad_popmax_af_threshold)
 
 hl.init(min_block_size=128, 
         local=f"local[*]", 
@@ -165,6 +168,23 @@ sv_mt = sv_mt.annotate_rows(
     )
 )
 
+# Frequency flags
+sv_mt = sv_mt.annotate_rows(
+    info=sv_mt.info.annotate(
+        dominant_freq=((hl.max(sv_mt.info.AF)<=dom_af_threshold) & 
+            (sv_mt.info[gnomad_af_field]<=gnomad_af_dom_threshold)),
+        recessive_freq=((hl.max(sv_mt.info.AF)<=rec_af_threshold) & 
+            (sv_mt.info[gnomad_af_field]<=gnomad_af_rec_threshold))
+        )
+)
+
+# Annotate gnomAD_popmax_AF and gnomad_popmax_freq flag
+gnomad_fields = [x for x in list(sv_mt.info) if 'gnomad' in x.lower() 
+                and 'ac' not in x.lower() and 'an' not in x.lower() 
+                and 'af' in x.lower()]
+sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(gnomAD_popmax_AF=hl.max([sv_mt.info[field] for field in gnomad_fields])))
+sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(gnomad_popmax_freq=sv_mt.info.gnomAD_popmax_AF<=gnomad_popmax_af_threshold))
+
 # SVLEN flag
 suffixes = ['BP', 'KB', 'MB', 'GB', 'TB', 'PB']
 def humansize(bps):
@@ -176,18 +196,8 @@ def humansize(bps):
     return '%s_%s' % (f, suffixes[i])
 
 size_threshold_field = f"passes_SVLEN_filter_{humansize(size_threshold)}"
-# flag size threshold
+# Flag size threshold
 sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(**{size_threshold_field: (sv_mt.info.SVLEN>=size_threshold)}))
-
-# Frequency flags
-sv_mt = sv_mt.annotate_rows(
-    info=sv_mt.info.annotate(
-        dominant_freq=((hl.max(sv_mt.info.AF)<=dom_af_threshold) & 
-            (sv_mt.info[gnomad_af_field]<=gnomad_af_dom_threshold)),
-        recessive_freq=((hl.max(sv_mt.info.AF)<=rec_af_threshold) & 
-            (sv_mt.info[gnomad_af_field]<=gnomad_af_rec_threshold))
-        )
-)
 
 # Update header with all new annotations and flags
 # Annotations
@@ -201,6 +211,7 @@ header['info']['constrained_genes'] = {'Description': f"All genes in genes field
 header['info']['prec_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(prec_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['hi_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(hi_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['ts_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(ts_uri)}.", 'Number': '.', 'Type': 'String'}
+header['info']['gnomAD_popmax_AF'] = {'Description': f"gnomAD popmax AF taken from fields: {', '.join(gnomad_fields)}.", 'Number': '1', 'Type': 'Float'}
 # Flags
 header['info']['any_constrained'] = {'Description': f"Any gene in genes field is in {os.path.basename(constrained_uri)}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['any_prec'] = {'Description': f"Any gene in genes field is in {os.path.basename(prec_uri)}.", 'Number': '0', 'Type': 'Flag'}
@@ -208,8 +219,9 @@ header['info']['any_hi'] = {'Description': f"Any gene in genes field is in {os.p
 header['info']['any_ts'] = {'Description': f"Any gene in genes field is in {os.path.basename(ts_uri)}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['any_genelist'] = {'Description': f"Any gene in genes field is in gene lists from {os.path.basename(gene_list_tsv)}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['any_omim'] = {'Description': f"Any gene in genes field is in {os.path.basename(omim_uri)}.", 'Number': '0', 'Type': 'Flag'}
-header['info'][size_threshold_field] = {'Description': f"Passes SVLEN size filter of {humansize(size_threshold).replace('_', ' ')}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['dominant_freq'] = {'Description': f"Passes cohort AF <= {dom_af_threshold} AND gnomAD AF <= {gnomad_af_dom_threshold}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['recessive_freq'] = {'Description': f"Passes cohort AF <= {rec_af_threshold} AND gnomAD AF <= {gnomad_af_rec_threshold}.", 'Number': '0', 'Type': 'Flag'}
+header['info']['gnomad_popmax_freq'] = {'Description': f"Passes gnomAD popmax AF <= {gnomad_popmax_af_threshold}.", 'Number': '0', 'Type': 'Flag'}
+header['info'][size_threshold_field] = {'Description': f"Passes SVLEN size filter of {humansize(size_threshold).replace('_', ' ')}.", 'Number': '0', 'Type': 'Flag'}
 
 hl.export_vcf(sv_mt, output_filename, metadata=header, tabix=True)

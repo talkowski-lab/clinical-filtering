@@ -50,6 +50,7 @@ workflow filterClinicalVariantsSV {
         Float rec_af_threshold=0.01
         Float gnomad_af_dom_threshold=0.01
         Float gnomad_af_rec_threshold=0.01
+        Float gnomad_popmax_af_threshold=0.05
         String gnomad_af_field='gnomad_v4.1_sv_AF'
 
         RuntimeAttr? runtime_attr_bcftools
@@ -380,7 +381,8 @@ task annotateGeneLevelVCF {
         Float rec_af_threshold
         Float gnomad_af_dom_threshold
         Float gnomad_af_rec_threshold
-        
+        Float gnomad_popmax_af_threshold
+
         String gnomad_af_field
         String genome_build
         String hail_docker
@@ -427,7 +429,8 @@ task annotateGeneLevelVCF {
         --sv-gene-fields ~{sep=',' sv_gene_fields} --permissive-csq-fields ~{sep=',' permissive_csq_fields} \
         --restrictive-csq-fields ~{sep=',' restrictive_csq_fields} --constrained-uri ~{constrained_uri} \
         --prec-uri ~{prec_uri} --hi-uri ~{hi_uri} --ts-uri ~{ts_uri} --dom-af ~{dom_af_threshold} --rec-af ~{rec_af_threshold} \
-        --gnomad-dom-af ~{gnomad_af_dom_threshold} --gnomad-rec-af ~{gnomad_af_rec_threshold} --gnomad-af-field ~{gnomad_af_field}
+        --gnomad-dom-af ~{gnomad_af_dom_threshold} --gnomad-rec-af ~{gnomad_af_rec_threshold} --gnomad-af-field ~{gnomad_af_field} \
+        --gnomad-popmax-af ~{gnomad_popmax_af_threshold}
     >>>
 
     output {
@@ -657,117 +660,5 @@ task filterVCF {
         File sv_pathogenic_tsv = basename(vcf_file, file_ext) + '_path_variants.tsv.gz'
         File sv_filtered_vcf = basename(vcf_file, file_ext) + '.filtered.vcf.bgz'
         File sv_filtered_vcf_idx = basename(vcf_file, file_ext) + '.filtered.vcf.bgz.tbi'
-    }
-}
-
-task filterByGeneList {
-    input {
-        File vcf_file
-        File gene_list
-        String genome_build
-        String hail_docker
-        Int size_threshold
-        Array[String] sv_gene_fields
-        RuntimeAttr? runtime_attr_override
-    }
-
-    Float input_size = size(vcf_file, 'GB')
-    Float base_disk_gb = 10.0
-    Float input_disk_scale = 5.0
-
-    RuntimeAttr runtime_default = object {
-        mem_gb: 4,
-        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
-        cpu_cores: 1,
-        preemptible_tries: 3,
-        max_retries: 1,
-        boot_disk_gb: 10
-    }
-
-    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
-
-    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
-    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
-    
-    runtime {
-        memory: "~{memory} GB"
-        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
-        cpu: cpu_cores
-        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
-        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
-        docker: hail_docker
-        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
-    }
-
-    command <<<
-    set -eou pipefail
-    cat <<EOF > filter_gene_list.py
-    import datetime
-    import pandas as pd
-    import hail as hl
-    import numpy as np
-    import sys
-    import os
-
-    vcf_file = sys.argv[1]
-    gene_list = sys.argv[2]
-    genome_build = sys.argv[3]
-    size_threshold = int(sys.argv[4])
-    cores = sys.argv[5]
-    mem = int(np.floor(float(sys.argv[6])))
-    sv_gene_fields = sys.argv[7].split(',')
-
-    hl.init(min_block_size=128, 
-            local=f"local[*]", 
-            spark_conf={
-                        "spark.driver.memory": f"{int(np.floor(mem*0.8))}g",
-                        "spark.speculation": 'true'
-                        }, 
-            tmp_dir="tmp", local_tmpdir="tmp",
-                        )
-
-    mt = hl.import_vcf(vcf_file, force_bgz=vcf_file.split('.')[-1] in ['gz', 'bgz'], 
-        reference_genome=genome_build, array_elements_required=False, call_fields=[])
-    header = hl.get_vcf_metadata(vcf_file)
-
-    genes = pd.read_csv(gene_list, sep='\t', header=None)[0].tolist()
-    gene_list_name = os.path.basename(gene_list).split('.txt')[0]
-
-    mt = mt.annotate_rows(genes=hl.array(hl.set(hl.flatmap(lambda x: x, [mt.info[field] for field in sv_gene_fields]))))
-    mt = mt.annotate_rows(info=mt.info.annotate(disease_genes=hl.array(hl.set(genes).intersection(hl.set(mt.genes)))))
-
-    def get_predicted_sources_expr(row_expr, sv_gene_fields):
-        return hl.array(
-            [hl.or_missing(hl.set(row_expr.info[col]).intersection(hl.set(row_expr.info.disease_genes)).size()>0, col) for col in sv_gene_fields]
-        ).filter(hl.is_defined)
-
-    mt = mt.annotate_rows(info=mt.info.annotate(disease_gene_sources=get_predicted_sources_expr(mt, sv_gene_fields)))
-
-    suffixes = ['BP', 'KB', 'MB', 'GB', 'TB', 'PB']
-    def humansize(bps):
-        i = 0
-        while bps >= 1000 and i < len(suffixes)-1:
-            bps /= 1000.
-            i += 1
-        f = ('%.2f' % bps).rstrip('0').rstrip('.')
-        return '%s_%s' % (f, suffixes[i])
-
-    size_threshold_field = f"passes_SVLEN_filter_{humansize(size_threshold)}"
-    # flag size threshold
-    mt = mt.annotate_rows(info=mt.info.annotate(**{size_threshold_field: (mt.info.SVLEN>=size_threshold)}))
-    header['info']['disease_genes'] = {'Description': f"Disease genes overlapping with {gene_list_name}.", 'Number': '.', 'Type': 'String'}
-    header['info']['disease_gene_sources'] = {'Description': f"Sources for disease genes overlapping with {gene_list_name}. Considered fields: {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}
-    header['info'][size_threshold_field] = {'Description': f"Passes SVLEN size filter of {humansize(size_threshold).replace('_', ' ')}.", 'Number': '0', 'Type': 'Flag'}
-
-    hl.export_vcf(mt, os.path.basename(vcf_file).split('.vcf')[0] + f".{gene_list_name}.vcf.bgz", metadata=header, tabix=True)
-    EOF
-
-    python3 filter_gene_list.py ~{vcf_file} ~{gene_list} ~{genome_build} ~{size_threshold} ~{cpu_cores} ~{memory} ~{sep=',' sv_gene_fields}
-    >>>
-
-    String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    output {
-        File sv_filtered_gene_list_vcf = basename(vcf_file, file_ext) + ".~{basename(gene_list, '.txt')}.vcf.bgz"
-        File sv_filtered_gene_list_vcf_idx = basename(vcf_file, file_ext) + ".~{basename(gene_list, '.txt')}.vcf.bgz.tbi"
     }
 }

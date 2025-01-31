@@ -7,6 +7,8 @@
 '''
 1/30/2025:
 - added dominant_gt and recessive_gt annotations
+1/31/2025:
+- added remove_parent_probands_trio_matrix function --> removes redundant "trios"
 '''
 ###
 
@@ -55,6 +57,15 @@ def filter_and_annotate_tm(tm, variant_category, filter_type='trio'):
     tm = tm.annotate_rows(variant_category=variant_category)
     return tm
 
+def remove_parent_probands_trio_matrix(tm):
+    '''
+    Function to bypass peculiarity of Hail's trio_matrix() function when complete_trios=False
+    removes "trios" where the "proband" is a parent --> only leaves trios/duos/singletons as entries
+    '''
+    fathers = tm.father.s.collect()
+    mothers = tm.mother.s.collect()
+    return tm.filter_cols(hl.array(fathers + mothers).contains(tm.proband.s), keep=False)
+
 sv_mt = hl.import_vcf(sv_vcf, force_bgz=sv_vcf.split('.')[-1] in ['gz', 'bgz'], 
     reference_genome=genome_build, array_elements_required=False, call_fields=[])
 header = hl.get_vcf_metadata(sv_vcf)
@@ -78,6 +89,7 @@ tmp_ped.to_csv(cropped_ped_uri, sep='\t', index=False)
 pedigree = hl.Pedigree.read(cropped_ped_uri, delimiter='\t')
 
 sv_tm = hl.trio_matrix(sv_mt, pedigree, complete_trios=False)
+sv_tm = remove_parent_probands_trio_matrix(sv_tm)  # NEW 1/31/2025: Removes redundant "trios"  
 phased_sv_tm = hl.experimental.phase_trio_matrix_by_transmission(sv_tm, call_field='GT', phased_call_field='PBT_GT')
 
 # Mendel errors

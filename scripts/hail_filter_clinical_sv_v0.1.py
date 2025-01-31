@@ -129,7 +129,7 @@ rec_non_trio_criteria = ((~phased_sv_tm.complete_trio) &
                         (phased_sv_tm.proband_entry.GT.is_hom_var())
                         )
 
-phased_sv_tm.annotate_entries(dominant_gt=((rec_trio_criteria) | (rec_non_trio_criteria)),
+phased_sv_tm = phased_sv_tm.annotate_entries(dominant_gt=((rec_trio_criteria) | (rec_non_trio_criteria)),
                               recessive_gt=((rec_trio_criteria) | (rec_non_trio_criteria)))
 
 # Output 1: grab Pathogenic only

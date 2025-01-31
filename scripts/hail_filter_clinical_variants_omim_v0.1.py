@@ -7,6 +7,8 @@
 1/27/2025:
 - removed "# NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)" code logic for outputs (NIFS-specific)
 - added non-NIFS-specific non-ref proband GT filter for omim_recessive_tsv
+1/31/2025:
+- added remove_parent_probands_trio_matrix function --> removes redundant "trios"
 '''
 ###
 
@@ -75,6 +77,15 @@ def filter_mt(mt):
         )
     return mt 
 
+def remove_parent_probands_trio_matrix(tm):
+    '''
+    Function to bypass peculiarity of Hail's trio_matrix() function when complete_trios=False
+    removes "trios" where the "proband" is a parent --> only leaves trios/duos/singletons as entries
+    '''
+    fathers = tm.father.s.collect()
+    mothers = tm.mother.s.collect()
+    return tm.filter_cols(hl.array(fathers + mothers).contains(tm.proband.s), keep=False)
+
 mt = hl.import_vcf(vcf_file, reference_genome=build, find_replace=('null', ''), force_bgz=True, call_fields=[], array_elements_required=False)
 
 header = hl.get_vcf_metadata(vcf_file)
@@ -104,6 +115,7 @@ tmp_ped.to_csv(cropped_ped_uri, sep='\t', index=False)
 pedigree = hl.Pedigree.read(cropped_ped_uri, delimiter='\t')
 
 tm = hl.trio_matrix(mt, pedigree, complete_trios=False)
+tm = remove_parent_probands_trio_matrix(tm)  # NEW 1/31/2025: Removes redundant "trios"  
 phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
 
 # Mendel errors

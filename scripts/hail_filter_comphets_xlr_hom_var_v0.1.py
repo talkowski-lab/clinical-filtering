@@ -20,6 +20,8 @@
 - removed omim_uri, sv_gene_fields, rec_gene_list_tsv (annotation task added to filterClinicalVariantsSV_v0.1.wdl)
 - flatten INFO and vep.transcript_consequences fields
 - filter out rows where CHR2 is not the same chromosome (SV spans multiple chromosomes)
+1/31/2025:
+- added remove_parent_probands_trio_matrix function --> removes redundant "trios"
 '''
 ###
 
@@ -104,6 +106,16 @@ def load_split_vep_consequences(vcf_uri):
     # NEW 1/15/2025: commented out because now annotated (in INFO) in hail_filter_clinical_variants_v0.1.py :)
     # mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)))
     return mt
+
+def remove_parent_probands_trio_matrix(tm):
+    '''
+    Function to bypass peculiarity of Hail's trio_matrix() function when complete_trios=False
+    removes "trios" where the "proband" is a parent --> only leaves trios/duos/singletons as entries
+    '''
+    fathers = tm.father.s.collect()
+    mothers = tm.mother.s.collect()
+    return tm.filter_cols(hl.array(fathers + mothers).contains(tm.proband.s), keep=False)
+
 
 ## STEP 1: Merge SNV/Indel VCF with SV VCF (or just one of them)
 # Load SNV/Indel VCF
@@ -582,6 +594,7 @@ def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
     subset_mt = subset_mt.drop('variant_qc')
 
     subset_tm = hl.trio_matrix(subset_mt, pedigree, complete_trios=complete_trios)
+    subset_tm = remove_parent_probands_trio_matrix(subset_tm)  # NEW 1/31/2025: Removes redundant "trios"  
     # filter by AD of alternate allele in proband
     # NEW 1/30/2025: allow for missing proband_entry.AD (e.g. for SVs)
     if 'AD' in list(subset_mt.entry):
@@ -713,6 +726,7 @@ if len(trio_samples)==0:
 
 # Trio matrix
 merged_tm = hl.trio_matrix(merged_mt, pedigree, complete_trios=False)
+merged_tm = remove_parent_probands_trio_matrix(merged_tm)  # NEW 1/31/2025: Removes redundant "trios"  
 
 # filter by AD of alternate allele in proband
 # NEW 1/28/2025: allow for missing proband_entry.AD (e.g. for SVs)

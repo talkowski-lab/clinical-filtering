@@ -8,6 +8,8 @@
 - removed all code related to CA (NIFS-specific)
 - edited gencc_omim_tm filtering to use mother_entry.GT instead of CA for mother het status, filter by non-ref GT in proband
 - removed "# NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)" code logic for outputs (NIFS-specific)
+1/31/2025:
+- added remove_parent_probands_trio_matrix function --> removes redundant "trios"
 '''
 ###
 
@@ -55,6 +57,15 @@ def filter_mt(mt, filter_csq=True, filter_impact=True):
             mt.vep.transcript_consequences.IMPACT))
             )
     return mt 
+
+def remove_parent_probands_trio_matrix(tm):
+    '''
+    Function to bypass peculiarity of Hail's trio_matrix() function when complete_trios=False
+    removes "trios" where the "proband" is a parent --> only leaves trios/duos/singletons as entries
+    '''
+    fathers = tm.father.s.collect()
+    mothers = tm.mother.s.collect()
+    return tm.filter_cols(hl.array(fathers + mothers).contains(tm.proband.s), keep=False)
 
 hl.init(min_block_size=128, 
         spark_conf={"spark.executor.cores": cores, 
@@ -105,6 +116,7 @@ tmp_ped.to_csv(f"{prefix}.ped", sep='\t', index=False)
 pedigree = hl.Pedigree.read(f"{prefix}.ped", delimiter='\t')
 
 tm = hl.trio_matrix(mt, pedigree, complete_trios=False)
+tm = remove_parent_probands_trio_matrix(tm)  # NEW 1/31/2025: Removes redundant "trios"  
 phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
 
 # Mendel errors

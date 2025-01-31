@@ -114,9 +114,6 @@ dom_non_trio_criteria = ((~phased_sv_tm.complete_trio) &
                         (phased_sv_tm.proband_entry.GT.is_het())
                         )
 
-has_mother = hl.is_defined(phased_sv_tm.mother)
-has_father = hl.is_defined(phased_sv_tm.father)
-
 # homozygous and het parents
 rec_trio_criteria = ((phased_sv_tm.complete_trio) &  
                      (phased_sv_tm.proband_entry.GT.is_hom_var()) &
@@ -129,7 +126,7 @@ rec_non_trio_criteria = ((~phased_sv_tm.complete_trio) &
                         (phased_sv_tm.proband_entry.GT.is_hom_var())
                         )
 
-phased_sv_tm = phased_sv_tm.annotate_entries(dominant_gt=((rec_trio_criteria) | (rec_non_trio_criteria)),
+phased_sv_tm = phased_sv_tm.annotate_entries(dominant_gt=((dom_trio_criteria) | (dom_non_trio_criteria)),
                               recessive_gt=((rec_trio_criteria) | (rec_non_trio_criteria)))
 
 # Output 1: grab Pathogenic only

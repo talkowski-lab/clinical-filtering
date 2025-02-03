@@ -27,6 +27,7 @@
 - added annotate_and_filter_trio_matrix function to match SV outputs and reduce redundancy in code
 - added get_transmission in phase_by_transmission_aggregate_by_gene
 - added get_mendel_errors in annotate_and_filter_trio_matrix
+- changed variant_type annotation to variant_types to retain original variant_type field
 '''
 ###
 
@@ -714,7 +715,8 @@ def get_non_trio_comphets(mt):
                                                                      (non_trio_phased_tm.proband_GT.size()>1))  
     
     # NEW 1/14/2025: Annotate variant_type and variant_source as comma-separated strings of unique values (basically per gene)
-    non_trio_phased_tm = non_trio_phased_tm.annotate_rows(variant_type=  
+    # NEW 2/3/2025: Change variant_type annotation to variant_types to retain original variant_type field
+    non_trio_phased_tm = non_trio_phased_tm.annotate_rows(variant_types=  
         hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_type))),
                                                         variant_source= 
         hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_non_trios.rows()[non_trio_phased_tm.row_key].variant_source))),
@@ -754,7 +756,8 @@ def get_trio_comphets(mt):
     trio_phased_tm = trio_phased_tm.filter_entries(trio_phased_tm.proband_PBT_GT_set.size()>1)  
 
     # NEW 1/30/2025: (from get_trio_comphets) Annotate variant_type and variant_source as comma-separated strings of unique values (basically per gene)
-    trio_phased_tm = trio_phased_tm.annotate_rows(variant_type=  
+    # NEW 2/3/2025: Change variant_type annotation to variant_types to retain original variant_type field
+    trio_phased_tm = trio_phased_tm.annotate_rows(variant_types=  
         hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_trios.rows()[trio_phased_tm.row_key].variant_type))),
                                                         variant_source= 
         hl.str(', ').join(hl.sorted(hl.array(potential_comp_hets_trios.rows()[trio_phased_tm.row_key].variant_source))),

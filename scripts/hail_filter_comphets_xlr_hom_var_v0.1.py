@@ -22,6 +22,9 @@
 - filter out rows where CHR2 is not the same chromosome (SV spans multiple chromosomes)
 1/31/2025:
 - added remove_parent_probands_trio_matrix function --> removes redundant "trios"
+2/3/2025:
+- annotate phenotype and unaffected/affected counts
+- added annotate_and_filter_trio_matrix function to match SV outputs and reduce redundancy in code
 '''
 ###
 
@@ -288,6 +291,19 @@ if sv_vcf!='NA':
 
 # NEW 1/14/2025: Annotate PAR status (moved up from end of script)
 merged_mt = merged_mt.annotate_rows(in_non_par=~(merged_mt.locus.in_autosome_or_par()))
+
+# NEW 2/3/2025: Annotate phenotype and unaffected/affected counts
+# Annotate affected status/phenotype from pedigree
+ped_ht = hl.import_table(ped_uri, delimiter='\t').key_by('sample_id')
+merged_mt = merged_mt.annotate_cols(phenotype=ped_ht[merged_mt.s].phenotype)
+
+# Get cohort unaffected/affected het and homvar counts
+merged_mt = merged_mt.annotate_rows(**{
+    "n_het_unaffected": hl.agg.filter(merged_mt.phenotype=='1', hl.agg.sum(merged_mt.GT.is_het())),
+    "n_hom_var_unaffected": hl.agg.filter(merged_mt.phenotype=='1', hl.agg.sum(merged_mt.GT.is_hom_var())),
+    "n_het_affected": hl.agg.filter(merged_mt.phenotype=='2', hl.agg.sum(merged_mt.GT.is_het())),
+    "n_hom_var_affected": hl.agg.filter(merged_mt.phenotype=='2', hl.agg.sum(merged_mt.GT.is_hom_var()))
+})
 
 ## EDITED HAIL FUNCTIONS
 # EDITED: don't check locus struct
@@ -585,6 +601,57 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     
     return phased_tm, gene_agg_phased_tm
 
+def annotate_and_filter_trio_matrix(tm, mt, pedigree):
+    complete_trio_probands = [trio.s for trio in pedigree.complete_trios()]
+    tm = tm.annotate_cols(trio_status=hl.if_else(tm.fam_id=='-9', 'not_in_pedigree', 
+                                                       hl.if_else(hl.array(complete_trio_probands).contains(tm.id), 'trio', 'non_trio')))
+
+    # Annotate affected status/phenotype from pedigree
+    tm = tm.annotate_cols(
+        proband=tm.proband.annotate(
+            phenotype=ped_ht[tm.proband.s].phenotype),
+    mother=tm.mother.annotate(
+            phenotype=ped_ht[tm.mother.s].phenotype),
+    father=tm.father.annotate(
+            phenotype=ped_ht[tm.father.s].phenotype))
+
+    affected_cols = ['n_het_unaffected', 'n_hom_var_unaffected', 'n_het_affected', 'n_hom_var_affected']
+    tm = tm.annotate_rows(**{col: mt.rows()[tm.row_key][col] 
+                                                 for col in affected_cols})
+
+    ## Annotate dominant_gt and recessive_gt
+    # denovo
+    dom_trio_criteria = ((tm.trio_status=='trio') &  
+                         (tm.mendel_code==2))
+    # het absent in unaff
+    dom_non_trio_criteria = ((tm.trio_status!='trio') & 
+                            (tm.n_hom_var_unaffected==0) &
+                            (tm.n_het_unaffected==0) & 
+                            (tm.proband_entry.GT.is_het())
+                            )
+
+    # homozygous and het parents
+    rec_trio_criteria = ((tm.trio_status=='trio') &  
+                         (tm.proband_entry.GT.is_hom_var()) &
+                         (tm.mother_entry.GT.is_het()) &
+                         (tm.father_entry.GT.is_het())
+                        )  
+    # hom and unaff are not hom
+    rec_non_trio_criteria = ((tm.trio_status!='trio') &  
+                            (tm.n_hom_var_unaffected==0) &
+                            (tm.proband_entry.GT.is_hom_var())
+                            )
+
+    tm = tm.annotate_entries(dominant_gt=((dom_trio_criteria) | (dom_non_trio_criteria)),
+                                  recessive_gt=((rec_trio_criteria) | (rec_non_trio_criteria)))
+    
+    # filter by AD of alternate allele in proband
+    # NEW 1/30/2025: allow for missing proband_entry.AD (e.g. for SVs)
+    if 'AD' in list(mt.entry):
+        tm = tm.filter_entries((tm.proband_entry.AD[1]>=ad_alt_threshold) |
+                                                    (hl.is_missing(tm.proband_entry.AD)))
+    return tm    
+
 def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
     subset_mt = mt.filter_cols(hl.array(samples).contains(mt.s), keep=keep)
 
@@ -595,11 +662,7 @@ def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
 
     subset_tm = hl.trio_matrix(subset_mt, pedigree, complete_trios=complete_trios)
     subset_tm = remove_parent_probands_trio_matrix(subset_tm)  # NEW 1/31/2025: Removes redundant "trios"  
-    # filter by AD of alternate allele in proband
-    # NEW 1/30/2025: allow for missing proband_entry.AD (e.g. for SVs)
-    if 'AD' in list(subset_mt.entry):
-        subset_tm = subset_tm.filter_entries((subset_tm.proband_entry.AD[1]>=ad_alt_threshold) |
-                                                    (hl.is_missing(subset_tm.proband_entry.AD)))
+    subset_tm = annotate_and_filter_trio_matrix(subset_tm, subset_mt, pedigree)  # NEW 2/3/2025
     return subset_mt, subset_tm
 
 def get_non_trio_comphets(mt):
@@ -708,14 +771,10 @@ comphet_mt = merged_mt.filter_rows(merged_mt.locus.in_autosome_or_par())
 
 if len(trio_samples)>0:
     merged_trio_comphets = get_trio_comphets(comphet_mt)
-    merged_trio_comphets = merged_trio_comphets.annotate_cols(trio_status='trio')
     merged_comphets = merged_trio_comphets.entries()
 
 if len(non_trio_samples)>0:
     merged_non_trio_comphets = get_non_trio_comphets(comphet_mt)
-    merged_non_trio_comphets = merged_non_trio_comphets.annotate_cols(trio_status=
-                                                              hl.if_else(merged_non_trio_comphets.fam_id=='-9', 
-                                                              'not_in_pedigree', 'non_trio'))
     merged_comphets = merged_non_trio_comphets.entries()
 
 if (len(trio_samples)>0) and (len(non_trio_samples)>0):
@@ -727,16 +786,9 @@ if len(trio_samples)==0:
 # Trio matrix
 merged_tm = hl.trio_matrix(merged_mt, pedigree, complete_trios=False)
 merged_tm = remove_parent_probands_trio_matrix(merged_tm)  # NEW 1/31/2025: Removes redundant "trios"  
-
-# filter by AD of alternate allele in proband
-# NEW 1/28/2025: allow for missing proband_entry.AD (e.g. for SVs)
-if 'AD' in list(merged_mt.entry):
-    merged_tm = merged_tm.filter_entries((merged_tm.proband_entry.AD[1]>=ad_alt_threshold) |
-                                         (hl.is_missing(merged_tm.proband_entry.AD)))
+merged_tm = annotate_and_filter_trio_matrix(merged_tm, merged_mt, pedigree)  # NEW 2/3/2025 
 
 gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(merged_tm, merged_mt, pedigree)
-gene_phased_tm = gene_phased_tm.annotate_cols(trio_status=hl.if_else(gene_phased_tm.fam_id=='-9', 'not_in_pedigree', 
-                                                   hl.if_else(hl.array(trio_samples).contains(gene_phased_tm.id), 'trio', 'non_trio')))
 
 # NEW 1/13/2025: maternal carrier variants
 # NEW 1/30/2025: edited gene_phased_tm.vep.transcript_consequences.SYMBOL --> gene_phased_tm.gene,

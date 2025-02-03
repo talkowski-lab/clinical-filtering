@@ -9,6 +9,8 @@
 - added dominant_gt and recessive_gt annotations
 1/31/2025:
 - added remove_parent_probands_trio_matrix function --> removes redundant "trios"
+2/3/2025:
+- changed complete_trio annotation to trio_status to match comphet script
 '''
 ###
 
@@ -99,8 +101,10 @@ phased_sv_tm = phased_sv_tm.annotate_entries(mendel_code=all_errors_sv_mt[phased
 phased_sv_tm = get_transmission(phased_sv_tm)
 
 # Annotate if complete trio or not
+# NEW 2/3/2025: Change complete_trio annotation to trio_status to match comphet script
 complete_trio_probands = [trio.s for trio in pedigree.complete_trios()]
-phased_sv_tm = phased_sv_tm.annotate_cols(complete_trio=hl.array(complete_trio_probands).contains(phased_sv_tm.proband.s))
+phased_sv_tm = phased_sv_tm.annotate_cols(trio_status=hl.if_else(phased_sv_tm.fam_id=='-9', 'not_in_pedigree', 
+                                                   hl.if_else(hl.array(complete_trio_probands).contains(phased_sv_tm.id), 'trio', 'non_trio')))
 
 # Annotate affected status/phenotype from pedigree
 phased_sv_tm = phased_sv_tm.annotate_cols(
@@ -117,23 +121,23 @@ phased_sv_tm = phased_sv_tm.annotate_rows(**{col: sv_mt.rows()[phased_sv_tm.row_
 
 ## Annotate dominant_gt and recessive_gt
 # denovo
-dom_trio_criteria = ((phased_sv_tm.complete_trio) &  
+dom_trio_criteria = ((phased_sv_tm.trio_status=='trio') &  
                      (phased_sv_tm.mendel_code==2))
 # het absent in unaff
-dom_non_trio_criteria = ((~phased_sv_tm.complete_trio) & 
+dom_non_trio_criteria = ((phased_sv_tm.trio_status!='trio') & 
                         (phased_sv_tm.n_hom_var_unaffected==0) &
                         (phased_sv_tm.n_het_unaffected==0) & 
                         (phased_sv_tm.proband_entry.GT.is_het())
                         )
 
 # homozygous and het parents
-rec_trio_criteria = ((phased_sv_tm.complete_trio) &  
+rec_trio_criteria = ((phased_sv_tm.trio_status=='trio') &  
                      (phased_sv_tm.proband_entry.GT.is_hom_var()) &
                      (phased_sv_tm.mother_entry.GT.is_het()) &
                      (phased_sv_tm.father_entry.GT.is_het())
                     )  
 # hom and unaff are not hom
-rec_non_trio_criteria = ((~phased_sv_tm.complete_trio) &  
+rec_non_trio_criteria = ((phased_sv_tm.trio_status!='trio') &  
                         (phased_sv_tm.n_hom_var_unaffected==0) &
                         (phased_sv_tm.proband_entry.GT.is_hom_var())
                         )

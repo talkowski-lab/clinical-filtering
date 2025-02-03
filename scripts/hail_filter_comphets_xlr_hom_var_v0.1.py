@@ -615,7 +615,7 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
 
 def annotate_and_filter_trio_matrix(tm, mt, pedigree):
     complete_trio_probands = [trio.s for trio in pedigree.complete_trios()]
-    if len(complete_trio_probands) == 0:
+    if len(complete_trio_probands)==0:
         complete_trio_probands = ['']
     tm = tm.annotate_cols(trio_status=hl.if_else(tm.fam_id=='-9', 'not_in_pedigree', 
                                                        hl.if_else(hl.array(complete_trio_probands).contains(tm.id), 'trio', 'non_trio')))

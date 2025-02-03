@@ -1,5 +1,5 @@
 ###
-# Copied over from hail_filter_comphets_xlr_hom_var_v0.1.py on 1/27/2025
+# Copied over from hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py on 1/27/2025
 # to incorporate updates made to NIFS pipeline
 
 ## CHANGE LOG:

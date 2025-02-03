@@ -25,6 +25,8 @@
 2/3/2025:
 - annotate phenotype and unaffected/affected counts
 - added annotate_and_filter_trio_matrix function to match SV outputs and reduce redundancy in code
+- added get_transmission in phase_by_transmission_aggregate_by_gene
+- added get_mendel_errors in annotate_and_filter_trio_matrix
 '''
 ###
 
@@ -570,10 +572,18 @@ def mendel_errors(call, pedigree) -> Tuple[Table, Table, Table, Table]:
 
 ## STEP 2: Get CompHets
 # Mendel errors
-def get_mendel_errors(mt, phased_tm, pedigree):
+def get_mendel_errors(mt, tm, pedigree):
     all_errors, per_fam, per_sample, per_variant = mendel_errors(mt['GT'], pedigree)  # edited Hail function, see above
     all_errors_mt = all_errors.key_by().to_matrix_table(row_key=[locus_expr,'alleles'], col_key=['s'], col_fields=['fam_id'])
-    phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_key, phased_tm.col_key].mendel_code)
+    tm = tm.annotate_entries(mendel_code=all_errors_mt[tm.row_key, tm.col_key].mendel_code)
+    return tm
+
+def get_transmission(phased_tm):
+    phased_tm = phased_tm.annotate_entries(transmission=hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|0'), 'uninherited',
+            hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|1'), 'inherited_from_mother',
+                        hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|0'), 'inherited_from_father',
+                                hl.or_missing(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|1'), 'inherited_from_both'))))
+    )
     return phased_tm
 
 def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
@@ -582,8 +592,10 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     tm = tm.filter_entries(tm.proband_entry.GT.is_non_ref())
 
     phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
-    phased_tm = get_mendel_errors(mt, phased_tm, pedigree)
     phased_tm = phased_tm.key_rows_by(locus_expr,'alleles','gene')
+
+    # NEW 2/3/2025: get_transmission in phase_by_transmission_aggregate_by_gene
+    phased_tm = get_transmission(phased_tm)
 
     # NEW 1/14/2025: filter_entries before aggregation
     phased_tm = phased_tm.filter_entries(hl.is_defined(phased_tm.proband_entry.GT))
@@ -605,6 +617,9 @@ def annotate_and_filter_trio_matrix(tm, mt, pedigree):
     complete_trio_probands = [trio.s for trio in pedigree.complete_trios()]
     tm = tm.annotate_cols(trio_status=hl.if_else(tm.fam_id=='-9', 'not_in_pedigree', 
                                                        hl.if_else(hl.array(complete_trio_probands).contains(tm.id), 'trio', 'non_trio')))
+
+    # NEW 2/3/2025: get_mendel_errors in annotate_and_filter_trio_matrix
+    tm = get_mendel_errors(mt, tm, pedigree)
 
     # Annotate affected status/phenotype from pedigree
     tm = tm.annotate_cols(

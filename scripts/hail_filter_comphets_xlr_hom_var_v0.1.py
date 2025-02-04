@@ -595,7 +595,7 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
     
     # NEW 2/3/2025: Run annotate_and_filter_trio_matrix after phasing in phase_by_transmission_aggregate_by_gene
-    subset_tm = annotate_and_filter_trio_matrix(phased_tm, mt, pedigree) 
+    phased_tm = annotate_and_filter_trio_matrix(phased_tm, mt, pedigree) 
 
     phased_tm = phased_tm.key_rows_by(locus_expr,'alleles','gene')
 

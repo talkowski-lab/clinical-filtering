@@ -24,7 +24,7 @@
 - added remove_parent_probands_trio_matrix function --> removes redundant "trios"
 2/3/2025:
 - annotate phenotype and unaffected/affected counts
-- added annotate_and_filter_trio_matrix function to match SV outputs and reduce redundancy in code
+- added annotate_and_filter_trio_matrix function to match SV outputs and reduce redundancy in code (run after phasing in phase_by_transmission_aggregate_by_gene)
 - added get_transmission in phase_by_transmission_aggregate_by_gene
 - added get_mendel_errors in annotate_and_filter_trio_matrix
 - changed variant_type annotation to variant_types to retain original variant_type field for comphets
@@ -593,6 +593,10 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     tm = tm.filter_entries(tm.proband_entry.GT.is_non_ref())
 
     phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
+    
+    # NEW 2/3/2025: Run annotate_and_filter_trio_matrix after phasing in phase_by_transmission_aggregate_by_gene
+    subset_tm = annotate_and_filter_trio_matrix(phased_tm, mt, pedigree) 
+
     phased_tm = phased_tm.key_rows_by(locus_expr,'alleles','gene')
 
     # NEW 2/3/2025: get_transmission in phase_by_transmission_aggregate_by_gene
@@ -661,7 +665,7 @@ def annotate_and_filter_trio_matrix(tm, mt, pedigree):
                             )
 
     tm = tm.annotate_entries(dominant_gt=((dom_trio_criteria) | (dom_non_trio_criteria)),
-                                  recessive_gt=((rec_trio_criteria) | (rec_non_trio_criteria)))
+                            recessive_gt=((rec_trio_criteria) | (rec_non_trio_criteria)))
     
     # filter by AD of alternate allele in proband
     # NEW 1/30/2025: allow for missing proband_entry.AD (e.g. for SVs)
@@ -680,7 +684,6 @@ def get_subset_tm(mt, samples, pedigree, keep=True, complete_trios=False):
 
     subset_tm = hl.trio_matrix(subset_mt, pedigree, complete_trios=complete_trios)
     subset_tm = remove_parent_probands_trio_matrix(subset_tm)  # NEW 1/31/2025: Removes redundant "trios"  
-    subset_tm = annotate_and_filter_trio_matrix(subset_tm, subset_mt, pedigree)  # NEW 2/3/2025
     return subset_mt, subset_tm
 
 def get_non_trio_comphets(mt):
@@ -806,7 +809,6 @@ if len(trio_samples)==0:
 # Trio matrix
 merged_tm = hl.trio_matrix(merged_mt, pedigree, complete_trios=False)
 merged_tm = remove_parent_probands_trio_matrix(merged_tm)  # NEW 1/31/2025: Removes redundant "trios"  
-merged_tm = annotate_and_filter_trio_matrix(merged_tm, merged_mt, pedigree)  # NEW 2/3/2025 
 
 gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(merged_tm, merged_mt, pedigree)
 

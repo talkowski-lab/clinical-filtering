@@ -573,11 +573,11 @@ def mendel_errors(call, pedigree) -> Tuple[Table, Table, Table, Table]:
 
 ## STEP 2: Get CompHets
 # Mendel errors
-def get_mendel_errors(mt, tm, pedigree):
+def get_mendel_errors(mt, phased_tm, pedigree):
     all_errors, per_fam, per_sample, per_variant = mendel_errors(mt['GT'], pedigree)  # edited Hail function, see above
     all_errors_mt = all_errors.key_by().to_matrix_table(row_key=[locus_expr,'alleles'], col_key=['s'], col_fields=['fam_id'])
-    tm = tm.annotate_entries(mendel_code=all_errors_mt[tm.row_key, tm.col_key].mendel_code)
-    return tm
+    phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_key, phased_tm.col_key].mendel_code)
+    return phased_tm
 
 def get_transmission(phased_tm):
     phased_tm = phased_tm.annotate_entries(transmission=hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|0'), 'uninherited',

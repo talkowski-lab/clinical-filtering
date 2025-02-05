@@ -11,6 +11,8 @@
 - added remove_parent_probands_trio_matrix function --> removes redundant "trios"
 2/3/2025:
 - changed complete_trio annotation to trio_status to match comphet script
+2/5/2025:
+- moved ped format standardization to before ped_ht
 '''
 ###
 
@@ -73,7 +75,13 @@ sv_mt = hl.import_vcf(sv_vcf, force_bgz=sv_vcf.split('.')[-1] in ['gz', 'bgz'],
 header = hl.get_vcf_metadata(sv_vcf)
 
 # Annotate affected status/phenotype from pedigree
-ped_ht = hl.import_table(ped_uri, delimiter='\t').key_by('sample_id')
+# NEW 2/5/2025: Moved ped format standardization to before ped_ht
+tmp_ped = pd.read_csv(ped_uri, sep='\t').iloc[:,:6]
+tmp_ped.columns = ['family_id', 'sample_id', 'paternal_id', 'maternal_id', 'sex', 'phenotype']
+cropped_ped_uri = f"{os.path.basename(ped_uri).split('.ped')[0]}_crop.ped"
+tmp_ped.to_csv(cropped_ped_uri, sep='\t', index=False)
+
+ped_ht = hl.import_table(cropped_ped_uri, delimiter='\t').key_by('sample_id')
 sv_mt = sv_mt.annotate_cols(phenotype=ped_ht[sv_mt.s].phenotype)
 
 # Get cohort unaffected/affected het and homvar counts
@@ -85,9 +93,6 @@ sv_mt = sv_mt.annotate_rows(**{
 })
 
 # Phasing
-tmp_ped = pd.read_csv(ped_uri, sep='\t').iloc[:,:6]
-cropped_ped_uri = f"{os.path.basename(ped_uri).split('.ped')[0]}_crop.ped"
-tmp_ped.to_csv(cropped_ped_uri, sep='\t', index=False)
 pedigree = hl.Pedigree.read(cropped_ped_uri, delimiter='\t')
 
 sv_tm = hl.trio_matrix(sv_mt, pedigree, complete_trios=False)

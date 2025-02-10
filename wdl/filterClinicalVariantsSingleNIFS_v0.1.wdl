@@ -26,7 +26,8 @@ workflow filterClinicalVariants {
         String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_NIFS_v0.1.py"
         String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_NIFS_v0.1.py"
         String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py"
-
+        String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/parseTSV_NIFS.py"
+        
         String hail_docker
         String sv_base_mini_docker
 
@@ -49,13 +50,15 @@ workflow filterClinicalVariants {
         Boolean include_not_omim=false  # NIFS-specific
         Boolean include_all_maternal_carrier_variants=true  # NIFS-specific
 
-        File carrier_gene_list  # NIFS-specific
+        File carrier_gene_list  # NIFS-specific, TODO: not actually NIFS-specific anymore?
+        File extra_inheritance_gene_list  # NIFS-specific
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
         String dom_gene_list_tsv='NA'
 
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_omim
         RuntimeAttr? runtime_attr_filter_comphets
+        RuntimeAttr? runtime_attr_filter_tiers
     }
 
     call makeDummyPed {
@@ -118,6 +121,26 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_comphets
     }
 
+    call finalFilteringTiers as finalFilteringTiersDominant {
+        input:
+            input_tsv=runClinicalFilteringOMIM.omim_dominant,
+            extra_inheritance_gene_list=extra_inheritance_gene_list,
+            inheritance_type='dominant',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
+    call finalFilteringTiers as finalFilteringTiersRecessive {
+        input:
+            input_tsv=filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv,
+            extra_inheritance_gene_list=extra_inheritance_gene_list,
+            inheritance_type='recessive',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
     output {
         File mat_carrier_tsv = runClinicalFiltering.mat_carrier_tsv
         File clinvar_tsv = runClinicalFiltering.clinvar
@@ -128,6 +151,9 @@ workflow filterClinicalVariants {
         File omim_recessive_tsv = runClinicalFilteringOMIM.omim_recessive_tsv  # NEW 1/17/2025
         File omim_dominant_tsv = runClinicalFilteringOMIM.omim_dominant
         File comphet_xlr_hom_var_mat_carrier_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv
+
+        File final_omim_dominant_tsv = finalFilteringTiersDominant.filtered_tsv  # NEW 2/10/2025
+        File final_comphet_xlr_hom_var_mat_carrier_tsv = finalFilteringTiersRecessive.filtered_tsv  # NEW 2/10/2025
     }
 }
 
@@ -241,5 +267,59 @@ task makeDummyPed {
 
     output {
         File ped_uri = out_ped
+    }
+}
+
+task finalFilteringTiers {
+    input {
+        File input_tsv
+        File extra_inheritance_gene_list
+
+        String inheritance_type
+        String hail_docker
+        String filter_final_tiers_script
+        
+        RuntimeAttr? runtime_attr_override
+    }
+
+    Float input_size = size(input_tsv, 'GB')
+    Float base_disk_gb = 10.0
+    Float input_disk_scale = 5.0
+
+    RuntimeAttr runtime_default = object {
+        mem_gb: 4,
+        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
+        cpu_cores: 1,
+        preemptible_tries: 3,
+        max_retries: 1,
+        boot_disk_gb: 10
+    }
+
+    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
+
+    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
+    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
+    
+    runtime {
+        memory: "~{memory} GB"
+        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
+        cpu: cpu_cores
+        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
+        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
+        docker: hail_docker
+        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
+    }
+
+    String file_ext = if sub(basename(input_tsv), '.tsv.gz', '')!=basename(input_tsv) then '.tsv.gz' else '.tsv'
+    String output_filename = basename(input_tsv, file_ext) + '.filtered.tiers.tsv'
+
+    command <<<
+    set -eou pipefail
+    curl ~{filter_final_tiers_script} > parseTSV.py
+    python3 parseTSV.py -i ~{input_tsv} -o ~{output_filename} -l ~{extra_inheritance_gene_list} -t ~{inheritance_type}
+    >>>
+
+    output {
+        File filtered_tsv = output_filename
     }
 }

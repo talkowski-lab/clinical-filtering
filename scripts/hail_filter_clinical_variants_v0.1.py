@@ -10,6 +10,8 @@
 - removed "# NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)" code logic for outputs (NIFS-specific)
 1/31/2025:
 - added remove_parent_probands_trio_matrix function --> removes redundant "trios"
+2/10/2025:
+- added include_all_maternal_carrier_variants parameter
 '''
 ###
 
@@ -30,6 +32,7 @@ af_threshold = float(sys.argv[6])
 gnomad_af_threshold = float(sys.argv[7])
 build = sys.argv[8]
 pass_filter = ast.literal_eval(sys.argv[9].capitalize())
+include_all_maternal_carrier_variants = ast.literal_eval(sys.argv[10].capitalize())
 
 def filter_mt(mt, filter_csq=True, filter_impact=True):
     '''
@@ -180,5 +183,7 @@ hl.export_vcf(clinvar_mt, prefix+'_clinvar_variants.vcf.bgz', metadata=header, t
 # export ClinVar TSV
 clinvar_tm.entries().flatten().export(prefix+'_clinvar_variants.tsv.gz', delimiter='\t')
 
+# NEW 2/10/2025: added include_all_maternal_carrier_variants parameter
 # export GenCC_OMIM TSV
-gencc_omim_tm.entries().flatten().export(prefix+'_mat_carrier_variants.tsv.gz', delimiter='\t')
+if include_all_maternal_carrier_variants:
+    gencc_omim_tm.entries().flatten().export(prefix+'_mat_carrier_variants.tsv.gz', delimiter='\t')

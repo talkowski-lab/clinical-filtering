@@ -13,6 +13,8 @@
 - only include fetal sample in output (mother_entry will be filled)
 1/21/2025:
 - added CA_from_GT annotation to INFO
+2/10/2025:
+- added include_all_maternal_carrier_variants parameter
 '''
 ###
 
@@ -33,6 +35,7 @@ af_threshold = float(sys.argv[6])
 gnomad_af_threshold = float(sys.argv[7])
 build = sys.argv[8]
 pass_filter = ast.literal_eval(sys.argv[9].capitalize())
+include_all_maternal_carrier_variants = ast.literal_eval(sys.argv[10].capitalize())
 
 def filter_mt(mt, filter_csq=True, filter_impact=True):
     '''
@@ -211,5 +214,7 @@ hl.export_vcf(clinvar_mt, prefix+'_clinvar_variants.vcf.bgz', metadata=header, t
 # export ClinVar TSV
 clinvar_tm.filter_cols(clinvar_tm.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_clinvar_variants.tsv.gz', delimiter='\t')
 
+# NEW 2/10/2025: added include_all_maternal_carrier_variants parameter
 # export GenCC_OMIM TSV
-gencc_omim_tm.filter_cols(gencc_omim_tm.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_mat_carrier_variants.tsv.gz', delimiter='\t')
+if include_all_maternal_carrier_variants:
+    gencc_omim_tm.filter_cols(gencc_omim_tm.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_mat_carrier_variants.tsv.gz', delimiter='\t')

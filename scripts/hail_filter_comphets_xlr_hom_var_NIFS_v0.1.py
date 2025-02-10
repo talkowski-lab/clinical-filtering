@@ -52,14 +52,11 @@ clinvar_vcf = sys.argv[2]
 sv_vcf = sys.argv[3]
 ped_uri = sys.argv[4]
 prefix = sys.argv[5]
-omim_uri = sys.argv[6]
-sv_gene_fields = sys.argv[7].split(',') 
-build = sys.argv[8]
-cores = sys.argv[9]  # string
-mem = int(np.floor(float(sys.argv[10])))
-ad_alt_threshold = int(sys.argv[11])
-rec_gene_list_tsv = sys.argv[12]
-carrier_gene_list = sys.argv[13]
+build = sys.argv[6]
+cores = sys.argv[7]  # string
+mem = int(np.floor(float(sys.argv[8])))
+ad_alt_threshold = int(sys.argv[9])
+carrier_gene_list = sys.argv[10]
 
 hl.init(min_block_size=128, 
         local=f"local[*]", 
@@ -151,143 +148,8 @@ if snv_indel_vcf!='NA':
     snv_mt = snv_mt.annotate_rows(variant_type='SNV/Indel', 
                                   gene_source=['vep'])
     
-    # NEW 1/7/2025
-    # Annotate by gene list(s)
-    if rec_gene_list_tsv!='NA':
-        gene_list_uris = pd.read_csv(rec_gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
-        gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
-                    for gene_list_name, uri in gene_list_uris.items()}
-
-        snv_mt = snv_mt.annotate_rows(
-            gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(snv_mt.gene), gene_list_name) 
-                for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
-    
-# Load SV VCF
-if sv_vcf!='NA':
-    locus_expr = 'locus_interval'
-    sv_mt = hl.import_vcf(sv_vcf, reference_genome=build, force_bgz=True, call_fields=[], array_elements_required=False)
-
-    # filter out BNDs
-    sv_mt = sv_mt.filter_rows(sv_mt.info.SVTYPE!='BND') 
-
-    # Annotate genes —— ignore genes for CPX SVs
-    sv_mt = sv_mt.annotate_rows(gene=hl.or_missing(sv_mt.info.SVTYPE!='CPX', 
-                                                   hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in sv_gene_fields])))))
-    sv_mt = sv_mt.annotate_rows(variant_type='SV')
-
-    sv_mt = sv_mt.explode_rows(sv_mt.gene)
-
-    # get gene source
-    def get_predicted_sources_expr(row_expr, sv_gene_fields):
-        return hl.array(
-            [hl.or_missing(hl.array(row_expr.info[col]).contains(row_expr.gene), col) for col in sv_gene_fields]
-        ).filter(hl.is_defined)
-
-    sv_mt = sv_mt.annotate_rows(gene_source=get_predicted_sources_expr(sv_mt, sv_gene_fields))
-
-    # Make "fake" VEP annotations for SV MT formatting
-    if (snv_indel_vcf!='NA'):
-        snv_vep_fields = {field: str(snv_mt.vep.transcript_consequences[field].dtype) for field in list(snv_mt.row.vep.transcript_consequences)}
-    else:
-        snv_vep_fields = {'OMIM_MIM_number': 'array<str>', 'OMIM_inheritance_code': 'str'}
-    sv_mt = sv_mt.annotate_rows(vep=hl.struct(transcript_consequences=
-            {field: hl.missing(dtype) for field, dtype in snv_vep_fields.items()}))
-
-    # Annotate OMIM in SVs
-    omim = hl.import_table(omim_uri).key_by('approvedGeneSymbol')
-    sv_mt = sv_mt.key_rows_by('gene')
-    sv_mt = sv_mt.annotate_rows(vep=sv_mt.vep.annotate(
-        transcript_consequences=sv_mt.vep.transcript_consequences.annotate(
-        OMIM_MIM_number=hl.if_else(hl.is_defined(omim[sv_mt.row_key]), omim[sv_mt.row_key].mimNumber, ''),
-        OMIM_inheritance_code=hl.if_else(hl.is_defined(omim[sv_mt.row_key]), omim[sv_mt.row_key].inheritance_code, ''))))
-    sv_mt = sv_mt.key_rows_by('locus', 'alleles')
-
-    # NEW 1/7/2025 
-    # Annotate and filter by gene list(s)
-    if rec_gene_list_tsv!='NA':
-        gene_list_uris = pd.read_csv(rec_gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
-        gene_lists = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
-                    for gene_list_name, uri in gene_list_uris.items()}
-
-        sv_mt = sv_mt.annotate_rows(
-            gene_lists=hl.array([hl.or_missing(hl.array(gene_list).contains(sv_mt.gene), gene_list_name) 
-                for gene_list_name, gene_list in gene_lists.items()]).filter(hl.is_defined))
-
-        # OMIM recessive code
-        omim_rec_code = (sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('2'))
-        # OMIM XLR code
-        omim_xlr_code = (sv_mt.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))
-        in_gene_list = (sv_mt.gene_lists.size()>0)
-        sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code | in_gene_list)
-
-# Unify SNV/Indel MT and SV MT INFO (row) and entry fields
-if (snv_indel_vcf!='NA') and (sv_vcf!='NA'):
-    sv_info_fields, sv_entry_fields = list(sv_mt.row.info), list(sv_mt.entry)
-    snv_info_fields, snv_entry_fields = list(snv_mt.row.info), list(snv_mt.entry)
-
-    sv_missing_entry_fields = {field: str(snv_mt[field].dtype) for field in np.setdiff1d(snv_entry_fields, sv_entry_fields)}
-    snv_missing_entry_fields = {field: str(sv_mt[field].dtype) for field in np.setdiff1d(sv_entry_fields, snv_entry_fields)}
-
-    sv_missing_info_fields = {field: str(snv_mt.info[field].dtype) for field in np.setdiff1d(snv_info_fields, sv_info_fields)}
-    snv_missing_info_fields = {field: str(sv_mt.info[field].dtype) for field in np.setdiff1d(sv_info_fields, snv_info_fields)}
-
-    sv_mt = sv_mt.annotate_entries(**{field: hl.missing(dtype) for field, dtype in sv_missing_entry_fields.items()})
-    snv_mt = snv_mt.annotate_entries(**{field: hl.missing(dtype) for field, dtype in snv_missing_entry_fields.items()})
-
-    sv_mt = sv_mt.select_entries(*sorted(list(sv_mt.entry)))
-    snv_mt = snv_mt.select_entries(*sorted(list(snv_mt.entry)))
-
-    sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(**{field: hl.missing(dtype) for field, dtype in sv_missing_info_fields.items()}))
-    snv_mt = snv_mt.annotate_rows(info=snv_mt.info.annotate(**{field: hl.missing(dtype) for field, dtype in snv_missing_info_fields.items()}))
-
-    sv_mt = sv_mt.annotate_rows(info=sv_mt.info.select(*sorted(list(sv_mt.info))))
-    snv_mt = snv_mt.annotate_rows(info=snv_mt.info.select(*sorted(list(snv_mt.info))))
-
-    sv_mt = sv_mt.key_rows_by().select_rows(*sorted(list(sv_mt.row))).key_rows_by('locus','alleles')
-    snv_mt = snv_mt.key_rows_by().select_rows(*sorted(list(snv_mt.row))).key_rows_by('locus','alleles')
-
-    # Subset shared samples 
-    sv_samps = sv_mt.s.collect()
-    snv_samps = snv_mt.s.collect()
-    shared_samps = list(np.intersect1d(sv_samps, snv_samps))
-
-    if len(shared_samps)==0:
-        shared_samps = ['']
-
-    # Match column order before merging
-    def align_mt2_cols_to_mt1(mt1, mt2):
-        mt1 = mt1.add_col_index()
-        mt2 = mt2.add_col_index()
-        new_col_order = mt2.index_cols(mt1.col_key).col_idx.collect()
-        return mt2.choose_cols(new_col_order)
-    
-    sv_mt = sv_mt.filter_cols(hl.array(shared_samps).contains(sv_mt.s))
-    snv_mt = align_mt2_cols_to_mt1(sv_mt, snv_mt)
-
-    variant_types = 'SV_SNV_Indel'
-    merged_mt = sv_mt.union_rows(snv_mt)
-        
-elif snv_indel_vcf!='NA':
     variant_types = 'SNV_Indel'
     merged_mt = snv_mt
-
-elif sv_vcf!='NA':
-    variant_types = 'SV'
-    merged_mt = sv_mt
-
-# Clean up merged SV VCF with SNV/Indel VCF
-if sv_vcf!='NA':
-    # Change locus to locus_interval to include END for SVs
-    merged_mt = merged_mt.annotate_rows(end=hl.if_else(hl.is_defined(merged_mt.info.END2), merged_mt.info.END2, merged_mt.info.END))
-    # Account for INS having same END but different SVLEN
-    merged_mt = merged_mt.annotate_rows(end=hl.if_else(merged_mt.info.SVTYPE=='INS', merged_mt.end + merged_mt.info.SVLEN, merged_mt.end))
-    # Account for empty END for SNV/Indels
-    merged_mt = merged_mt.annotate_rows(end=hl.if_else(merged_mt.variant_type=='SNV/Indel', merged_mt.locus.position, merged_mt.end))
-    merged_mt = merged_mt.key_rows_by()
-    merged_mt = merged_mt.annotate_rows(locus_interval=hl.locus_interval(contig=merged_mt.locus.contig, 
-                                                                              start=merged_mt.locus.position,
-                                                                              end=merged_mt.end, reference_genome=build))
-    merged_mt = merged_mt.key_rows_by(locus_expr, 'alleles')
 
 # NEW 1/14/2025: Annotate PAR status (moved up from end of script)
 merged_mt = merged_mt.annotate_rows(in_non_par=~(merged_mt.locus.in_autosome_or_par()))

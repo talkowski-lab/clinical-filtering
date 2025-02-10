@@ -17,6 +17,7 @@ workflow filterClinicalVariants {
     input {
         Array[File] annot_vcf_files
         File ped_uri
+        File empty_file  # for if include_all_maternal_carrier_variants=false
 
         String cohort_prefix
         String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_v0.1.py"
@@ -41,6 +42,7 @@ workflow filterClinicalVariants {
         String genome_build='GRCh38'
         Int families_per_chunk=500
 
+        Boolean include_all_maternal_carrier_variants=false
         Boolean pass_filter=false
         Boolean include_not_omim=true  # NIFS-specific
 
@@ -73,6 +75,8 @@ workflow filterClinicalVariants {
             gnomad_af_threshold=gnomad_af_threshold,
             genome_build=genome_build,
             pass_filter=pass_filter,
+            include_all_maternal_carrier_variants=include_all_maternal_carrier_variants,
+            empty_file=empty_file,
             runtime_attr_override=runtime_attr_filter
         }
 
@@ -118,13 +122,15 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_merge_omim_dom
     }
 
-    call helpers.mergeResultsPython as mergeMaternalCarriers {
-        input:
-            tsvs=runClinicalFiltering.mat_carrier_tsv,
-            hail_docker=hail_docker,
-            input_size=size(runClinicalFiltering.mat_carrier_tsv, 'GB'),
-            merged_filename=cohort_prefix+'_mat_carrier_variants.tsv.gz',
-            runtime_attr_override=runtime_attr_merge_mat_carriers
+    if (include_all_maternal_carrier_variants) {
+        call helpers.mergeResultsPython as mergeMaternalCarriers {
+            input:
+                tsvs=runClinicalFiltering.mat_carrier_tsv,
+                hail_docker=hail_docker,
+                input_size=size(runClinicalFiltering.mat_carrier_tsv, 'GB'),
+                merged_filename=cohort_prefix+'_mat_carrier_variants.tsv.gz',
+                runtime_attr_override=runtime_attr_merge_mat_carriers
+        }
     }
 
     call helpers.mergeResultsPython as mergeOMIMRecessive {
@@ -155,7 +161,7 @@ workflow filterClinicalVariants {
     }
 
     output {
-        File mat_carrier_tsv = mergeMaternalCarriers.merged_tsv
+        File mat_carrier_tsv = select_first([mergeMaternalCarriers.merged_tsv, empty_file])
         File clinvar_tsv = mergeClinVar.merged_tsv
         File clinvar_vcf = mergeClinVarVCFs.merged_vcf_file
         File clinvar_vcf_idx = mergeClinVarVCFs.merged_vcf_idx

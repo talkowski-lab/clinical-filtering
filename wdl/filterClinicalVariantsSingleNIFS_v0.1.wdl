@@ -19,6 +19,7 @@ struct RuntimeAttr {
 workflow filterClinicalVariants {
     input {
         File vcf_file
+        File empty_file  # for if include_all_maternal_carrier_variants=false
 
         String predicted_sex_chrom_ploidy  # XX or XY
 
@@ -46,6 +47,7 @@ workflow filterClinicalVariants {
 
         Boolean pass_filter=false
         Boolean include_not_omim=false  # NIFS-specific
+        Boolean include_all_maternal_carrier_variants=true  # NIFS-specific
 
         File carrier_gene_list  # NIFS-specific
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
@@ -74,6 +76,8 @@ workflow filterClinicalVariants {
         gnomad_af_threshold=gnomad_af_threshold,
         genome_build=genome_build,
         pass_filter=pass_filter,
+        include_all_maternal_carrier_variants=include_all_maternal_carrier_variants,
+        empty_file=empty_file,
         runtime_attr_override=runtime_attr_filter
     }
 
@@ -106,13 +110,10 @@ workflow filterClinicalVariants {
             clinvar_vcf=runClinicalFiltering.clinvar_vcf,
             sv_vcf='NA',
             ped_uri=makeDummyPed.ped_uri,
-            omim_uri=runClinicalFiltering.clinvar_vcf,  # dummy input
-            sv_gene_fields=['NA'],
             filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
             genome_build=genome_build,
             hail_docker=hail_docker,
             ad_alt_threshold=ad_alt_threshold,
-            rec_gene_list_tsv=rec_gene_list_tsv,
             carrier_gene_list=carrier_gene_list,
             runtime_attr_override=runtime_attr_filter_comphets
     }

@@ -13,6 +13,7 @@ task runClinicalFiltering {
     input {
         File vcf_file
         File ped_uri
+        File empty_file
 
         String filter_clinical_variants_snv_indel_script
         String hail_docker
@@ -21,6 +22,7 @@ task runClinicalFiltering {
         Float af_threshold
         Float gnomad_af_threshold
         Boolean pass_filter
+        Boolean include_all_maternal_carrier_variants
 
         RuntimeAttr? runtime_attr_override
     }
@@ -58,11 +60,12 @@ task runClinicalFiltering {
     command {
         curl ~{filter_clinical_variants_snv_indel_script} > filter_vcf.py
         python3 filter_vcf.py ~{vcf_file} ~{prefix} ~{cpu_cores} ~{memory} \
-            ~{ped_uri} ~{af_threshold} ~{gnomad_af_threshold} ~{genome_build} ~{pass_filter}
+            ~{ped_uri} ~{af_threshold} ~{gnomad_af_threshold} ~{genome_build} ~{pass_filter} \
+            ~{include_all_maternal_carrier_variants}
     }
 
     output {
-        File mat_carrier_tsv = prefix + '_mat_carrier_variants.tsv.gz'
+        File mat_carrier_tsv = if include_all_maternal_carrier_variants then prefix + '_mat_carrier_variants.tsv.gz' else empty_file
         File clinvar = prefix + '_clinvar_variants.tsv.gz'
         File clinvar_vcf = prefix + '_clinvar_variants.vcf.bgz'
         File clinvar_vcf_idx = prefix + '_clinvar_variants.vcf.bgz.tbi'

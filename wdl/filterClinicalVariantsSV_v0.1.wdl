@@ -25,7 +25,7 @@ workflow filterClinicalVariantsSV {
         File hi_uri
         File ts_uri
 
-        File annot_beds_with_header_tsv
+        File annot_beds_with_header_tsv  # no header, 3 columns: name, uri, match_svtype (True or False)
 
         String cohort_prefix
         String genome_build='GRCh38'
@@ -73,11 +73,13 @@ workflow filterClinicalVariantsSV {
     scatter (arr in read_tsv(annot_beds_with_header_tsv)) {
         String annot_name = arr[0]
         File ref_bed_with_header = arr[1]
+        String match_svtype = arr[2]
     
         call intersectBed {
             input:
             bed_file=vcfToBed.bed_output,
             ref_bed_with_header=ref_bed_with_header,
+            match_svtype=match_svtype,
             cohort_prefix=cohort_prefix,
             bed_overlap_threshold=bed_overlap_threshold,
             variant_interpretation_docker=variant_interpretation_docker
@@ -202,6 +204,7 @@ task intersectBed {
     input {
         File bed_file
         File ref_bed_with_header
+        String match_svtype
         String cohort_prefix
         String variant_interpretation_docker
 
@@ -242,7 +245,12 @@ task intersectBed {
     command <<<
         set -eou pipefail
         tail -n +2 ~{ref_bed_with_header} > ref.bed 
-        bedtools intersect -wao -f ~{bed_overlap_threshold} -r -a ~{bed_file} -b ref.bed | bgzip > ~{cohort_prefix}_~{ref_bed_with_header_str}.bed.gz
+        if [ "~{match_svtype}" = "True" ]; then
+            # Assume 5th column of bed_file is SVTYPE and last column of ref.bed is SVTYPE
+            bedtools intersect -wao -f ~{bed_overlap_threshold} -r -a ~{bed_file} -b ref.bed | awk '{if ($5 == $(NF-1)) print}' | bgzip > ~{cohort_prefix}_~{ref_bed_with_header_str}.bed.gz
+        else 
+            bedtools intersect -wao -f ~{bed_overlap_threshold} -r -a ~{bed_file} -b ref.bed | bgzip > ~{cohort_prefix}_~{ref_bed_with_header_str}.bed.gz
+        fi
     >>>
 
     output {

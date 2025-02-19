@@ -15,7 +15,7 @@
 - moved ped format standardization to before ped_ht
 2/19/2025:
 - use dominant_freq and recessive_freq flag in INFO to filter for dominant and recessive outputs
-- merge all five outputs into one
+- annotate categories for merged output, instead of filtering for five separate outputs
 - get affected/unaffected counts at family-level
 '''
 ###
@@ -51,9 +51,9 @@ def get_transmission(phased_tm):
     )
     return phased_tm
 
-def filter_and_annotate_tm(tm, variant_category, filter_type='trio'):
+def filter_and_annotate_tm(tm, variant_category=None, filter_type='trio'):
     '''
-    Filter entries by presence in trio --> annotate by variant_category
+    Filter entries by presence in trio --> annotate by variant_category (if given)
     filter_type can be 'trio' or 'proband'
     '''
     if filter_type=='trio':
@@ -62,7 +62,8 @@ def filter_and_annotate_tm(tm, variant_category, filter_type='trio'):
                                     (tm.father_entry.GT.is_non_ref()))
     if filter_type=='proband':
         tm = tm.filter_entries(tm.proband_entry.GT.is_non_ref())
-    tm = tm.annotate_rows(variant_category=variant_category)
+    if variant_category:
+        tm = tm.annotate_rows(variant_category=variant_category)
     return tm
 
 def remove_parent_probands_trio_matrix(tm):
@@ -168,61 +169,64 @@ rec_non_trio_criteria = ((phased_sv_tm.trio_status!='trio') &
 phased_sv_tm = phased_sv_tm.annotate_entries(dominant_gt=((dom_trio_criteria) | (dom_non_trio_criteria)),
                               recessive_gt=((rec_trio_criteria) | (rec_non_trio_criteria)))
 
-# Output 1: grab Pathogenic only
-path_sv_tm = phased_sv_tm.filter_rows(hl.any(lambda x: x.matches('athogenic'), phased_sv_tm.info.clinical_interpretation) |  # ClinVar P/LP
-            (hl.is_defined(phased_sv_tm.info.dbvar_pathogenic)))  # dbVar Pathogenic
-path_sv_tm = filter_and_annotate_tm(path_sv_tm, 'P/LP')
+# NEW 2/19/2025: Annotate categories for merged output, instead of filtering
+# Category 1: Pathogenic only
+phased_sv_tm = phased_sv_tm.annotate_rows(
+    variant_category=hl.if_else(
+        hl.any(lambda x: x.matches('athogenic'), phased_sv_tm.info.clinical_interpretation) |  # ClinVar P/LP
+        (hl.is_defined(phased_sv_tm.info.dbvar_pathogenic)),  # dbVar Pathogenic 
+        hl.array(['P/LP']), 
+        hl.empty_array('str')
+    )
+)
 
-# Output 2: grab GD only
-gd_sv_tm = phased_sv_tm.filter_rows((hl.is_defined(phased_sv_tm.info.gd_sv_name)))  # GD region  
-gd_sv_tm = filter_and_annotate_tm(gd_sv_tm, 'GD')
+# Category 2: GD only
+phased_sv_tm = phased_sv_tm.annotate_rows(
+    variant_category=hl.if_else(
+        hl.is_defined(phased_sv_tm.info.gd_sv_name),  # GD region
+        phased_sv_tm.variant_category.append('GD'), 
+        phased_sv_tm.variant_category
+    )
+)
 
-# Output 3: grab large regions
+# Category 3: large regions
 size_field = [x for x in list(sv_mt.info) if 'passes_SVLEN_filter_' in x][0]
-large_sv_tm = phased_sv_tm.filter_rows(phased_sv_tm.info[size_field])
-large_sv_tm = filter_and_annotate_tm(large_sv_tm, 'large_region')
+phased_sv_tm = phased_sv_tm.annotate_rows(
+    variant_category=hl.if_else(
+        phased_sv_tm.info[size_field], 
+        phased_sv_tm.variant_category.append('large_region'), 
+        phased_sv_tm.variant_category
+    )
+)
 
 # NEW 2/19/2025: Use dominant_freq and recessive_freq flag in INFO to filter
-# Output 4: grab OMIM AD and XLD
-omim_dom_or_xld_code = ((hl.any(lambda x:x.matches('1'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AD code
-                                    (hl.any(lambda x:x.matches('3'), phased_sv_tm.info.OMIM_inheritance_code)))  # OMIM XLD code
-dom_sv_tm = phased_sv_tm.filter_rows(omim_dom_or_xld_code & phased_sv_tm.info.dominant_freq)
-dom_sv_tm = filter_and_annotate_tm(dom_sv_tm, 'OMIM_dominant')
+# Category 4: OMIM AD and XLD
+omim_dom_or_xld_code = (
+    (hl.any(lambda x: x.matches('1'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AD code
+    (hl.any(lambda x: x.matches('3'), phased_sv_tm.info.OMIM_inheritance_code))  # OMIM XLD code
+)
+phased_sv_tm = phased_sv_tm.annotate_rows(
+    variant_category=hl.if_else(
+        omim_dom_or_xld_code & phased_sv_tm.info.dominant_freq,
+        phased_sv_tm.variant_category.append('OMIM_dominant'), 
+        phased_sv_tm.variant_category
+    )
+)
 
-# Output 5: grab OMIM AR and XLR
-omim_rec_or_xlr_code = ((hl.any(lambda x:x.matches('2'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AR code
-                                    (hl.any(lambda x:x.matches('4'), phased_sv_tm.info.OMIM_inheritance_code)))  # OMIM XLR code
-rec_sv_tm = phased_sv_tm.filter_rows(omim_rec_or_xlr_code & phased_sv_tm.info.recessive_freq)
-rec_sv_tm = filter_and_annotate_tm(rec_sv_tm, 'OMIM_recessive')
+# Category 5: OMIM AR and XLR
+omim_dom_or_xld_code = (
+    (hl.any(lambda x: x.matches('2'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AR code
+    (hl.any(lambda x: x.matches('4'), phased_sv_tm.info.OMIM_inheritance_code))  # OMIM XLR code
+)
+phased_sv_tm = phased_sv_tm.annotate_rows(
+    variant_category=hl.if_else(
+        omim_dom_or_xld_code & phased_sv_tm.info.recessive_freq,
+        phased_sv_tm.variant_category.append('OMIM_recessive'), 
+        phased_sv_tm.variant_category
+    )
+)
 
-# NEW 2/19/2025: merge all five outputs above
-merged_output_tm = hl.MatrixTable.union_rows(*[path_sv_tm, gd_sv_tm, large_sv_tm, dom_sv_tm, rec_sv_tm])
-# Key by rsid/ID (should unique for SVs)
-merged_output_tm = merged_output_tm.key_rows_by('rsid')
-# Annotate all variant_category (as array) for each unique SV
-grouped_merged_output_tm = merged_output_tm.group_rows_by('rsid').aggregate_rows(variant_category=hl.agg.collect(merged_output_tm.variant_category)).result()
-# Subset phased_sv_tm to sites in the outputs and filter (to avoid union_rows in export)
-merged_output_tm = phased_sv_tm.key_rows_by('rsid').semi_join_rows(grouped_merged_output_tm.rows())
-merged_output_tm = filter_and_annotate_tm(merged_output_tm, '')
-# Annotate merged_output_tm with variant_category array from grouped TM
-merged_output_tm = merged_output_tm.annotate_rows(variant_category=grouped_merged_output_tm.rows()[merged_output_tm.row_key].variant_category)
-# Drop duplicate rows after merge
-merged_output_tm = merged_output_tm.distinct_by_row()
-
-# export P/LP TSV
-path_sv_tm.entries().flatten().export(os.path.basename(sv_vcf).split('.vcf')[0] + '_path_variants.tsv.gz', delimiter='\t')
-
-# export GD TSV
-gd_sv_tm.entries().flatten().export(os.path.basename(sv_vcf).split('.vcf')[0] + '_GD_variants.tsv.gz', delimiter='\t')
-
-# export large region TSV
-large_sv_tm.entries().flatten().export(os.path.basename(sv_vcf).split('.vcf')[0] + '_large_regions_variants.tsv.gz', delimiter='\t')
-
-# export OMIM dominant TSV
-dom_sv_tm.entries().flatten().export(os.path.basename(sv_vcf).split('.vcf')[0] + '_dominant_variants.tsv.gz', delimiter='\t')
-
-# export OMIM recessive TSV
-rec_sv_tm.entries().flatten().export(os.path.basename(sv_vcf).split('.vcf')[0] + '_recessive_variants.tsv.gz', delimiter='\t')
+merged_output_tm = filter_and_annotate_tm(phased_sv_tm)
 
 # export merged TSV
 merged_output_tm.entries().flatten().export(os.path.basename(sv_vcf).split('.vcf')[0] + '_merged_variants.tsv.gz', delimiter='\t')

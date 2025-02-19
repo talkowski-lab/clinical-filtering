@@ -181,11 +181,11 @@ workflow filterClinicalVariants {
         File omim_dominant_tsv = select_first([filterClinicalVariantsSNVIndel.omim_dominant_tsv, empty_file])
 
         # SVs
-        File sv_pathogenic_tsv = select_first([filterClinicalVariantsSV.sv_pathogenic_tsv, empty_file])
-        File sv_genomic_disorders_tsv = select_first([filterClinicalVariantsSV.sv_genomic_disorders_tsv, empty_file])
-        File sv_large_regions_tsv = select_first([filterClinicalVariantsSV.sv_large_regions_tsv, empty_file])
-        File sv_dominant_tsv = select_first([filterClinicalVariantsSV.sv_dominant_tsv, empty_file])
-        File sv_recessive_tsv = select_first([filterClinicalVariantsSV.sv_recessive_tsv, empty_file])
+        # File sv_pathogenic_tsv = select_first([filterClinicalVariantsSV.sv_pathogenic_tsv, empty_file])
+        # File sv_genomic_disorders_tsv = select_first([filterClinicalVariantsSV.sv_genomic_disorders_tsv, empty_file])
+        # File sv_large_regions_tsv = select_first([filterClinicalVariantsSV.sv_large_regions_tsv, empty_file])
+        # File sv_dominant_tsv = select_first([filterClinicalVariantsSV.sv_dominant_tsv, empty_file])
+        # File sv_recessive_tsv = select_first([filterClinicalVariantsSV.sv_recessive_tsv, empty_file])
         File sv_merged_clinical_tsv = select_first([filterClinicalVariantsSV.sv_merged_clinical_tsv, empty_file])
         File sv_flagged_vcf = select_first([filterClinicalVariantsSV.sv_flagged_vcf, empty_file])
         File sv_flagged_vcf_idx = select_first([filterClinicalVariantsSV.sv_flagged_vcf_idx, empty_file])

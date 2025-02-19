@@ -144,11 +144,11 @@ workflow filterClinicalVariantsSV {
     }
 
     output {
-        File sv_pathogenic_tsv = filterVCF.sv_pathogenic_tsv
-        File sv_genomic_disorders_tsv = filterVCF.sv_genomic_disorders_tsv
-        File sv_large_regions_tsv = filterVCF.sv_large_regions_tsv
-        File sv_dominant_tsv = filterVCF.sv_dominant_tsv
-        File sv_recessive_tsv = filterVCF.sv_recessive_tsv
+        # File sv_pathogenic_tsv = filterVCF.sv_pathogenic_tsv
+        # File sv_genomic_disorders_tsv = filterVCF.sv_genomic_disorders_tsv
+        # File sv_large_regions_tsv = filterVCF.sv_large_regions_tsv
+        # File sv_dominant_tsv = filterVCF.sv_dominant_tsv
+        # File sv_recessive_tsv = filterVCF.sv_recessive_tsv
         File sv_merged_clinical_tsv = filterVCF.sv_merged_clinical_tsv
         File sv_flagged_vcf = annotateGeneLevelVCF.annotated_vcf
         File sv_flagged_vcf_idx = annotateGeneLevelVCF.annotated_vcf_idx
@@ -592,11 +592,11 @@ task filterVCF {
 
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
     output {
-        File sv_pathogenic_tsv = basename(vcf_file, file_ext) + '_path_variants.tsv.gz'
-        File sv_genomic_disorders_tsv = basename(vcf_file, file_ext) + '_GD_variants.tsv.gz'
-        File sv_large_regions_tsv = basename(vcf_file, file_ext) + '_large_regions_variants.tsv.gz'
-        File sv_dominant_tsv = basename(vcf_file, file_ext) + '_dominant_variants.tsv.gz'
-        File sv_recessive_tsv = basename(vcf_file, file_ext) + '_recessive_variants.tsv.gz'
+        # File sv_pathogenic_tsv = basename(vcf_file, file_ext) + '_path_variants.tsv.gz'
+        # File sv_genomic_disorders_tsv = basename(vcf_file, file_ext) + '_GD_variants.tsv.gz'
+        # File sv_large_regions_tsv = basename(vcf_file, file_ext) + '_large_regions_variants.tsv.gz'
+        # File sv_dominant_tsv = basename(vcf_file, file_ext) + '_dominant_variants.tsv.gz'
+        # File sv_recessive_tsv = basename(vcf_file, file_ext) + '_recessive_variants.tsv.gz'
         File sv_merged_clinical_tsv = basename(vcf_file, file_ext) + '_merged_variants.tsv.gz'
     }
 }

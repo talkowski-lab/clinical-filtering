@@ -13,6 +13,9 @@
 - changed complete_trio annotation to trio_status to match comphet script
 2/5/2025:
 - moved ped format standardization to before ped_ht
+NEW 2/19/2025:
+- use dominant_freq and recessive_freq flag in INFO to filter for dominant and recessive outputs
+- merge all five outputs into one
 '''
 ###
 
@@ -165,14 +168,28 @@ large_sv_tm = phased_sv_tm.filter_rows(phased_sv_tm.info[size_field])
 large_sv_tm = filter_and_annotate_tm(large_sv_tm, 'large_region')
 
 # Output 4: grab OMIM AD and XLD
-dom_sv_tm = phased_sv_tm.filter_rows((hl.any(lambda x:x.matches('1'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AD code
+# NEW 2/19/2025: Use dominant_freq flag in INFO to filter
+omim_dom_or_xld_code = ((hl.any(lambda x:x.matches('1'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AD code
                                     (hl.any(lambda x:x.matches('3'), phased_sv_tm.info.OMIM_inheritance_code)))  # OMIM XLD code
+dom_sv_tm = phased_sv_tm.filter_rows(omim_dom_or_xld_code & phased_sv_tm.info.dominant_freq)
 dom_sv_tm = filter_and_annotate_tm(dom_sv_tm, 'OMIM_dominant')
 
 # Output 5: grab OMIM AR and XLR
-rec_sv_tm = phased_sv_tm.filter_rows((hl.any(lambda x:x.matches('2'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AD code
-                                    (hl.any(lambda x:x.matches('4'), phased_sv_tm.info.OMIM_inheritance_code)))  # OMIM XLD code
+# NEW 2/19/2025: Use recessive_freq flag in INFO to filter
+omim_rec_or_xlr_code = ((hl.any(lambda x:x.matches('2'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AR code
+                                    (hl.any(lambda x:x.matches('4'), phased_sv_tm.info.OMIM_inheritance_code)))  # OMIM XLR code
+rec_sv_tm = phased_sv_tm.filter_rows(omim_rec_or_xlr_code & phased_sv_tm.info.recessive_freq)
 rec_sv_tm = filter_and_annotate_tm(rec_sv_tm, 'OMIM_recessive')
+
+# NEW 2/19/2025: merge all five outputs above
+merged_output_tm = hl.MatrixTable.union_rows(*[path_sv_tm, gd_sv_tm, large_sv_tm, dom_sv_tm, rec_sv_tm])
+# Key by rsid/ID (should unique for SVs)
+merged_output_tm = merged_output_tm.key_rows_by('rsid')
+# Annotate all variant_category (as array) for each unique SV
+grouped_merged_output_tm = merged_output_tm.group_rows_by('rsid').aggregate_rows(variant_category=hl.agg.collect(merged_output_tm.variant_category)).result()
+merged_output_tm = merged_output_tm.annotate_rows(variant_category=grouped_merged_output_tm.rows()[merged_output_tm.row_key].variant_category)
+# Drop duplicate rows after merge
+merged_output_tm = merged_output_tm.distinct_by_row()
 
 # export P/LP TSV
 path_sv_tm.entries().flatten().export(os.path.basename(sv_vcf).split('.vcf')[0] + '_path_variants.tsv.gz', delimiter='\t')
@@ -188,3 +205,6 @@ dom_sv_tm.entries().flatten().export(os.path.basename(sv_vcf).split('.vcf')[0] +
 
 # export OMIM recessive TSV
 rec_sv_tm.entries().flatten().export(os.path.basename(sv_vcf).split('.vcf')[0] + '_recessive_variants.tsv.gz', delimiter='\t')
+
+# export merged TSV
+merged_output_tm.entries().flatten().export(os.path.basename(sv_vcf).split('.vcf')[0] + '_merged_variants.tsv.gz', delimiter='\t')

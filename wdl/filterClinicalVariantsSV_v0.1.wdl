@@ -147,6 +147,7 @@ workflow filterClinicalVariantsSV {
         File sv_large_regions_tsv = filterVCF.sv_large_regions_tsv
         File sv_dominant_tsv = filterVCF.sv_dominant_tsv
         File sv_recessive_tsv = filterVCF.sv_recessive_tsv
+        File sv_merged_clinical_tsv = filterVCF.sv_merged_clinical_tsv
         File sv_flagged_vcf = annotateGeneLevelVCF.annotated_vcf
         File sv_flagged_vcf_idx = annotateGeneLevelVCF.annotated_vcf_idx
     }
@@ -588,5 +589,6 @@ task filterVCF {
         File sv_large_regions_tsv = basename(vcf_file, file_ext) + '_large_regions_variants.tsv.gz'
         File sv_dominant_tsv = basename(vcf_file, file_ext) + '_dominant_variants.tsv.gz'
         File sv_recessive_tsv = basename(vcf_file, file_ext) + '_recessive_variants.tsv.gz'
+        File sv_merged_clinical_tsv = basename(vcf_file, file_ext) + '_merged_variants.tsv.gz'
     }
 }

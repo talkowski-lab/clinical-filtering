@@ -186,6 +186,7 @@ workflow filterClinicalVariants {
         File sv_large_regions_tsv = select_first([filterClinicalVariantsSV.sv_large_regions_tsv, empty_file])
         File sv_dominant_tsv = select_first([filterClinicalVariantsSV.sv_dominant_tsv, empty_file])
         File sv_recessive_tsv = select_first([filterClinicalVariantsSV.sv_recessive_tsv, empty_file])
+        File sv_merged_clinical_tsv = select_first([filterClinicalVariantsSV.sv_merged_clinical_tsv, empty_file])
         File sv_flagged_vcf = select_first([filterClinicalVariantsSV.sv_flagged_vcf, empty_file])
         File sv_flagged_vcf_idx = select_first([filterClinicalVariantsSV.sv_flagged_vcf_idx, empty_file])
 

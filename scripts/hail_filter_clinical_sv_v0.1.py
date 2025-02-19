@@ -13,9 +13,10 @@
 - changed complete_trio annotation to trio_status to match comphet script
 2/5/2025:
 - moved ped format standardization to before ped_ht
-NEW 2/19/2025:
+2/19/2025:
 - use dominant_freq and recessive_freq flag in INFO to filter for dominant and recessive outputs
 - merge all five outputs into one
+- get affected/unaffected counts at family-level
 '''
 ###
 
@@ -88,15 +89,25 @@ ped_ht = hl.import_table(cropped_ped_uri, delimiter='\t').key_by('sample_id')
 sv_mt = sv_mt.annotate_cols(phenotype=ped_ht[sv_mt.s].phenotype)
 
 # Get cohort unaffected/affected het and homvar counts
+# Get cohort unaffected/affected het and homvar counts
 sv_mt = sv_mt.annotate_rows(**{
-    "n_het_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_het())),
-    "n_hom_var_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_hom_var())),
-    "n_het_affected": hl.agg.filter(sv_mt.phenotype=='2', hl.agg.sum(sv_mt.GT.is_het())),
-    "n_hom_var_affected": hl.agg.filter(sv_mt.phenotype=='2', hl.agg.sum(sv_mt.GT.is_hom_var()))
+    "n_cohort_het_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_het())),
+    "n_cohort_hom_var_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_hom_var())),
+    "n_cohort_het_affected": hl.agg.filter(sv_mt.phenotype=='2', hl.agg.sum(sv_mt.GT.is_het())),
+    "n_cohort_hom_var_affected": hl.agg.filter(sv_mt.phenotype=='2', hl.agg.sum(sv_mt.GT.is_hom_var()))
 })
 
 # Phasing
 pedigree = hl.Pedigree.read(cropped_ped_uri, delimiter='\t')
+
+# NEW 2/19/2025: Get affected/unaffected counts at family-level
+fam_sv_mt = sv_mt.annotate_cols(family_id=ped_ht[sv_mt.s].family_id)
+grouped_fam_sv_mt = fam_sv_mt.group_cols_by(fam_sv_mt.family_id).aggregate(**{
+    "n_family_het_unaffected": hl.agg.filter(fam_sv_mt.phenotype=='1', hl.agg.sum(fam_sv_mt.GT.is_het())),
+    "n_family_hom_var_unaffected": hl.agg.filter(fam_sv_mt.phenotype=='1', hl.agg.sum(fam_sv_mt.GT.is_hom_var())),
+    "n_family_het_affected": hl.agg.filter(fam_sv_mt.phenotype=='2', hl.agg.sum(fam_sv_mt.GT.is_het())),
+    "n_family_hom_var_affected": hl.agg.filter(fam_sv_mt.phenotype=='2', hl.agg.sum(fam_sv_mt.GT.is_hom_var()))
+})
 
 sv_tm = hl.trio_matrix(sv_mt, pedigree, complete_trios=False)
 sv_tm = remove_parent_probands_trio_matrix(sv_tm)  # NEW 1/31/2025: Removes redundant "trios"  
@@ -118,14 +129,18 @@ phased_sv_tm = phased_sv_tm.annotate_cols(trio_status=hl.if_else(phased_sv_tm.fa
 phased_sv_tm = phased_sv_tm.annotate_cols(
     proband=phased_sv_tm.proband.annotate(
         phenotype=ped_ht[phased_sv_tm.proband.s].phenotype),
-mother=phased_sv_tm.mother.annotate(
-        phenotype=ped_ht[phased_sv_tm.mother.s].phenotype),
-father=phased_sv_tm.father.annotate(
-        phenotype=ped_ht[phased_sv_tm.father.s].phenotype))
+    mother=phased_sv_tm.mother.annotate(
+            phenotype=ped_ht[phased_sv_tm.mother.s].phenotype),
+    father=phased_sv_tm.father.annotate(
+            phenotype=ped_ht[phased_sv_tm.father.s].phenotype))
 
-affected_cols = ['n_het_unaffected', 'n_hom_var_unaffected', 'n_het_affected', 'n_hom_var_affected']
+cohort_affected_cols = ["n_cohort_het_unaffected", "n_cohort_hom_var_unaffected", "n_cohort_het_affected", "n_cohort_hom_var_affected"]
 phased_sv_tm = phased_sv_tm.annotate_rows(**{col: sv_mt.rows()[phased_sv_tm.row_key][col] 
-                                             for col in affected_cols})
+                                             for col in cohort_affected_cols})
+
+family_affected_cols = ["n_family_het_unaffected", "n_family_hom_var_unaffected", "n_family_het_affected", "n_family_hom_var_affected"]
+phased_sv_tm = phased_sv_tm.annotate_entries(**{col: grouped_fam_sv_mt[phased_sv_tm.row_key, phased_sv_tm.fam_id][col]
+                                             for col in family_affected_cols})
 
 ## Annotate dominant_gt and recessive_gt
 # denovo
@@ -133,8 +148,8 @@ dom_trio_criteria = ((phased_sv_tm.trio_status=='trio') &
                      (phased_sv_tm.mendel_code==2))
 # het absent in unaff
 dom_non_trio_criteria = ((phased_sv_tm.trio_status!='trio') & 
-                        (phased_sv_tm.n_hom_var_unaffected==0) &
-                        (phased_sv_tm.n_het_unaffected==0) & 
+                        (phased_sv_tm.n_cohort_hom_var_unaffected==0) & 
+                        (phased_sv_tm.n_cohort_het_unaffected==0) & 
                         (phased_sv_tm.proband_entry.GT.is_het())
                         )
 
@@ -146,7 +161,7 @@ rec_trio_criteria = ((phased_sv_tm.trio_status=='trio') &
                     )  
 # hom and unaff are not hom
 rec_non_trio_criteria = ((phased_sv_tm.trio_status!='trio') &  
-                        (phased_sv_tm.n_hom_var_unaffected==0) &
+                        (phased_sv_tm.n_cohort_hom_var_unaffected==0) & 
                         (phased_sv_tm.proband_entry.GT.is_hom_var())
                         )
 
@@ -167,15 +182,14 @@ size_field = [x for x in list(sv_mt.info) if 'passes_SVLEN_filter_' in x][0]
 large_sv_tm = phased_sv_tm.filter_rows(phased_sv_tm.info[size_field])
 large_sv_tm = filter_and_annotate_tm(large_sv_tm, 'large_region')
 
+# NEW 2/19/2025: Use dominant_freq and recessive_freq flag in INFO to filter
 # Output 4: grab OMIM AD and XLD
-# NEW 2/19/2025: Use dominant_freq flag in INFO to filter
 omim_dom_or_xld_code = ((hl.any(lambda x:x.matches('1'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AD code
                                     (hl.any(lambda x:x.matches('3'), phased_sv_tm.info.OMIM_inheritance_code)))  # OMIM XLD code
 dom_sv_tm = phased_sv_tm.filter_rows(omim_dom_or_xld_code & phased_sv_tm.info.dominant_freq)
 dom_sv_tm = filter_and_annotate_tm(dom_sv_tm, 'OMIM_dominant')
 
 # Output 5: grab OMIM AR and XLR
-# NEW 2/19/2025: Use recessive_freq flag in INFO to filter
 omim_rec_or_xlr_code = ((hl.any(lambda x:x.matches('2'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AR code
                                     (hl.any(lambda x:x.matches('4'), phased_sv_tm.info.OMIM_inheritance_code)))  # OMIM XLR code
 rec_sv_tm = phased_sv_tm.filter_rows(omim_rec_or_xlr_code & phased_sv_tm.info.recessive_freq)

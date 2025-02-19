@@ -201,6 +201,10 @@ merged_output_tm = hl.MatrixTable.union_rows(*[path_sv_tm, gd_sv_tm, large_sv_tm
 merged_output_tm = merged_output_tm.key_rows_by('rsid')
 # Annotate all variant_category (as array) for each unique SV
 grouped_merged_output_tm = merged_output_tm.group_rows_by('rsid').aggregate_rows(variant_category=hl.agg.collect(merged_output_tm.variant_category)).result()
+# Subset phased_sv_tm to sites in the outputs and filter (to avoid union_rows in export)
+merged_output_tm = phased_sv_tm.key_rows_by('rsid').semi_join_rows(grouped_merged_output_tm.rows())
+merged_output_tm = filter_and_annotate_tm(merged_output_tm, '')
+# Annotate merged_output_tm with variant_category array from grouped TM
 merged_output_tm = merged_output_tm.annotate_rows(variant_category=grouped_merged_output_tm.rows()[merged_output_tm.row_key].variant_category)
 # Drop duplicate rows after merge
 merged_output_tm = merged_output_tm.distinct_by_row()

@@ -8,6 +8,8 @@
 1/30/2025:
 - added gnomAD_popmax_AF to INFO and gnomad_popmax_freq flag
 - changed gene_lists annotation to gene_list in INFO to match SNV/Indels
+2/19/2025:
+- remove sv_gene_fields input and change Python variable to be a union of restrictive_csq_fields and permissive_csq_fields
 '''
 ###
 
@@ -28,7 +30,6 @@ parser.add_argument('--omim', dest='omim_uri', help='OMIM file for annotations')
 parser.add_argument('--cores', dest='cores', help='CPU cores')
 parser.add_argument('--mem', dest='mem', help='Memory')
 parser.add_argument('--build', dest='build', help='Genome build')
-parser.add_argument('--sv-gene-fields', dest='sv_gene_fields', help='PREDICTED_* fields to consider for genes field in INFO')
 parser.add_argument('--permissive-csq-fields', dest='permissive_csq_fields', help='PREDICTED_* fields to consider for permissive_csq field in INFO')
 parser.add_argument('--restrictive-csq-fields', dest='restrictive_csq_fields', help='PREDICTED_* fields to consider for restrictive_csq field in INFO')
 parser.add_argument('--constrained-uri', dest='constrained_uri', help='File for constrained genes')
@@ -52,7 +53,6 @@ genome_build = args.build
 gene_list_tsv = args.gene_list_tsv
 omim_uri = args.omim_uri
 size_threshold = int(args.size_threshold)
-sv_gene_fields = (args.sv_gene_fields).split(',')
 restrictive_csq_fields = (args.restrictive_csq_fields).split(',')
 permissive_csq_fields = (args.permissive_csq_fields).split(',')
 constrained_uri = args.constrained_uri
@@ -65,6 +65,9 @@ gnomad_af_dom_threshold = float(args.gnomad_af_dom_threshold)
 gnomad_af_rec_threshold = float(args.gnomad_af_rec_threshold)
 gnomad_af_field = args.gnomad_af_field
 gnomad_popmax_af_threshold = float(args.gnomad_popmax_af_threshold)
+
+# NEW 2/19/2025: Remove sv_gene_fields input and change Python variable to be a union of restrictive_csq_fields and permissive_csq_fields
+sv_gene_fields = list(np.union1d(permissive_csq_fields, restrictive_csq_fields))
 
 hl.init(min_block_size=128, 
         local=f"local[*]", 
@@ -202,7 +205,7 @@ sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(**{size_threshold_field: (s
 
 # Update header with all new annotations and flags
 # Annotations
-header['info']['genes'] = {'Description': f"All genes from {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}
+header['info']['genes'] = {'Description': f"All genes from (union of restrictive_csq and permissive_csq fields) {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}
 header['info']['restrictive_csq'] = {'Description': f"All genes from {', '.join(restrictive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
 header['info']['permissive_csq'] = {'Description': f"All genes from {', '.join(permissive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
 header['info']['gene_source'] = {'Description': f"Sources for genes in genes field, considered fields: {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}

@@ -36,9 +36,6 @@ workflow filterClinicalVariantsSV {
         String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_gene_level_v0.1.py"
         String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_sv_v0.1.py"
 
-        Array[String] sv_gene_fields = ["PREDICTED_BREAKEND_EXONIC","PREDICTED_COPY_GAIN","PREDICTED_DUP_PARTIAL",
-                "PREDICTED_INTRAGENIC_EXON_DUP","PREDICTED_INTRONIC","PREDICTED_INV_SPAN","PREDICTED_LOF","PREDICTED_MSV_EXON_OVERLAP",
-                "PREDICTED_NEAREST_TSS","PREDICTED_PARTIAL_EXON_DUP","PREDICTED_PROMOTER","PREDICTED_TSS_DUP","PREDICTED_UTR"]
         Array[String] permissive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN",
                          "PREDICTED_PARTIAL_EXON_DUP", "PREDICTED_DUP_PARTIAL", "PREDICTED_INTRONIC",
                          "PREDICTED_INV_SPAN", "PREDICTED_UTR", "PREDICTED_PROMOTER", "PREDICTED_BREAKEND_EXONIC"]
@@ -119,7 +116,6 @@ workflow filterClinicalVariantsSV {
         prec_uri=prec_uri,
         hi_uri=hi_uri,
         ts_uri=ts_uri,
-        sv_gene_fields=sv_gene_fields,
         permissive_csq_fields=permissive_csq_fields,
         restrictive_csq_fields=restrictive_csq_fields,
         size_threshold=size_threshold,
@@ -377,7 +373,6 @@ task annotateGeneLevelVCF {
         File hi_uri
         File ts_uri
 
-        Array[String] sv_gene_fields
         Array[String] permissive_csq_fields
         Array[String] restrictive_csq_fields
         
@@ -431,11 +426,11 @@ task annotateGeneLevelVCF {
     curl ~{annotate_sv_gene_level_script} > annotate_vcf.py
     python3 annotate_vcf.py -i ~{vcf_file} -o ~{output_filename} -l ~{gene_list_tsv} -s ~{size_threshold} \
         --omim ~{omim_uri} --cores ~{cpu_cores} --mem ~{memory} --build ~{genome_build} \
-        --sv-gene-fields ~{sep=',' sv_gene_fields} --permissive-csq-fields ~{sep=',' permissive_csq_fields} \
-        --restrictive-csq-fields ~{sep=',' restrictive_csq_fields} --constrained-uri ~{constrained_uri} \
-        --prec-uri ~{prec_uri} --hi-uri ~{hi_uri} --ts-uri ~{ts_uri} --dom-af ~{dom_af_threshold} --rec-af ~{rec_af_threshold} \
-        --gnomad-dom-af ~{gnomad_af_dom_threshold} --gnomad-rec-af ~{gnomad_af_rec_threshold} --gnomad-af-field ~{gnomad_af_field} \
-        --gnomad-popmax-af ~{gnomad_popmax_af_threshold}
+        --permissive-csq-fields ~{sep=',' permissive_csq_fields} --restrictive-csq-fields ~{sep=',' restrictive_csq_fields} \
+        --constrained-uri ~{constrained_uri} --prec-uri ~{prec_uri} --hi-uri ~{hi_uri} --ts-uri ~{ts_uri} \
+        --dom-af ~{dom_af_threshold} --rec-af ~{rec_af_threshold} \
+        --gnomad-dom-af ~{gnomad_af_dom_threshold} --gnomad-rec-af ~{gnomad_af_rec_threshold} \
+        --gnomad-af-field ~{gnomad_af_field} --gnomad-popmax-af ~{gnomad_popmax_af_threshold}
     >>>
 
     output {

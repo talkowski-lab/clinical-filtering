@@ -205,7 +205,7 @@ sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(**{size_threshold_field: (s
 
 # Update header with all new annotations and flags
 # Annotations
-header['info']['genes'] = {'Description': f"All genes from (union of restrictive_csq and permissive_csq fields) {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}
+header['info']['genes'] = {'Description': f"All genes from (union of restrictive_csq_fields and permissive_csq_fields) {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}
 header['info']['restrictive_csq'] = {'Description': f"All genes from {', '.join(restrictive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
 header['info']['permissive_csq'] = {'Description': f"All genes from {', '.join(permissive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
 header['info']['gene_source'] = {'Description': f"Sources for genes in genes field, considered fields: {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}

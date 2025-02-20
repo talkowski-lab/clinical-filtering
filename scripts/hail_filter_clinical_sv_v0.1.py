@@ -214,13 +214,13 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
 )
 
 # Category 5: OMIM AR and XLR
-omim_dom_or_xld_code = (
+omim_rec_or_xlr_code = (
     (hl.any(lambda x: x.matches('2'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AR code
     (hl.any(lambda x: x.matches('4'), phased_sv_tm.info.OMIM_inheritance_code))  # OMIM XLR code
 )
 phased_sv_tm = phased_sv_tm.annotate_rows(
     variant_category=hl.if_else(
-        omim_dom_or_xld_code & phased_sv_tm.info.recessive_freq,
+        omim_rec_or_xlr_code & phased_sv_tm.info.recessive_freq,
         phased_sv_tm.variant_category.append('OMIM_recessive'), 
         phased_sv_tm.variant_category
     )

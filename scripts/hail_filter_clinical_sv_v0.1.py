@@ -17,6 +17,8 @@
 - use dominant_freq and recessive_freq flag in INFO to filter for dominant and recessive outputs
 - annotate categories for merged output, instead of filtering for five separate outputs
 - get affected/unaffected counts at family-level
+2/20/2025:
+- rewrote variant_category annotation because using append was messing things up in Hail
 '''
 ###
 
@@ -170,60 +172,46 @@ phased_sv_tm = phased_sv_tm.annotate_entries(dominant_gt=((dom_trio_criteria) | 
                               recessive_gt=((rec_trio_criteria) | (rec_non_trio_criteria)))
 
 # NEW 2/19/2025: Annotate categories for merged output, instead of filtering
-# Category 1: Pathogenic only
-phased_sv_tm = phased_sv_tm.annotate_rows(
-    variant_category=hl.if_else(
-        (hl.any(lambda x: x.matches('athogenic'), phased_sv_tm.info.clinical_interpretation)) |  # ClinVar P/LP
-        (hl.is_defined(phased_sv_tm.info.dbvar_pathogenic)),  # dbVar Pathogenic 
-        hl.array(['P/LP']), 
-        hl.empty_array('str')
-    )
-)
-
-# Category 2: GD only
-phased_sv_tm = phased_sv_tm.annotate_rows(
-    variant_category=hl.if_else(
-        hl.is_defined(phased_sv_tm.info.gd_sv_name),  # GD region
-        phased_sv_tm.variant_category.append('GD'), 
-        phased_sv_tm.variant_category
-    )
-)
-
-# Category 3: large regions
+# NEW 2/20/2025: Rewrote variant_category annotation because using append was messing things up in Hail?
 size_field = [x for x in list(sv_mt.info) if 'passes_SVLEN_filter_' in x][0]
 phased_sv_tm = phased_sv_tm.annotate_rows(
-    variant_category=hl.if_else(
-        phased_sv_tm.info[size_field], 
-        phased_sv_tm.variant_category.append('large_region'), 
-        phased_sv_tm.variant_category
-    )
-)
-
-# NEW 2/19/2025: Use dominant_freq and recessive_freq flag in INFO to filter
-# Category 4: OMIM AD and XLD
-omim_dom_or_xld_code = (
-    (hl.any(lambda x: x.matches('1'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AD code
-    (hl.any(lambda x: x.matches('3'), phased_sv_tm.info.OMIM_inheritance_code))  # OMIM XLD code
-)
-phased_sv_tm = phased_sv_tm.annotate_rows(
-    variant_category=hl.if_else(
-        (omim_dom_or_xld_code) & (phased_sv_tm.info.dominant_freq),
-        phased_sv_tm.variant_category.append('OMIM_dominant'), 
-        phased_sv_tm.variant_category
-    )
-)
-
-# Category 5: OMIM AR and XLR
-omim_rec_or_xlr_code = (
-    (hl.any(lambda x: x.matches('2'), phased_sv_tm.info.OMIM_inheritance_code)) |  # OMIM AR code
-    (hl.any(lambda x: x.matches('4'), phased_sv_tm.info.OMIM_inheritance_code))  # OMIM XLR code
-)
-phased_sv_tm = phased_sv_tm.annotate_rows(
-    variant_category=hl.if_else(
-        (omim_rec_or_xlr_code) & (phased_sv_tm.info.recessive_freq),
-        phased_sv_tm.variant_category.append('OMIM_recessive'), 
-        phased_sv_tm.variant_category
-    )
+    variant_category = hl.array([
+        # Category 1: Pathogenic only (P/LP)
+        hl.if_else(
+            (hl.any(lambda x: x.matches('athogenic'), phased_sv_tm.info.clinical_interpretation)) |  # ClinVar P/LP
+            (hl.is_defined(phased_sv_tm.info.dbvar_pathogenic)),  # dbVar Pathogenic 
+            'P/LP', 
+            hl.missing(hl.tstr)
+        ),
+        
+        # Category 2: GD only (GD region)
+        hl.if_else(
+            hl.is_defined(phased_sv_tm.info.gd_sv_name),  # GD region
+            'GD', 
+            hl.missing(hl.tstr)
+        ),
+        
+        # Category 3: Large regions (passes_SVLEN_filter)
+        hl.if_else(
+            phased_sv_tm.info[size_field], 
+            'large_region', 
+            hl.missing(hl.tstr)
+        ),
+        
+        # Category 4: OMIM AD and XLD (dominant_freq)
+        hl.if_else(
+            (hl.any(lambda x: x.matches('1') | x.matches('3'), phased_sv_tm.info.OMIM_inheritance_code)) & (phased_sv_tm.info.dominant_freq),
+            'OMIM_dominant', 
+            hl.missing(hl.tstr)
+        ),
+        
+        # Category 5: OMIM AR and XLR (recessive_freq)
+        hl.if_else(
+            (hl.any(lambda x: x.matches('2') | x.matches('4'), phased_sv_tm.info.OMIM_inheritance_code)) & (phased_sv_tm.info.recessive_freq),
+            'OMIM_recessive', 
+            hl.missing(hl.tstr)
+        ),
+    ]).filter(lambda x: hl.is_defined(x))  # Filter out null values
 )
 
 merged_output_tm = phased_sv_tm.filter_rows(phased_sv_tm.variant_category.size()>0)

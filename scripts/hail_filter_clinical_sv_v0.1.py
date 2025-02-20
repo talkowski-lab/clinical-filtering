@@ -173,7 +173,7 @@ phased_sv_tm = phased_sv_tm.annotate_entries(dominant_gt=((dom_trio_criteria) | 
 # Category 1: Pathogenic only
 phased_sv_tm = phased_sv_tm.annotate_rows(
     variant_category=hl.if_else(
-        hl.any(lambda x: x.matches('athogenic'), phased_sv_tm.info.clinical_interpretation) |  # ClinVar P/LP
+        (hl.any(lambda x: x.matches('athogenic'), phased_sv_tm.info.clinical_interpretation)) |  # ClinVar P/LP
         (hl.is_defined(phased_sv_tm.info.dbvar_pathogenic)),  # dbVar Pathogenic 
         hl.array(['P/LP']), 
         hl.empty_array('str')
@@ -207,7 +207,7 @@ omim_dom_or_xld_code = (
 )
 phased_sv_tm = phased_sv_tm.annotate_rows(
     variant_category=hl.if_else(
-        omim_dom_or_xld_code & phased_sv_tm.info.dominant_freq,
+        (omim_dom_or_xld_code) & (phased_sv_tm.info.dominant_freq),
         phased_sv_tm.variant_category.append('OMIM_dominant'), 
         phased_sv_tm.variant_category
     )
@@ -220,7 +220,7 @@ omim_rec_or_xlr_code = (
 )
 phased_sv_tm = phased_sv_tm.annotate_rows(
     variant_category=hl.if_else(
-        omim_rec_or_xlr_code & phased_sv_tm.info.recessive_freq,
+        (omim_rec_or_xlr_code) & (phased_sv_tm.info.recessive_freq),
         phased_sv_tm.variant_category.append('OMIM_recessive'), 
         phased_sv_tm.variant_category
     )

@@ -43,6 +43,8 @@
 2/10/2025:
 - merged parseCompHetTSV_NIFS.py and parseDomTSV_NIFS.py into this script (only difference is OMIM_inheritance_code filtering)
 - added inheritance_map to parse dominant/recessive outputs using same script
+2/25/2025:
+- added 'other' category for inheritance_type and inheritance_map
 '''
 ###
 
@@ -82,7 +84,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-i", "--input", help="Input_TSV")
 parser.add_argument("-o", "--output", help="Output_File")
 parser.add_argument("-l", "--list", help="Gene_List")
-parser.add_argument("-t", "--type", help="Type (dominant or recessive)")
+parser.add_argument("-t", "--type", help="Type (dominant, recessive, other)")
 
 args = parser.parse_args()
 
@@ -96,8 +98,9 @@ else:
 output = open(args.output, mode="w")
 
 # NEW 2/10/2025: added inheritance_map to parse dominant/recessive outputs using same script
+# NEW 2/25/2025: added 'other' category for inheritance_type and inheritance_map
 inheritance_type = args.type
-inheritance_map = {'dominant': [1,3], 'recessive': [2,4]}
+inheritance_map = {'dominant': [1,3], 'recessive': [2,4], 'other': [1,2,3,4,5]}
 
 #clinSig
 #Include ClinVar P/LP

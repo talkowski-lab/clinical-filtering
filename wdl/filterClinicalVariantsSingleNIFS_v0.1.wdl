@@ -121,6 +121,26 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_comphets
     }
 
+    call finalFilteringTiers as finalFilteringTiersMaternalCarrier {
+        input:
+            input_tsv=runClinicalFiltering.mat_carrier_tsv,
+            extra_inheritance_gene_list=extra_inheritance_gene_list,
+            inheritance_type='other',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
+    call finalFilteringTiers as finalFilteringTiersClinVar {
+        input:
+            input_tsv=runClinicalFiltering.clinvar,
+            extra_inheritance_gene_list=extra_inheritance_gene_list,
+            inheritance_type='other',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
     call finalFilteringTiers as finalFilteringTiersDominant {
         input:
             input_tsv=runClinicalFilteringOMIM.omim_dominant,
@@ -132,6 +152,16 @@ workflow filterClinicalVariants {
     }
 
     call finalFilteringTiers as finalFilteringTiersRecessive {
+        input:
+            input_tsv=runClinicalFilteringOMIM.omim_recessive_tsv,
+            extra_inheritance_gene_list=extra_inheritance_gene_list,
+            inheritance_type='recessive',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
+    call finalFilteringTiers as finalFilteringTiersCompHet {
         input:
             input_tsv=filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv,
             extra_inheritance_gene_list=extra_inheritance_gene_list,
@@ -152,8 +182,11 @@ workflow filterClinicalVariants {
         File omim_dominant_tsv = runClinicalFilteringOMIM.omim_dominant
         File comphet_xlr_hom_var_mat_carrier_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv
 
+        File final_mat_carrier_tsv = finalFilteringTiersMaternalCarrier.filtered_tsv  # NEW 2/25/2025
+        File final_clinvar_tsv = finalFilteringTiersClinVar.filtered_tsv  # NEW 2/25/2025
+        File final_omim_recessive_tsv = finalFilteringTiersRecessive.filtered_tsv  # NEW 2/25/2025
         File final_omim_dominant_tsv = finalFilteringTiersDominant.filtered_tsv  # NEW 2/10/2025
-        File final_comphet_xlr_hom_var_mat_carrier_tsv = finalFilteringTiersRecessive.filtered_tsv  # NEW 2/10/2025
+        File final_comphet_xlr_hom_var_mat_carrier_tsv = finalFilteringTiersCompHet.filtered_tsv  # NEW 2/10/2025
     }
 }
 

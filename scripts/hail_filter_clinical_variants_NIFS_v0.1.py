@@ -15,6 +15,9 @@
 - added CA_from_GT annotation to INFO
 2/10/2025:
 - added include_all_maternal_carrier_variants parameter
+2/25/2025:
+- comment out CA_list code because deprecated for CA_from_GT in INFO
+- drop CA_from_GT from entries after adding to INFO
 '''
 ###
 
@@ -107,13 +110,14 @@ header['info']['all_csqs'] = {'Description': "All unique consequences in vep.tra
 header['info']['gnomad_popmax_af'] = {'Description': "GnomAD Popmax AF taken across all fields in vep.transcript_consequences containing the string 'gnomAD'.",
     'Number': '1', 'Type': 'Float'}
 
-# NEW 1/15/2025: NIFS-specific
-# move CA annotation from entry-level to row-level (FORMAT to INFO)
-mt = mt.annotate_rows(CA_list=hl.array(hl.set(hl.agg.collect(mt.CA).filter(hl.is_defined))))  # CA_list as intermediate field
-mt = mt.annotate_rows(info=mt.info.annotate(
-    CA=hl.or_missing(mt.CA_list.size()>0, mt.CA_list[0])))
-# add CA field to INFO in VCF header
-header['info']['CA'] = header['format']['CA']
+# NEW 2/25/2025: Comment out CA_list code because deprecated for CA_from_GT in INFO
+# # NEW 1/15/2025: NIFS-specific
+# # move CA annotation from entry-level to row-level (FORMAT to INFO)
+# mt = mt.annotate_rows(CA_list=hl.array(hl.set(hl.agg.collect(mt.CA).filter(hl.is_defined))))  # CA_list as intermediate field
+# mt = mt.annotate_rows(info=mt.info.annotate(
+#     CA=hl.or_missing(mt.CA_list.size()>0, mt.CA_list[0])))
+# # add CA field to INFO in VCF header
+# header['info']['CA'] = header['format']['CA']
 
 # Phasing
 tmp_ped = pd.read_csv(ped_uri, sep='\t').iloc[:,:6]
@@ -146,7 +150,8 @@ phased_tm = phased_tm.annotate_entries(CA_from_GT=hl.if_else(
 phased_tm = phased_tm.annotate_rows(CA_from_GT_list=hl.array(hl.set(hl.agg.collect(phased_tm.CA_from_GT).filter(hl.is_defined))))  # CA_from_GT_list as intermediate field
 phased_tm = phased_tm.annotate_rows(info=phased_tm.info.annotate(
     CA_from_GT=hl.or_missing(phased_tm.CA_from_GT_list.size()>0, phased_tm.CA_from_GT_list[0])))
-phased_tm = phased_tm.drop('CA_from_GT_list')
+# NEW 2/25/2025: Drop CA_from_GT from entries after adding to INFO
+phased_tm = phased_tm.drop('CA_from_GT_list', 'CA_from_GT')
 # annotate mt from phased_mt
 mt = mt.annotate_rows(info=phased_tm.rows()[mt.row_key].info)
 # add CA_from_GT to INFO in VCF header

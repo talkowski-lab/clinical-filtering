@@ -539,8 +539,8 @@ task addPhenotypesMergeAndPrettifyOutputs {
 
     # Map phenotypes
     pheno_df = pd.read_csv(pheno_uri, sep='\t')
-    df['disease_title'] = df.HGVSc_symbol.map(pheno_df.set_index('gene_symbol').disease_title.to_dict())
-    df['classification_title'] = df.HGVSc_symbol.map(pheno_df.set_index('gene_symbol').classification_title.to_dict())
+    merged_df['disease_title'] = merged_df.HGVSc_symbol.map(pheno_df.set_index('gene_symbol').disease_title.to_dict())
+    merged_df['classification_title'] = merged_df.HGVSc_symbol.map(pheno_df.set_index('gene_symbol').classification_title.to_dict())
 
     # Add new phenotype columns to priority columns, before HGVSc_symbol
     priority_cols = priority_cols[:priority_cols.index('HGVSc_symbol')] + ['disease_title', 'classification_title'] + priority_cols[priority_cols.index('HGVSc_symbol'):]

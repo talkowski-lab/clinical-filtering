@@ -21,12 +21,12 @@ workflow filterClinicalVariants {
         File vcf_file
         File empty_file  # for if include_all_maternal_carrier_variants=false
 
-        File confirmation_vcf  # NIFS-specific
-        File maternal_vcf  # NIFS-specific
+        String? confirmation_vcf  # NIFS-specific
+        String? maternal_vcf  # NIFS-specific
 
         String sample_id  # NIFS-specific
-        String confirmation_sample_id  # NIFS-specific
-        String maternal_sample_id  # NIFS-specific
+        String? confirmation_sample_id  # NIFS-specific
+        String? maternal_sample_id  # NIFS-specific
 
         String predicted_sex_chrom_ploidy  # XX or XY, NIFS-specific
 
@@ -211,10 +211,10 @@ workflow filterClinicalVariants {
     call flagFromConfirmationMaternalVCF {
         input:
             input_tsv=addPhenotypesMergeAndPrettifyOutputs.merged_output,
-            confirmation_vcf=confirmation_vcf,
-            maternal_vcf=maternal_vcf,
-            confirmation_sample_id=confirmation_sample_id,
-            maternal_sample_id=maternal_sample_id,
+            confirmation_vcf=select_first([confirmation_vcf, 'NA']),
+            maternal_vcf=select_first([maternal_vcf, 'NA']),
+            confirmation_sample_id=select_first([confirmation_sample_id, 'NA']),
+            maternal_sample_id=select_first([maternal_sample_id, 'NA']),
             hail_docker=hail_docker,
             genome_build=genome_build,
             runtime_attr_override=runtime_attr_flag_conf_mat_gt
@@ -561,8 +561,8 @@ task addPhenotypesMergeAndPrettifyOutputs {
 task flagFromConfirmationMaternalVCF {
     input {
         File input_tsv
-        File confirmation_vcf
-        File maternal_vcf
+        String confirmation_vcf
+        String maternal_vcf
 
         String confirmation_sample_id
         String maternal_sample_id
@@ -632,27 +632,35 @@ task flagFromConfirmationMaternalVCF {
 
     hl.init(default_reference=build)
 
-    # Load
-    conf_mt = hl.import_vcf(confirmation_vcf_uri, force_bgz=True, array_elements_required=False)
-    mat_mt = hl.import_vcf(maternal_vcf_uri, force_bgz=True, array_elements_required=False)
     merged_ht = hl.import_table(input_uri)
-
-    # Annotate with temporary confirmation_sample_id/maternal_sample_id and Hail-friendly locus/alleles fields
-    merged_ht = merged_ht.annotate(confirmation_sample_id=confirmation_sample_id,
-                    maternal_sample_id=maternal_sample_id,
-                    hail_locus=hl.parse_locus(merged_ht.locus),
+    # Annotate with temporary Hail-friendly locus/alleles fields
+    merged_ht = merged_ht.annotate(hail_locus=hl.parse_locus(merged_ht.locus),
                     hail_alleles=hl.array(merged_ht.alleles.split(','))).key_by('hail_locus','hail_alleles')
 
-    # Annotate GT from confirmation_vcf and maternal_vcf
-    merged_ht = merged_ht.annotate(confirmation_GT=conf_mt[merged_ht.key, merged_ht.confirmation_sample_id].GT,
-                    maternal_GT=conf_mt[merged_ht.key, merged_ht.maternal_sample_id].GT)
+    # confirmation_vcf
+    if confirmation_vcf_uri!='NA' and confirmation_sample_id!='NA':
+        conf_mt = hl.import_vcf(confirmation_vcf_uri, force_bgz=True, array_elements_required=False)
+        # Annotate with temporary confirmation_sample_id
+        merged_ht = merged_ht.annotate(confirmation_sample_id=confirmation_sample_id)
+        # Annotate GT from confirmation_vcf
+        merged_ht = merged_ht.annotate(confirmation_GT=conf_mt[merged_ht.key, merged_ht.confirmation_sample_id].GT)
+        # Flag if GT matches 
+        merged_ht = merged_ht.annotate(GT_matches_confirmation_vcf=merged_ht.confirmation_GT==hl.parse_call(merged_ht['proband_entry.GT']))
 
-    # Flag if GT matches 
-    merged_ht = merged_ht.annotate(GT_matches_confirmation_vcf=merged_ht.confirmation_GT==hl.parse_call(merged_ht['proband_entry.GT']),
-                                GT_matches_maternal_vcf=merged_ht.maternal_GT==hl.parse_call(merged_ht['mother_entry.GT']))
+    # maternal_vcf
+    if maternal_vcf_uri!='NA' and maternal_sample_id!='NA':
+        conf_mt = hl.import_vcf(maternal_vcf_uri, force_bgz=True, array_elements_required=False)
+        # Annotate with temporary maternal_sample_id
+        merged_ht = merged_ht.annotate(maternal_sample_id=maternal_sample_id)
+        # Annotate GT from maternal_vcf
+        merged_ht = merged_ht.annotate(maternal_GT=conf_mt[merged_ht.key, merged_ht.maternal_sample_id].GT)
+        # Flag if GT matches 
+        merged_ht = merged_ht.annotate(GT_matches_maternal_vcf=merged_ht.maternal_GT==hl.parse_call(merged_ht['mother_entry.GT']))
 
     # Drop temporary fields before export
-    merged_df = merged_ht.key_by().drop('confirmation_sample_id','maternal_sample_id','hail_locus','hail_alleles').to_pandas()   
+    tmp_fields = ['confirmation_sample_id','maternal_sample_id','hail_locus','hail_alleles']
+    fields_to_drop = np.intersect1d(tmp_fields, list(merged_ht.row)).tolist()
+    merged_df = merged_ht.key_by().drop(*fields_to_drop).to_pandas()   
 
     # Export to Excel
     merged_df.to_excel(output_filename)

@@ -68,7 +68,7 @@ workflow filterClinicalVariants {
         # String gnomad_af_field='gnomad_v4.1_sv_AF'
 
         ## SNV/Indel inputs that are optional and already have defaults in the imported workflow
-        # Float spliceAI_threshold=0.95
+        # Float spliceAI_threshold=0.8
         # Float af_threshold=0.1  # NIFS-specific
         # Float gnomad_af_threshold=0.05
         # Float am_rec_threshold=0.56

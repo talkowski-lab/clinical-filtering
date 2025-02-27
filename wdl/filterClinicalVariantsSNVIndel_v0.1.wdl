@@ -27,7 +27,7 @@ workflow filterClinicalVariants {
         String sv_base_mini_docker
 
         Int ad_alt_threshold=3
-        Float spliceAI_threshold=0.95
+        Float spliceAI_threshold=0.8
         Float af_threshold=0.1  # NIFS-specific
         Float gnomad_af_threshold=0.05
         Float am_rec_threshold=0.56

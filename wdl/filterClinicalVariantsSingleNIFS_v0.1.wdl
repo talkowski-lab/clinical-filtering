@@ -549,8 +549,8 @@ task addPhenotypesMergeAndPrettifyOutputs {
     EOF
 
     python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -o ~{output_filename} -p ~{gene_phenotype_map} \
-        --exclude-cols ~{sep="," dup_exclude_cols} --cols-for-varkey ~{sep="," cols_for_varkey} \
-        --float-cols ~{sep="," float_cols} --priority-cols ~{sep="," priority_cols}
+        --exclude-cols "~{sep=',' dup_exclude_cols}" --cols-for-varkey "~{sep=',' cols_for_varkey}" \
+        --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=',' priority_cols}"
     >>>
 
     output {

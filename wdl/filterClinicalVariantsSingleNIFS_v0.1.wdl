@@ -534,7 +534,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
     merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]
 
     # Drop VarKey column before export
-    merged_df = merged_df.drop('VarKey', axis=1)
+    merged_df = merged_df.drop('VarKey', axis=1).copy()
     remaining_cols = list(np.setdiff1d(merged_df.columns, priority_cols))
 
     # Map phenotypes

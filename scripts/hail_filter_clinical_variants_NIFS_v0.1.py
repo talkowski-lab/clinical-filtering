@@ -18,6 +18,8 @@
 2/25/2025:
 - comment out CA_list code because deprecated for CA_from_GT in INFO
 - drop CA_from_GT from entries after adding to INFO
+2/27/2025:
+- revert to all ClinVar P/LP, NOT 2*+ only
 '''
 ###
 
@@ -166,10 +168,11 @@ phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_k
 # Output 1: grab ClinVar only
 clinvar_mt = mt.filter_rows(hl.any(lambda x: x.matches('athogenic'), mt.info.CLNSIG))
 clinvar_tm = phased_tm.filter_rows(hl.any(lambda x: x.matches('athogenic'), phased_tm.info.CLNSIG))
-# NEW 1/9/2025: keep 2*+ ClinVar only
+# NEW 1/9/2025: Keep 2*+ ClinVar only
 clinvar_two_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided', '_multiple_submitters', '_no_conflicts']]
-clinvar_mt = clinvar_mt.filter_rows(hl.any([clinvar_mt.info.CLNREVSTAT==category for category in clinvar_two_star_plus]))
-clinvar_tm = clinvar_tm.filter_rows(hl.any([clinvar_tm.info.CLNREVSTAT==category for category in clinvar_two_star_plus]))
+# NEW 2/27/2025: Revert to all ClinVar P/LP, NOT 2*+ only
+# clinvar_mt = clinvar_mt.filter_rows(hl.any([clinvar_mt.info.CLNREVSTAT==category for category in clinvar_two_star_plus]))
+# clinvar_tm = clinvar_tm.filter_rows(hl.any([clinvar_tm.info.CLNREVSTAT==category for category in clinvar_two_star_plus]))
 
 clinvar_tm = clinvar_tm.filter_entries((clinvar_tm.proband_entry.GT.is_non_ref()) | 
                                    (clinvar_tm.mother_entry.GT.is_non_ref()) |

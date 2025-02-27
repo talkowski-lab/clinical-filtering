@@ -45,6 +45,8 @@
 - added inheritance_map to parse dominant/recessive outputs using same script
 2/25/2025:
 - added 'other' category for inheritance_type and inheritance_map
+2/27/2025:
+- removed keeping not in ClinVar ('or clin_sig==""')
 '''
 ###
 
@@ -273,14 +275,15 @@ for line in input.readlines():
         clin_sig=entryList[headerList.index("info.CLNSIG")]
         clin_revstat=entryList[headerList.index("info.CLNREVSTAT")]
 
+        # NEW 2/27/2025: Removed keeping not in ClinVar ('or clin_sig==""')
         #Clinvar P/LP with 1* evidence or not present
-        if (clin_sig in clinSigIncludeP and clin_revstat in clinRevIncludeP) or clin_sig=="":
+        if (clin_sig in clinSigIncludeP and clin_revstat in clinRevIncludeP):
             clinVarFlagP="Y"
         else:
             clinVarFlagP="N"
 
         #Clinvar VUS
-        if (clin_sig in clinSigIncludeV and clin_revstat in clinRevIncludeV) or clin_sig=="":
+        if (clin_sig in clinSigIncludeV and clin_revstat in clinRevIncludeV):
             clinVarFlagV="Y"
         else:
             clinVarFlagV="N"

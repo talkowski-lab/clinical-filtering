@@ -70,7 +70,7 @@ workflow filterClinicalVariants {
         Array[String] priority_cols=['id', 'is_female', 'fam_id',
                         'variant_category','Tier','locus', 'alleles', 'rsid', 'HGVSc_symbol', 'HGVSc', 'HGVSp',
                         'filters', 'qual', 'AC', 'AC5_NOT_IN_GNOMAD', 'AF', 'DP', 'MQ', 'MQ0', 'QD',
-                        'CA_from_GT', 'gene_list', 'OMIM_inheritance_code', 'SYMBOL', 'Feature', 'BIOTYPE', 'Allele', 'Consequence', 'MPC', 'CANONICAL', 'MANE_SELECT',
+                        'CA_from_GT', 'gene_list', 'OMIM_inheritance_code', 'SYMBOL', 'Feature', 'BIOTYPE', 'Allele', 'Consequence', 'MPC', 'CANONICAL', 'MANE_PLUS_CLINICAL',
                         'proband_entry.AF', 'proband_entry.AD', 'proband_entry.DP', 'proband_entry.GT', 'proband_entry.GQ', 'mother_entry.AF', 'mother_entry.AD', 'mother_entry.DP', 'mother_entry.GT',
                         'CLNSIG', 'CLNREVSTAT', 'REVEL', 'IMPACT', 'MAX_AF', 'MAX_AF_POPS', 'CLIN_SIG', 'LOEUF_v2', 'LOEUF_v4', 'spliceAI_score']
         

@@ -554,21 +554,6 @@ task addPhenotypesMergeAndPrettifyOutputs {
     for i in range(2):
         merged_df.insert(len(priority_cols)+i, f"SPACE_{i}", np.nan)
 
-    # Sort by tier (lower = higher priority)
-    def get_len_of_top_numeric_tier(row):
-        top_numeric_tier = row.top_numeric_tier
-        numeric_tiers = row.numeric_tiers_list
-        top_tier = row.tiers_list[numeric_tiers.index(top_numeric_tier)]
-        return len(top_tier)
-
-    merged_df['tiers_list'] = merged_df.Tier.str.split(',')  # with * and flags
-    merged_df['numeric_tiers_list'] = merged_df.tiers_list.apply(lambda lst: [x[0] for x in lst])
-    merged_df['top_numeric_tier'] = merged_df.numeric_tiers_list.apply(min)
-    merged_df['top_tier_len'] = merged_df.apply(get_len_of_top_numeric_tier, axis=1)  # Longer = worse tier!
-
-    new_tier_cols = ['tiers_list','numeric_tiers_list','top_numeric_tier','top_tier_len']
-    merged_df = merged_df.sort_values(['top_numeric_tier','top_tier_len', 'comphet_ID']).drop(new_tier_cols, axis=1)
-
     merged_df.to_csv(output_filename, sep='\t', index=False)
     EOF
 
@@ -685,6 +670,21 @@ task flagFromConfirmationMaternalVCF {
     tmp_fields = ['confirmation_sample_id','maternal_sample_id','hail_locus','hail_alleles']
     fields_to_drop = np.intersect1d(tmp_fields, list(merged_ht.row)).tolist()
     merged_df = merged_ht.key_by().drop(*fields_to_drop).to_pandas()   
+
+    # Sort by tier (lower = higher priority)
+    def get_len_of_top_numeric_tier(row):
+        top_numeric_tier = row.top_numeric_tier
+        numeric_tiers = row.numeric_tiers_list
+        top_tier = row.tiers_list[numeric_tiers.index(top_numeric_tier)]
+        return len(top_tier)
+
+    merged_df['tiers_list'] = merged_df.Tier.str.split(',')  # with * and flags
+    merged_df['numeric_tiers_list'] = merged_df.tiers_list.apply(lambda lst: [x[0] for x in lst])
+    merged_df['top_numeric_tier'] = merged_df.numeric_tiers_list.apply(min)
+    merged_df['top_tier_len'] = merged_df.apply(get_len_of_top_numeric_tier, axis=1)  # Longer = worse tier!
+
+    new_tier_cols = ['tiers_list','numeric_tiers_list','top_numeric_tier','top_tier_len']
+    merged_df = merged_df.sort_values(['top_numeric_tier','top_tier_len', 'comphet_ID']).drop(new_tier_cols, axis=1)
 
     # Export to Excel, replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
     space_cols = merged_df.columns[merged_df.columns.str.contains('SPACE_')].tolist()

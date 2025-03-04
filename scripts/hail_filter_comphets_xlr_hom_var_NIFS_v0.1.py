@@ -25,6 +25,8 @@
 1/22/2025:
 - use export() and then load in pandas instead of to_pandas() to match formatting with other outputs
 - filter by proband GT before aggregating rows (for CA_from_GT edge cases)
+3/4/2025:
+- change OMIM_recessive/OMIM_dominant to just recessive/dominant
 TODO: remove SV/trio_status/etc. irrelevant code
 '''
 ###
@@ -120,12 +122,12 @@ if snv_indel_vcf!='NA':
     # Load and merge SNV/Indel ClinVar P/LP VCF
     if clinvar_vcf!='NA':
         clinvar_mt = load_split_vep_consequences(clinvar_vcf) 
-        # NEW 1/14/2025: added variant_source —— ClinVar_P/LP or OMIM_recessive or both
+        # NEW 1/14/2025: added variant_source —— ClinVar_P/LP or recessive or both
         snv_mt_no_clinvar = snv_mt
         snv_mt = snv_mt.union_rows(clinvar_mt).distinct_by_row()
         snv_mt = snv_mt.annotate_rows(variant_source=hl.if_else(hl.is_defined(clinvar_mt.rows()[snv_mt.row_key]),  # if in ClinVar
-                                                 hl.if_else(hl.is_defined(snv_mt_no_clinvar.rows()[snv_mt.row_key]), 'ClinVar_P/LP_OMIM_recessive',  # if also in omim_recessive_vcf
-                                                            'ClinVar_P/LP'), 'OMIM_recessive'))
+                                                 hl.if_else(hl.is_defined(snv_mt_no_clinvar.rows()[snv_mt.row_key]), 'ClinVar_P/LP_recessive',  # if also in recessive_vcf
+                                                            'ClinVar_P/LP'), 'recessive'))
 
     # Explode rows by transcript
     snv_mt = snv_mt.explode_rows(snv_mt.vep.transcript_consequences)

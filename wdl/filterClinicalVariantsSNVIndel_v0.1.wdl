@@ -115,10 +115,10 @@ workflow filterClinicalVariants {
 
     call helpers.mergeResultsPython as mergeOMIMDominant {
         input:
-            tsvs=runClinicalFilteringOMIM.omim_dominant,
+            tsvs=runClinicalFilteringOMIM.dominant,
             hail_docker=hail_docker,
-            input_size=size(runClinicalFilteringOMIM.omim_dominant, 'GB'),
-            merged_filename=cohort_prefix+'_OMIM_dominant.tsv.gz',
+            input_size=size(runClinicalFilteringOMIM.dominant, 'GB'),
+            merged_filename=cohort_prefix+'_dominant.tsv.gz',
             runtime_attr_override=runtime_attr_merge_omim_dom
     }
 
@@ -135,18 +135,18 @@ workflow filterClinicalVariants {
 
     call helpers.mergeResultsPython as mergeOMIMRecessive {
         input:
-            tsvs=runClinicalFilteringOMIM.omim_recessive_tsv,
+            tsvs=runClinicalFilteringOMIM.recessive_tsv,
             hail_docker=hail_docker,
-            input_size=size(runClinicalFilteringOMIM.omim_recessive_tsv, 'GB'),
-            merged_filename=cohort_prefix+'_OMIM_recessive.tsv.gz',
+            input_size=size(runClinicalFilteringOMIM.recessive_tsv, 'GB'),
+            merged_filename=cohort_prefix+'_recessive.tsv.gz',
             runtime_attr_override=runtime_attr_merge_omim_rec
     }
 
     call mergeVCFs.mergeVCFs as mergeOMIMRecessiveVCFs {
         input:  
-            vcf_files=runClinicalFilteringOMIM.omim_recessive_vcf,
+            vcf_files=runClinicalFilteringOMIM.recessive_vcf,
             sv_base_mini_docker=sv_base_mini_docker,
-            cohort_prefix=cohort_prefix + '_OMIM_recessive',
+            cohort_prefix=cohort_prefix + '_recessive',
             sort_after_merge=sort_after_merge,
             runtime_attr_override=runtime_attr_merge_omim_rec_vcfs
     }
@@ -165,9 +165,9 @@ workflow filterClinicalVariants {
         File clinvar_tsv = mergeClinVar.merged_tsv
         File clinvar_vcf = mergeClinVarVCFs.merged_vcf_file
         File clinvar_vcf_idx = mergeClinVarVCFs.merged_vcf_idx
-        File omim_recessive_vcf = mergeOMIMRecessiveVCFs.merged_vcf_file
-        File omim_recessive_vcf_idx = mergeOMIMRecessiveVCFs.merged_vcf_idx
-        File omim_recessive_tsv = mergeOMIMRecessive.merged_tsv
-        File omim_dominant_tsv = mergeOMIMDominant.merged_tsv
+        File recessive_vcf = mergeOMIMRecessiveVCFs.merged_vcf_file
+        File recessive_vcf_idx = mergeOMIMRecessiveVCFs.merged_vcf_idx
+        File recessive_tsv = mergeOMIMRecessive.merged_tsv
+        File dominant_tsv = mergeOMIMDominant.merged_tsv
     }
 }

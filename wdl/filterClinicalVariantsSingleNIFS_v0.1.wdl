@@ -130,7 +130,7 @@ workflow filterClinicalVariants {
 
     call filterClinicalVariants.filterCompHetsXLRHomVar as filterCompHetsXLRHomVar {
         input:
-            snv_indel_vcf=runClinicalFilteringOMIM.omim_recessive_vcf,
+            snv_indel_vcf=runClinicalFilteringOMIM.recessive_vcf,
             clinvar_vcf=runClinicalFiltering.clinvar_vcf,
             sv_vcf='NA',
             ped_uri=makeDummyPed.ped_uri,
@@ -164,7 +164,7 @@ workflow filterClinicalVariants {
 
     call finalFilteringTiers as finalFilteringTiersDominant {
         input:
-            input_tsv=runClinicalFilteringOMIM.omim_dominant,
+            input_tsv=runClinicalFilteringOMIM.dominant,
             extra_inheritance_gene_list=extra_inheritance_gene_list,
             inheritance_type='dominant',
             hail_docker=hail_docker,
@@ -174,7 +174,7 @@ workflow filterClinicalVariants {
 
     call finalFilteringTiers as finalFilteringTiersRecessive {
         input:
-            input_tsv=runClinicalFilteringOMIM.omim_recessive_tsv,
+            input_tsv=runClinicalFilteringOMIM.recessive_tsv,
             extra_inheritance_gene_list=extra_inheritance_gene_list,
             inheritance_type='recessive',
             hail_docker=hail_docker,
@@ -225,16 +225,16 @@ workflow filterClinicalVariants {
         File clinvar_tsv = runClinicalFiltering.clinvar
         File clinvar_vcf = runClinicalFiltering.clinvar_vcf
         File clinvar_vcf_idx = runClinicalFiltering.clinvar_vcf_idx
-        File omim_recessive_vcf = runClinicalFilteringOMIM.omim_recessive_vcf
-        File omim_recessive_vcf_idx = runClinicalFilteringOMIM.omim_recessive_vcf_idx
-        File omim_recessive_tsv = runClinicalFilteringOMIM.omim_recessive_tsv  # NEW 1/17/2025
-        File omim_dominant_tsv = runClinicalFilteringOMIM.omim_dominant
+        File recessive_vcf = runClinicalFilteringOMIM.recessive_vcf
+        File recessive_vcf_idx = runClinicalFilteringOMIM.recessive_vcf_idx
+        File recessive_tsv = runClinicalFilteringOMIM.recessive_tsv  # NEW 1/17/2025
+        File dominant_tsv = runClinicalFilteringOMIM.dominant
         File comphet_xlr_hom_var_mat_carrier_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv
 
         File final_mat_carrier_tsv = finalFilteringTiersMaternalCarrier.filtered_tsv  # NEW 2/25/2025
         File final_clinvar_tsv = finalFilteringTiersClinVar.filtered_tsv  # NEW 2/25/2025
-        File final_omim_recessive_tsv = finalFilteringTiersRecessive.filtered_tsv  # NEW 2/25/2025
-        File final_omim_dominant_tsv = finalFilteringTiersDominant.filtered_tsv  # NEW 2/10/2025
+        File final_recessive_tsv = finalFilteringTiersRecessive.filtered_tsv  # NEW 2/25/2025
+        File final_dominant_tsv = finalFilteringTiersDominant.filtered_tsv  # NEW 2/10/2025
         File final_comphet_xlr_hom_var_mat_carrier_tsv = finalFilteringTiersCompHet.filtered_tsv  # NEW 2/10/2025
 
         File final_merged_clinical_excel = flagFromConfirmationMaternalVCF.flagged_excel

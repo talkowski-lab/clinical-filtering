@@ -138,10 +138,10 @@ task runClinicalFilteringOMIM {
     }
 
     output {
-        File omim_recessive_vcf = prefix + '_OMIM_recessive.vcf.bgz'
-        File omim_recessive_vcf_idx = prefix + '_OMIM_recessive.vcf.bgz.tbi'
-        File omim_dominant = prefix + '_OMIM_dominant.tsv.gz'
-        File omim_recessive_tsv = prefix + '_OMIM_recessive.tsv.gz'  # NEW 1/17/2025
+        File recessive_vcf = prefix + '_recessive.vcf.bgz'
+        File recessive_vcf_idx = prefix + '_recessive.vcf.bgz.tbi'
+        File dominant = prefix + '_dominant.tsv.gz'
+        File recessive_tsv = prefix + '_recessive.tsv.gz'  # NEW 1/17/2025
     }
 }
 

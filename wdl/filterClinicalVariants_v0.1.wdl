@@ -158,7 +158,7 @@ workflow filterClinicalVariants {
     # CompHets
     call filterClinicalCompHets.filterClinicalCompHets as filterCompHetsXLRHomVar {
         input:
-            omim_recessive_vcf=select_first([filterClinicalVariantsSNVIndel.omim_recessive_vcf, 'NA']),
+            recessive_vcf=select_first([filterClinicalVariantsSNVIndel.recessive_vcf, 'NA']),
             clinvar_vcf=select_first([filterClinicalVariantsSNVIndel.clinvar_vcf, 'NA']),
             sv_flagged_vcf=select_first([filterClinicalVariantsSV.sv_flagged_vcf, 'NA']),
             ped_uri=ped_uri,
@@ -175,10 +175,10 @@ workflow filterClinicalVariants {
         File clinvar_vcf = select_first([filterClinicalVariantsSNVIndel.clinvar_vcf, empty_file])
         File clinvar_vcf_idx = select_first([filterClinicalVariantsSNVIndel.clinvar_vcf_idx, empty_file])
         File mat_carrier_tsv = select_first([filterClinicalVariantsSNVIndel.mat_carrier_tsv, empty_file])
-        File omim_recessive_vcf = select_first([filterClinicalVariantsSNVIndel.omim_recessive_vcf, empty_file])
-        File omim_recessive_vcf_idx = select_first([filterClinicalVariantsSNVIndel.omim_recessive_vcf_idx, empty_file])
-        File omim_recessive_tsv = select_first([filterClinicalVariantsSNVIndel.omim_recessive_tsv, empty_file])
-        File omim_dominant_tsv = select_first([filterClinicalVariantsSNVIndel.omim_dominant_tsv, empty_file])
+        File recessive_vcf = select_first([filterClinicalVariantsSNVIndel.recessive_vcf, empty_file])
+        File recessive_vcf_idx = select_first([filterClinicalVariantsSNVIndel.recessive_vcf_idx, empty_file])
+        File recessive_tsv = select_first([filterClinicalVariantsSNVIndel.recessive_tsv, empty_file])
+        File dominant_tsv = select_first([filterClinicalVariantsSNVIndel.dominant_tsv, empty_file])
 
         # SVs
         # File sv_pathogenic_tsv = select_first([filterClinicalVariantsSV.sv_pathogenic_tsv, empty_file])

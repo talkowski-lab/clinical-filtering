@@ -15,7 +15,7 @@ struct RuntimeAttr {
 
 workflow filterClinicalCompHets {
     input {
-        String omim_recessive_vcf='NA'
+        String recessive_vcf='NA'
         String clinvar_vcf='NA'
         String sv_flagged_vcf='NA'
         File ped_uri
@@ -61,11 +61,11 @@ workflow filterClinicalCompHets {
     } 
 
     scatter (sample_file in splitFamilies.family_shard_files) {
-        if (omim_recessive_vcf!='NA') {
+        if (recessive_vcf!='NA') {
             call helpers.subsetVCFSamplesHail as subsetVCFSamplesSNVIndels {
                 input:
                     samples_file=sample_file,
-                    vcf_file=select_first([omim_recessive_vcf]),
+                    vcf_file=select_first([recessive_vcf]),
                     hail_docker=hail_docker,
                     genome_build=genome_build,
                     runtime_attr_override=runtime_attr_subset_vcfs_snv_indel
@@ -109,7 +109,7 @@ workflow filterClinicalCompHets {
         }
     }
 
-    String variant_types_ = if omim_recessive_vcf!='NA' then 'SV_SNV_Indel' else 'SV'
+    String variant_types_ = if recessive_vcf!='NA' then 'SV_SNV_Indel' else 'SV'
     String variant_types = if sv_flagged_vcf!='NA' then variant_types_ else 'SNV_Indel'
     call helpers.mergeResultsPython as mergeCompHetsXLRHomVar {
         input:

@@ -9,10 +9,12 @@
 - commented out all_csqs and gnomad_popmax_af annotations because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
 - changed has_low_or_modifier_impact to is_moderate_or_high_impact inverse logic (should have the same result)
 1/17/2025: 
-- add omim_recessive_tsv output
+- add recessive_tsv output
 - only include fetal sample in output (mother_entry will be filled)
 1/27/2025:
-- filter by AD before outputting omim_recessive_tsv
+- filter by AD before outputting recessive_tsv
+3/4/2025:
+- change OMIM_recessive/OMIM_dominant to just recessive/dominant
 '''
 ###
 
@@ -306,25 +308,25 @@ omim_dom = omim_dom.filter_entries((omim_dom.proband_entry.AD[1]>=ad_alt_thresho
 omim_dom = omim_dom.filter_rows(hl.agg.count_where((hl.is_defined(omim_dom.proband_entry.GT)) |
                                                     (hl.is_defined(omim_dom.mother_entry.GT)) |
                                                     (hl.is_defined(omim_dom.father_entry.GT)))>0)
-omim_dom = omim_dom.annotate_rows(variant_category='OMIM_dominant')
+omim_dom = omim_dom.annotate_rows(variant_category='dominant')
 
 # NEW 1/17/2025: export OMIM Recessive TSV
 omim_rec = gene_phased_tm.semi_join_rows(omim_rec_mt.rows())
 
-# NEW 1/27/2025: filter by AD before outputting omim_recessive_tsv
+# NEW 1/27/2025: filter by AD before outputting recessive_tsv
 # filter by AD of alternate allele in trio
 omim_rec = omim_rec.filter_entries(omim_rec.proband_entry.AD[1]>=ad_alt_threshold)
 # variant must be in at least 1 trio
 omim_rec = omim_rec.filter_rows(hl.agg.count_where(hl.is_defined(omim_rec.proband_entry.GT))>0)
-omim_rec = omim_rec.annotate_rows(variant_category='OMIM_recessive')
+omim_rec = omim_rec.annotate_rows(variant_category='recessive')
 
 # export OMIM Recessive VCF
-hl.export_vcf(omim_rec_mt, prefix+'_OMIM_recessive.vcf.bgz', metadata=header, tabix=True)
+hl.export_vcf(omim_rec_mt, prefix+'_recessive.vcf.bgz', metadata=header, tabix=True)
 
 # export OMIM Dominant TSV
 # NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)
-omim_dom.filter_cols(omim_dom.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_OMIM_dominant.tsv.gz', delimiter='\t')
+omim_dom.filter_cols(omim_dom.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_dominant.tsv.gz', delimiter='\t')
 
 # export OMIM Recessive TSV
 # NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)
-omim_rec.filter_cols(omim_rec.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_OMIM_recessive.tsv.gz', delimiter='\t')
+omim_rec.filter_cols(omim_rec.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_recessive.tsv.gz', delimiter='\t')

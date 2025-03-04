@@ -28,6 +28,8 @@
 - added get_transmission in phase_by_transmission_aggregate_by_gene
 - added get_mendel_errors in annotate_and_filter_trio_matrix
 - changed variant_type annotation to variant_types to retain original variant_type field for comphets
+3/4/2025:
+- change OMIM_recessive/OMIM_dominant to just recessive/dominant
 '''
 ###
 
@@ -132,15 +134,15 @@ if snv_indel_vcf!='NA':
     # Load and merge SNV/Indel ClinVar P/LP VCF
     if clinvar_vcf!='NA':
         clinvar_mt = load_split_vep_consequences(clinvar_vcf) 
-        # NEW 1/14/2025: added variant_source —— ClinVar_P/LP or OMIM_recessive or both
+        # NEW 1/14/2025: added variant_source —— ClinVar_P/LP or recessive or both
         snv_mt_no_clinvar = snv_mt
         snv_mt = snv_mt.union_rows(clinvar_mt).distinct_by_row()
         snv_mt = snv_mt.annotate_rows(variant_source=hl.if_else(hl.is_defined(clinvar_mt.rows()[snv_mt.row_key]),  # if in ClinVar
-                                                 hl.if_else(hl.is_defined(snv_mt_no_clinvar.rows()[snv_mt.row_key]), 'ClinVar_P/LP_OMIM_recessive',  # if also in omim_recessive_vcf
-                                                            'ClinVar_P/LP'), 'OMIM_recessive'))
+                                                 hl.if_else(hl.is_defined(snv_mt_no_clinvar.rows()[snv_mt.row_key]), 'ClinVar_P/LP_recessive',  # if also in recessive_vcf
+                                                            'ClinVar_P/LP'), 'recessive'))
     # NEW 1/28/2025: variant_source annotation if not including ClinVar
     else:
-        snv_mt = snv_mt.annotate_rows(variant_source='OMIM_recessive')
+        snv_mt = snv_mt.annotate_rows(variant_source='recessive')
 
     # Explode rows by transcript
     snv_mt = snv_mt.explode_rows(snv_mt.vep.transcript_consequences)

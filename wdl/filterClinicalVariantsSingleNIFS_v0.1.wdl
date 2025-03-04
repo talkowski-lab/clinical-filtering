@@ -688,7 +688,7 @@ task flagFromConfirmationMaternalVCF {
 
     # Export to Excel, replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
     space_cols = merged_df.columns[merged_df.columns.str.contains('SPACE_')].tolist()
-    merged_df.rename({col: '' for col in space_cols}, axis=1).to_excel(output_filename)
+    merged_df.rename({col: '' for col in space_cols}, axis=1).to_excel(output_filename, index=False)
     EOF
     
     python3 add_GT_flags.py -i ~{input_tsv} -c ~{confirmation_vcf} -m ~{maternal_vcf} -o ~{output_filename} \

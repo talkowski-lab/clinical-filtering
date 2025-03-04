@@ -68,11 +68,10 @@ workflow filterClinicalVariants {
         Array[String] cols_for_varkey=['locus','alleles','id','SYMBOL','vep.transcript_consequences.Feature','Consequence','HGVSc']
         Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']
         Array[String] priority_cols=['id', 'is_female', 'fam_id',
-                        'variant_category','Tier','locus', 'alleles', 'rsid', 'HGVSc_symbol', 'HGVSc', 'HGVSp',
-                        'filters', 'qual', 'AC', 'AC5_NOT_IN_GNOMAD', 'AF', 'DP', 'MQ', 'MQ0', 'QD',
-                        'CA_from_GT', 'gene_list', 'OMIM_inheritance_code', 'SYMBOL', 'Feature', 'BIOTYPE', 'Allele', 'Consequence', 'MPC', 'CANONICAL', 'MANE_PLUS_CLINICAL',
-                        'proband_entry.AF', 'proband_entry.AD', 'proband_entry.DP', 'proband_entry.GT', 'proband_entry.GQ', 'mother_entry.AF', 'mother_entry.AD', 'mother_entry.DP', 'mother_entry.GT',
-                        'CLNSIG', 'CLNREVSTAT', 'REVEL', 'IMPACT', 'MAX_AF', 'MAX_AF_POPS', 'CLIN_SIG', 'LOEUF_v2', 'LOEUF_v4', 'spliceAI_score']
+                        'variant_category','Tier','locus', 'alleles',  # disease_title, classification_title inserted here
+                        'HGVSc_symbol', 'HGVSc', 'HGVSp', 'filters', 
+                        'proband_entry.GT', 'proband_entry.AD', 'mother_entry.GT', 'mother_entry.AD', 
+                        'gnomADe_AF', 'cohort_AC', 'cohort_AF', 'comphet_ID']
         
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_omim
@@ -545,7 +544,12 @@ task addPhenotypesMergeAndPrettifyOutputs {
     # Add new phenotype columns to priority columns, before HGVSc_symbol
     priority_cols = priority_cols[:priority_cols.index('HGVSc_symbol')] + ['disease_title', 'classification_title'] + priority_cols[priority_cols.index('HGVSc_symbol'):]
 
-    merged_df[priority_cols + remaining_cols].to_csv(output_filename, sep='\t', index=False)
+    # Add 2 empty columns as spacers after priority columns
+    merged_df = merged_df[priority_cols + remaining_cols].copy()
+    for i in range(2):
+        merged_df.insert(len(priority_cols)+i, f"SPACE_{i}", np.nan)
+
+    merged_df.to_csv(output_filename, sep='\t', index=False)
     EOF
 
     python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -o ~{output_filename} -p ~{gene_phenotype_map} \
@@ -662,8 +666,9 @@ task flagFromConfirmationMaternalVCF {
     fields_to_drop = np.intersect1d(tmp_fields, list(merged_ht.row)).tolist()
     merged_df = merged_ht.key_by().drop(*fields_to_drop).to_pandas()   
 
-    # Export to Excel
-    merged_df.to_excel(output_filename)
+    # Export to Excel, replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
+    space_cols = merged_df.columns[merged_df.columns.str.contains('SPACE_')].tolist()
+    merged_df.rename({col: '' for col in space_cols}, axis=1).to_excel(output_filename)
     EOF
     
     python3 add_GT_flags.py -i ~{input_tsv} -c ~{confirmation_vcf} -m ~{maternal_vcf} -o ~{output_filename} \

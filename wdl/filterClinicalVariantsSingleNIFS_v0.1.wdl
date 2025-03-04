@@ -492,7 +492,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
             return str(num)
 
     merged_df = pd.DataFrame()
-    extra_cols = []
+    all_cols = []
 
     for i, uri in enumerate(input_uris):
         df = pd.concat(pd.read_csv(uri, sep='\t', chunksize=100_000))
@@ -508,9 +508,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
             # Drop duplicate rows using all columns except variant_source (can be different because of comphets) 
             all_cols_minus_variant_source = [col for col in df.columns if col!='variant_source'] 
             df = df.drop_duplicates(all_cols_minus_variant_source)
-        # Add to list of columns not shared by all outputs
-        if not merged_df.empty:
-            extra_cols += list(np.setdiff1d(df.columns, merged_df.columns))
+        all_cols += df.columns.tolist()
         merged_df = pd.concat([merged_df, df])
 
     # Merge variant_category, Tier, Tier Group as comma separated string for various outputs
@@ -518,7 +516,9 @@ task addPhenotypesMergeAndPrettifyOutputs {
     merged_df['Tier'] = merged_df.VarKey.map(merged_df.groupby('VarKey').Tier.apply(','.join).to_dict())
     merged_df['Tier Group'] = merged_df.VarKey.map(merged_df.groupby('VarKey')['Tier Group'].apply(','.join).to_dict())
 
-    # prioritize CompHet/XLR/hom_var/mat_carrier output because extra columns
+    # Prioritize CompHet/XLR/hom_var/mat_carrier output because extra columns
+    col_counts = pd.Series(all_cols).value_counts()
+    extra_cols = col_counts[col_counts<len(uris)].index.tolist()
     cols_for_duplicate = list(np.setdiff1d(merged_df.columns, extra_cols+exclude_cols))
     merged_df = merged_df.drop_duplicates(cols_for_duplicate)
 

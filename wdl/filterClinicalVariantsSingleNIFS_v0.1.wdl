@@ -518,7 +518,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
 
     # Prioritize CompHet/XLR/hom_var/mat_carrier output because extra columns
     col_counts = pd.Series(all_cols).value_counts()
-    extra_cols = col_counts[col_counts<len(uris)].index.tolist()
+    extra_cols = col_counts[col_counts<len(input_uris)].index.tolist()
     cols_for_duplicate = list(np.setdiff1d(merged_df.columns, extra_cols+exclude_cols))
     merged_df = merged_df.drop_duplicates(cols_for_duplicate)
 

@@ -71,7 +71,7 @@ workflow filterClinicalVariants {
                         'variant_category','Tier','locus', 'alleles',  # disease_title, classification_title inserted here
                         'HGVSc_symbol', 'HGVSc', 'HGVSp', 'filters', 
                         'proband_entry.GT', 'proband_entry.AD', 'mother_entry.GT', 'mother_entry.AD', 
-                        'gnomADe_AF', 'cohort_AC', 'cohort_AF', 'comphet_ID']
+                        'gnomADe_AF', 'cohort_AC', 'cohort_AF']
         
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_omim

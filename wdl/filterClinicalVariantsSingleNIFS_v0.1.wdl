@@ -71,7 +71,7 @@ workflow filterClinicalVariants {
                         'variant_category','Tier','locus', 'alleles',  # disease_title, classification_title inserted here
                         'HGVSc_symbol', 'HGVSc', 'HGVSp', 'filters', 
                         'proband_entry.GT', 'proband_entry.AD', 'mother_entry.GT', 'mother_entry.AD', 
-                        'gnomADe_AF', 'cohort_AC', 'cohort_AF']
+                        'gnomADe_AF', 'cohort_AC', 'cohort_AF', 'comphet_ID']
         
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_omim
@@ -536,6 +536,11 @@ task addPhenotypesMergeAndPrettifyOutputs {
     merged_df = merged_df.drop('VarKey', axis=1).copy()
     remaining_cols = list(np.setdiff1d(merged_df.columns, priority_cols))
 
+    # Add comphet_ID column to keep comphets together when sorting below
+    merged_df['comphet_ID'] = ''
+    comphet_IDs = merged_df.loc[merged_df.variant_category.str.contains('comphet'), ['id','SYMBOL']].apply(':'.join, axis=1)
+    merged_df.loc[merged_df.variant_category.str.contains('comphet'), 'comphet_ID'] = comphet_IDs
+
     # Map phenotypes
     pheno_df = pd.read_csv(pheno_uri, sep='\t')
     merged_df['disease_title'] = merged_df.HGVSc_symbol.map(pheno_df.set_index('gene_symbol').disease_title.to_dict())
@@ -548,6 +553,21 @@ task addPhenotypesMergeAndPrettifyOutputs {
     merged_df = merged_df[priority_cols + remaining_cols].copy()
     for i in range(2):
         merged_df.insert(len(priority_cols)+i, f"SPACE_{i}", np.nan)
+
+    # Sort by tier (lower = higher priority)
+    def get_len_of_top_numeric_tier(row):
+        top_numeric_tier = row.top_numeric_tier
+        numeric_tiers = row.numeric_tiers_list
+        top_tier = row.tiers_list[numeric_tiers.index(top_numeric_tier)]
+        return len(top_tier)
+
+    merged_df['tiers_list'] = merged_df.Tier.str.split(',')  # with * and flags
+    merged_df['numeric_tiers_list'] = merged_df.tiers_list.apply(lambda lst: [x[0] for x in lst])
+    merged_df['top_numeric_tier'] = merged_df.numeric_tiers_list.apply(min)
+    merged_df['top_tier_len'] = merged_df.apply(get_len_of_top_numeric_tier, axis=1)  # Longer = worse tier!
+
+    new_tier_cols = ['tiers_list','numeric_tiers_list','top_numeric_tier','top_tier_len']
+    merged_df = merged_df.sort_values(['top_numeric_tier','top_tier_len', 'comphet_ID']).drop(new_tier_cols, axis=1)
 
     merged_df.to_csv(output_filename, sep='\t', index=False)
     EOF

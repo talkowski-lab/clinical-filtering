@@ -30,6 +30,7 @@
 - changed variant_type annotation to variant_types to retain original variant_type field for comphets
 3/4/2025:
 - change OMIM_recessive/OMIM_dominant to just recessive/dominant
+- remove redundant gene field from output
 '''
 ###
 
@@ -841,10 +842,11 @@ mat_carrier = mat_carrier.annotate(variant_category='maternal_carrier')
 
 # NEW 1/14/2025: use to_pandas() to bypass ClassTooLargeException in Hail tables union
 # NEW 1/22/2025: use export() and then load in pandas instead of to_pandas() to match formatting with other outputs
-merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set').flatten().export('comphets.tsv.gz')
-xlr_phased.flatten().export('xlr.tsv.gz')
-phased_hom_var.flatten().export('hom_var.tsv.gz')
-mat_carrier.flatten().export('mat_carrier.tsv.gz')
+# NEW 3/4/2025: remove redundant gene field from output
+merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set','gene').flatten().export('comphets.tsv.gz')
+xlr_phased.drop('gene').flatten().export('xlr.tsv.gz')
+phased_hom_var.drop('gene').flatten().export('hom_var.tsv.gz')
+mat_carrier.drop('gene').flatten().export('mat_carrier.tsv.gz')
 
 merged_comphets_df = pd.read_csv('comphets.tsv.gz', sep='\t')
 xlr_phased_df = pd.read_csv('xlr.tsv.gz', sep='\t')

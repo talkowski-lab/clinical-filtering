@@ -683,8 +683,30 @@ task flagFromConfirmationMaternalVCF {
     merged_df['top_numeric_tier'] = merged_df.numeric_tiers_list.apply(min)
     merged_df['top_tier_len'] = merged_df.apply(get_len_of_top_numeric_tier, axis=1)  # Longer = worse tier!
 
-    new_tier_cols = ['tiers_list','numeric_tiers_list','top_numeric_tier','top_tier_len']
-    merged_df = merged_df.sort_values(['top_numeric_tier','top_tier_len', 'comphet_ID']).drop(new_tier_cols, axis=1)
+    # Pull flags from Tier column and move to filters column
+    def get_flags_from_tier_list(tier_list):
+        flags = [';'.join(x.split(';')[1:]) for x in tier_list]
+        flags = [x for x in flags if x!='']
+        unique_flags = list(set(flags))
+        if len(unique_flags)==0:
+            return np.nan
+        return unique_flags[0]
+
+    def update_filters_with_flags(row):
+        if pd.isna(row.tier_filter):  # no new flags to add
+            return row.filters
+        if pd.isna(row.filters):  # no existing filters
+            return row.tier_filter
+        return row.filters + ',' + row.tier_filter
+
+    merged_df['tier_filter'] = merged_df.Tier.str.split(',').apply(get_flags_from_tier_list)
+    merged_df['filters'] = merged_df.apply(update_filters_with_flags, axis=1)
+
+    # Update Tier column to just have Tier (including *, but NO flags)
+    merged_df['Tier'] = merged_df.Tier.str.split(',').apply(lambda lst: [x.split(';')[0] for x in lst]).apply(','.join)
+
+    tmp_tier_cols = ['tiers_list','numeric_tiers_list','top_numeric_tier','top_tier_len','tier_filter']
+    merged_df = merged_df.sort_values(['top_numeric_tier','top_tier_len', 'comphet_ID']).drop(tmp_tier_cols, axis=1)
 
     # Export to Excel, replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
     space_cols = merged_df.columns[merged_df.columns.str.contains('SPACE_')].tolist()

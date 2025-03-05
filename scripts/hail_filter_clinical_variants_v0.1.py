@@ -14,6 +14,8 @@
 - added include_all_maternal_carrier_variants parameter
 2/27/2025:
 - revert to all ClinVar P/LP, NOT 2*+ only
+3/5/2025:
+- fix string matching for ClinVar P/LP output to exclude 'Conflicting'
 '''
 ###
 
@@ -130,8 +132,9 @@ all_errors_mt = all_errors.key_by().to_matrix_table(row_key=['locus','alleles'],
 phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_key, phased_tm.col_key].mendel_code)
 
 # Output 1: grab ClinVar only
-clinvar_mt = mt.filter_rows(hl.any(lambda x: x.matches('athogenic'), mt.info.CLNSIG))
-clinvar_tm = phased_tm.filter_rows(hl.any(lambda x: x.matches('athogenic'), phased_tm.info.CLNSIG))
+# NEW 3/5/2025: Fix string matching for ClinVar P/LP output to exclude 'Conflicting'
+clinvar_mt = mt.filter_rows(hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), mt.info.CLNSIG))
+clinvar_tm = phased_tm.filter_rows(hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), phased_tm.info.CLNSIG))
 # NEW 1/9/2025: keep 2*+ ClinVar only
 clinvar_two_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided', '_multiple_submitters', '_no_conflicts']]
 # NEW 2/27/2025: Revert to all ClinVar P/LP, NOT 2*+ only

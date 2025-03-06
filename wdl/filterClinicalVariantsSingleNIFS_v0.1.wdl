@@ -490,7 +490,11 @@ task addPhenotypesMergeAndPrettifyOutputs {
         # Strip quotes etc. from every column
         for col in df.columns:
             if df[col].dtype=='object':
-                df[col] = df[col].str.strip('\n').str.replace('\"','').str.replace('[','').str.replace(']','')
+                df[col] = df[col].str.strip('\n').str.replace('\"','').str.replace('[','').str.replace(']','').replace({'': np.nan})           
+                try:  # convert float column
+                    df[col] = df[col].astype(float)
+                except:
+                    pass
         
         # Make unique VarKey
         df['VarKey'] = df[cols_for_varkey].astype(str).apply(':'.join, axis=1)
@@ -531,7 +535,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
     merged_df = merged_df.drop('VarKey', axis=1).copy()
     remaining_cols = list(np.setdiff1d(merged_df.columns, priority_cols))
 
-    # Add comphet_ID column to keep comphets together when sorting below
+    # Add comphet_ID column to keep comphets together when sorting
     merged_df['comphet_ID'] = ''
     comphet_IDs = merged_df.loc[merged_df.variant_category.str.contains('comphet'), ['id','SYMBOL']].apply(':'.join, axis=1)
     merged_df.loc[merged_df.variant_category.str.contains('comphet'), 'comphet_ID'] = comphet_IDs

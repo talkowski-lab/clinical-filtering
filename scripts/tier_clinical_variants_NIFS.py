@@ -32,14 +32,13 @@ for col in df.columns:
 # Tier 5: default/lowest tier
 df['Tier'] = 5
 
-# Tier 4: Only native NIFS filters (except ABBINOM)
-passes_filters_except_abbinom = ((df.filters.isna()) | 
-                                 (df.filters.str.contains('ABBINOM')))
-df.loc[passes_filters_except_abbinom, 'Tier'] = 4
+# Tier 4: Only native NIFS filters
+passes_filters = (df.filters.isna())
+df.loc[passes_filters, 'Tier'] = 4
 
 # Tier 3: Include VUS or Conflicting in ClinVar
 vus_or_conflicting_in_clinvar = (df['info.CLNSIG'].str.contains('Uncertain') | df['info.CLNSIG'].str.contains('Conflicting'))
-df.loc[passes_filters_except_abbinom & vus_or_conflicting_in_clinvar, 'Tier'] = 3
+df.loc[passes_filters & vus_or_conflicting_in_clinvar, 'Tier'] = 3
 # CRITERIA FOR BOTH TIER 1 AND TIER 2
 is_clinvar_P_LP = ((df['info.CLNSIG'].astype(str).str.contains('athogenic')) 
                 & (~df['info.CLNSIG'].astype(str).str.contains('Conflicting')))
@@ -82,7 +81,7 @@ passes_tier_1_and_2 = (is_clinvar_P_LP_one_star_plus_or_not_in_clinvar &
                         passes_ECNT &
                         high_or_moderate_impact &
                         not_inframe_indel &
-                        passes_filters_except_abbinom)
+                        passes_filters)
 
 # Tier 2: ClinVar P/LP 1*+, in gene list, not in SEGDUP/STR/SIMPLEREP, etc.
 df.loc[passes_tier_1_and_2 & tier_2_proband_GT, 'Tier'] = 2

@@ -672,7 +672,7 @@ task flagFromConfirmationMaternalVCF {
         return len(top_tier)
 
     merged_df['tiers_list'] = merged_df.Tier.str.split(',')  # with * and flags
-    merged_df['numeric_tiers_list'] = merged_df.tiers_list.apply(lambda lst: [x[0] for x in lst])
+    merged_df['numeric_tiers_list'] = merged_df.tiers_list.apply(lambda lst: [x[0] for x in lst if x!='' else 5])  # Assign missing tier to tier 5 for sorting
     merged_df['top_numeric_tier'] = merged_df.numeric_tiers_list.apply(min)
     merged_df['top_tier_len'] = merged_df.apply(get_len_of_top_numeric_tier, axis=1)  # Longer = worse tier!
 

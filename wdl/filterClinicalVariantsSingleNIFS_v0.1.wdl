@@ -487,6 +487,10 @@ task addPhenotypesMergeAndPrettifyOutputs {
 
     for i, uri in enumerate(input_uris):
         df = pd.concat(pd.read_csv(uri, sep='\t', chunksize=100_000))
+        # Strip quotes etc. from every column
+        for col in df.columns:
+            if df[col].dtype=='object':
+                df[col] = df[col].str.strip('\n').str.replace('\"','').str.replace('[','').str.replace(']','')
         
         # Make unique VarKey
         df['VarKey'] = df[cols_for_varkey].astype(str).apply(':'.join, axis=1)

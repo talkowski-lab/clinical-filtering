@@ -487,6 +487,10 @@ task addPhenotypesMergeAndPrettifyOutputs {
 
     for i, uri in enumerate(input_uris):
         df = pd.concat(pd.read_csv(uri, sep='\t', chunksize=100_000))
+        
+        # Remove 'info.' and 'vep.transcript_consequences.' prefixes from column names
+        df.columns = df.columns.str.replace('info.','').str.replace('vep.transcript_consequences.','')
+
         # Make unique VarKey
         df['VarKey'] = df[cols_for_varkey].astype(str).apply(':'.join, axis=1)
         for col in float_cols:
@@ -515,10 +519,6 @@ task addPhenotypesMergeAndPrettifyOutputs {
 
     # Drop duplicate columns from tiering script
     merged_df = merged_df.loc[:,~merged_df.columns.str.contains('\.1')]
-
-    # Remove 'info.' and 'vep.transcript_consequences.' prefixes from column names
-    merged_df.columns = merged_df.columns.str.replace('info.','')
-    merged_df.columns = merged_df.columns.str.replace('vep.transcript_consequences.','')
 
     # Drop duplicate columns after renaming
     merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]

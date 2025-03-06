@@ -67,7 +67,6 @@ workflow filterClinicalVariants {
         String dom_gene_list_tsv='NA'
 
         # ALL NIFS-specific, for addPhenotypesMergeAndPrettifyOutputs task
-        # Array[String] dup_exclude_cols=['info.CSQ','Tier','Tier.1','Tier Group','variant_source']
         Array[String] dup_exclude_cols=['info.CSQ','Tier','variant_source']
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
         Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']
@@ -505,10 +504,9 @@ task addPhenotypesMergeAndPrettifyOutputs {
         all_cols += df.columns.tolist()
         merged_df = pd.concat([merged_df, df])
 
-    # Merge variant_category, Tier, Tier Group as comma separated string for various outputs
+    # Merge variant_category, Tier as comma separated string for various outputs
     merged_df['variant_category'] = merged_df.VarKey.map(merged_df.groupby('VarKey').variant_category.apply(','.join).to_dict())
-    merged_df['Tier'] = merged_df.VarKey.map(merged_df.groupby('VarKey').Tier.apply(lambda lst: pd.Series(lst).dropna().apply(','.join)).to_dict())
-    # merged_df['Tier Group'] = merged_df.VarKey.map(merged_df.groupby('VarKey')['Tier Group'].apply(','.join).to_dict())
+    merged_df['Tier'] = merged_df.VarKey.map(merged_df.groupby('VarKey').Tier.apply(lambda lst: ','.join(pd.Series(lst).dropna().tolist())).to_dict())
 
     # Prioritize CompHet/XLR/hom_var/mat_carrier output because extra columns
     col_counts = pd.Series(all_cols).value_counts()

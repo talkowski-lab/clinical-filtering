@@ -677,6 +677,9 @@ task flagFromConfirmationMaternalVCF {
     merged_df['numeric_tiers_list'] = merged_df.tiers_list.apply(lambda lst: [int(x[0])  if x!='' else 5 for x in lst])  # Assign missing tier to tier 5 for sorting
     merged_df['top_numeric_tier'] = merged_df.numeric_tiers_list.apply(min)
     merged_df['top_tier_len'] = merged_df.apply(get_len_of_top_numeric_tier, axis=1)  # Longer = worse tier!
+    # Get best tier for comphets
+    merged_df.loc[merged_df.variant_category.str.contains('comphet'), 'top_numeric_tier'] = merged_df.comphet_ID.map(
+                    merged_df[merged_df.variant_category.str.contains('comphet')].groupby('comphet_ID')['top_numeric_tier'].min())
 
     # Pull flags from Tier column and move to filters column
     def get_flags_from_tier_list(tier_list):

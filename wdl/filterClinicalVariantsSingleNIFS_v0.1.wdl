@@ -500,11 +500,8 @@ task addPhenotypesMergeAndPrettifyOutputs {
             # Drop duplicate rows using all columns except variant_source (can be different because of comphets) 
             all_cols_minus_variant_source = [col for col in df.columns if col!='variant_source'] 
             df = df.drop_duplicates(all_cols_minus_variant_source)
+
         all_cols += df.columns.tolist()
-
-        # Remove 'info.' and 'vep.transcript_consequences.' prefixes from column names
-        df.columns = df.columns.str.replace('info.','').str.replace('vep.transcript_consequences.','')
-
         merged_df = pd.concat([merged_df, df])
 
     # Merge variant_category, Tier, Tier Group as comma separated string for various outputs
@@ -520,6 +517,9 @@ task addPhenotypesMergeAndPrettifyOutputs {
 
     # Drop duplicate columns from tiering script
     merged_df = merged_df.loc[:,~merged_df.columns.str.contains('\.1')]
+
+    # Remove 'info.' and 'vep.transcript_consequences.' prefixes from column names
+    merged_df.columns = merged_df.columns.str.replace('info.','').str.replace('vep.transcript_consequences.','')
 
     # Drop duplicate columns after renaming
     merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]

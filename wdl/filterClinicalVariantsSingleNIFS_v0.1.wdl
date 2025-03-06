@@ -507,7 +507,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
     # Merge variant_category, Tier, Tier Group as comma separated string for various outputs
     merged_df['variant_category'] = merged_df.VarKey.map(merged_df.groupby('VarKey').variant_category.apply(','.join).to_dict())
     merged_df['Tier'] = merged_df.VarKey.map(merged_df.groupby('VarKey').Tier.apply(lambda lst: pd.Series(lst).dropna().apply(','.join)).to_dict())
-    merged_df['Tier Group'] = merged_df.VarKey.map(merged_df.groupby('VarKey')['Tier Group'].apply(','.join).to_dict())
+    # merged_df['Tier Group'] = merged_df.VarKey.map(merged_df.groupby('VarKey')['Tier Group'].apply(','.join).to_dict())
 
     # Prioritize CompHet/XLR/hom_var/mat_carrier output because extra columns
     col_counts = pd.Series(all_cols).value_counts()

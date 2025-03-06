@@ -488,9 +488,6 @@ task addPhenotypesMergeAndPrettifyOutputs {
     for i, uri in enumerate(input_uris):
         df = pd.concat(pd.read_csv(uri, sep='\t', chunksize=100_000))
         
-        # Remove 'info.' and 'vep.transcript_consequences.' prefixes from column names
-        df.columns = df.columns.str.replace('info.','').str.replace('vep.transcript_consequences.','')
-
         # Make unique VarKey
         df['VarKey'] = df[cols_for_varkey].astype(str).apply(':'.join, axis=1)
         for col in float_cols:
@@ -504,6 +501,10 @@ task addPhenotypesMergeAndPrettifyOutputs {
             all_cols_minus_variant_source = [col for col in df.columns if col!='variant_source'] 
             df = df.drop_duplicates(all_cols_minus_variant_source)
         all_cols += df.columns.tolist()
+
+        # Remove 'info.' and 'vep.transcript_consequences.' prefixes from column names
+        df.columns = df.columns.str.replace('info.','').str.replace('vep.transcript_consequences.','')
+
         merged_df = pd.concat([merged_df, df])
 
     # Merge variant_category, Tier, Tier Group as comma separated string for various outputs

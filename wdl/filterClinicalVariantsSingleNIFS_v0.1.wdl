@@ -67,7 +67,8 @@ workflow filterClinicalVariants {
         String dom_gene_list_tsv='NA'
 
         # ALL NIFS-specific, for addPhenotypesMergeAndPrettifyOutputs task
-        Array[String] dup_exclude_cols=['info.CSQ','Tier','Tier.1','Tier Group','variant_source']
+        # Array[String] dup_exclude_cols=['info.CSQ','Tier','Tier.1','Tier Group','variant_source']
+        Array[String] dup_exclude_cols=['info.CSQ','Tier','variant_source']
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
         Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']
         Array[String] priority_cols=['id', 'is_female', 'fam_id',

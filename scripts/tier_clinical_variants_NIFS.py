@@ -28,6 +28,7 @@ df = pd.read_csv(uri, sep='\t')
 for col in df.columns:
     if df[col].dtype=='object':
         df[col] = df[col].str.strip('\n').str.replace('\"','').str.replace('[','').str.replace(']','')
+
 # Tier 5: default/lowest tier
 df['Tier'] = 5
 
@@ -99,6 +100,6 @@ df.loc[passes_tier_1_and_2 &
 # Add flags for LQ and VUS
 df['Tier'] = df['Tier'].astype(str)
 df.loc[~passes_GQ, 'Tier'] = df.loc[~passes_GQ, 'Tier'] + ';LQ'
-df.loc[vus_or_conflicting_in_clinvar, 'Tier'] = df.loc[~passes_GQ, 'Tier'] + ';VUS'
+df.loc[vus_or_conflicting_in_clinvar, 'Tier'] = df.loc[vus_or_conflicting_in_clinvar, 'Tier'] + ';VUS'
 
 df.to_csv(output_uri, sep='\t', index=False)

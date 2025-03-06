@@ -144,18 +144,6 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_comphets
     }
 
-    call finalFilteringTiers as finalFilteringTiersClinVar {
-        input:
-            input_tsv=runClinicalFiltering.clinvar,
-            ECNT_threshold=ECNT_threshold,
-            ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
-            GQ_threshold=GQ_threshold,
-            inheritance_type='other',
-            hail_docker=hail_docker,
-            filter_final_tiers_script=filter_final_tiers_script,
-            runtime_attr_override=runtime_attr_filter_tiers
-    }
-
     call finalFilteringTiers as finalFilteringTiersDominant {
         input:
             input_tsv=runClinicalFilteringOMIM.dominant,
@@ -401,7 +389,7 @@ task finalFilteringTiers {
     set -eou pipefail
     curl ~{filter_final_tiers_script} > tier.py
     python3 tier.py -i ~{input_tsv} -o ~{output_filename} \
-        --ECNT-threshold ~{ECNT_threshold} ---NCount-over-proband-DP-threshold ~{ncount_over_proband_DP_threshold} \
+        --ECNT-threshold ~{ECNT_threshold} --NCount-over-proband-DP-threshold ~{ncount_over_proband_DP_threshold} \
         --GQ-threshold ~{GQ_threshold} -t ~{inheritance_type}
     >>>
 
@@ -516,7 +504,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
 
     # Merge variant_category, Tier, Tier Group as comma separated string for various outputs
     merged_df['variant_category'] = merged_df.VarKey.map(merged_df.groupby('VarKey').variant_category.apply(','.join).to_dict())
-    merged_df['Tier'] = merged_df.VarKey.map(merged_df.groupby('VarKey').Tier.apply(','.join).to_dict())
+    merged_df['Tier'] = merged_df.VarKey.map(merged_df.groupby('VarKey').Tier.apply(lambda lst: pd.Series(lst).dropna().apply(','.join)).to_dict())
     merged_df['Tier Group'] = merged_df.VarKey.map(merged_df.groupby('VarKey')['Tier Group'].apply(','.join).to_dict())
 
     # Prioritize CompHet/XLR/hom_var/mat_carrier output because extra columns

@@ -33,7 +33,7 @@ workflow filterClinicalVariants {
         String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_NIFS_v0.1.py"
         String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_NIFS_v0.1.py"
         String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py"
-        String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/parseTSV_NIFS.py"
+        String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/tier_clinical_variants_NIFS.py"
         
         String hail_docker
         String sv_base_mini_docker
@@ -51,6 +51,10 @@ workflow filterClinicalVariants {
         Float loeuf_v2_threshold=0.35
         Float loeuf_v4_threshold=0.6
 
+        Int ECNT_threshold=6
+        Float ncount_over_proband_DP_threshold=0.05
+        Int GQ_threshold=20
+
         String genome_build='GRCh38'
 
         Boolean pass_filter=false
@@ -59,7 +63,6 @@ workflow filterClinicalVariants {
 
         File gene_phenotype_map  # NIFS-specific for now (2/27/2025)
         File carrier_gene_list  # NIFS-specific, TODO: not actually NIFS-specific anymore?
-        File extra_inheritance_gene_list  # NIFS-specific
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
         String dom_gene_list_tsv='NA'
 
@@ -141,20 +144,12 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_comphets
     }
 
-    call finalFilteringTiers as finalFilteringTiersMaternalCarrier {
-        input:
-            input_tsv=runClinicalFiltering.mat_carrier_tsv,
-            extra_inheritance_gene_list=extra_inheritance_gene_list,
-            inheritance_type='other',
-            hail_docker=hail_docker,
-            filter_final_tiers_script=filter_final_tiers_script,
-            runtime_attr_override=runtime_attr_filter_tiers
-    }
-
     call finalFilteringTiers as finalFilteringTiersClinVar {
         input:
             input_tsv=runClinicalFiltering.clinvar,
-            extra_inheritance_gene_list=extra_inheritance_gene_list,
+            ECNT_threshold=ECNT_threshold,
+            ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
+            GQ_threshold=GQ_threshold,
             inheritance_type='other',
             hail_docker=hail_docker,
             filter_final_tiers_script=filter_final_tiers_script,
@@ -164,7 +159,9 @@ workflow filterClinicalVariants {
     call finalFilteringTiers as finalFilteringTiersDominant {
         input:
             input_tsv=runClinicalFilteringOMIM.dominant,
-            extra_inheritance_gene_list=extra_inheritance_gene_list,
+            ECNT_threshold=ECNT_threshold,
+            ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
+            GQ_threshold=GQ_threshold,
             inheritance_type='dominant',
             hail_docker=hail_docker,
             filter_final_tiers_script=filter_final_tiers_script,
@@ -174,7 +171,9 @@ workflow filterClinicalVariants {
     call finalFilteringTiers as finalFilteringTiersRecessive {
         input:
             input_tsv=runClinicalFilteringOMIM.recessive_tsv,
-            extra_inheritance_gene_list=extra_inheritance_gene_list,
+            ECNT_threshold=ECNT_threshold,
+            ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
+            GQ_threshold=GQ_threshold,
             inheritance_type='recessive',
             hail_docker=hail_docker,
             filter_final_tiers_script=filter_final_tiers_script,
@@ -184,7 +183,9 @@ workflow filterClinicalVariants {
     call finalFilteringTiers as finalFilteringTiersCompHet {
         input:
             input_tsv=filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv,
-            extra_inheritance_gene_list=extra_inheritance_gene_list,
+            ECNT_threshold=ECNT_threshold,
+            ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
+            GQ_threshold=GQ_threshold,
             inheritance_type='recessive',
             hail_docker=hail_docker,
             filter_final_tiers_script=filter_final_tiers_script,
@@ -196,7 +197,7 @@ workflow filterClinicalVariants {
             input_uris=[finalFilteringTiersCompHet.filtered_tsv,  # ORDER MATTERS (CompHet output first, exclude mat_carrier_tsv)
                 finalFilteringTiersRecessive.filtered_tsv,
                 finalFilteringTiersDominant.filtered_tsv,
-                finalFilteringTiersClinVar.filtered_tsv],
+                runClinicalFiltering.clinvar],
             gene_phenotype_map=gene_phenotype_map,
             dup_exclude_cols=dup_exclude_cols,
             cols_for_varkey=cols_for_varkey,
@@ -230,8 +231,6 @@ workflow filterClinicalVariants {
         File dominant_tsv = runClinicalFilteringOMIM.dominant
         File comphet_xlr_hom_var_mat_carrier_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv
 
-        File final_mat_carrier_tsv = finalFilteringTiersMaternalCarrier.filtered_tsv  # NEW 2/25/2025
-        File final_clinvar_tsv = finalFilteringTiersClinVar.filtered_tsv  # NEW 2/25/2025
         File final_recessive_tsv = finalFilteringTiersRecessive.filtered_tsv  # NEW 2/25/2025
         File final_dominant_tsv = finalFilteringTiersDominant.filtered_tsv  # NEW 2/10/2025
         File final_comphet_xlr_hom_var_mat_carrier_tsv = finalFilteringTiersCompHet.filtered_tsv  # NEW 2/10/2025
@@ -356,7 +355,9 @@ task makeDummyPed {
 task finalFilteringTiers {
     input {
         File input_tsv
-        File extra_inheritance_gene_list
+        Int ECNT_threshold
+        Float ncount_over_proband_DP_threshold
+        Int GQ_threshold
 
         String inheritance_type
         String hail_docker
@@ -394,12 +395,14 @@ task finalFilteringTiers {
     }
 
     String file_ext = if sub(basename(input_tsv), '.tsv.gz', '')!=basename(input_tsv) then '.tsv.gz' else '.tsv'
-    String output_filename = basename(input_tsv, file_ext) + '.filtered.tiers.tsv'
+    String output_filename = basename(input_tsv, file_ext) + '.tiers.tsv'
 
     command <<<
     set -eou pipefail
-    curl ~{filter_final_tiers_script} > parseTSV.py
-    python3 parseTSV.py -i ~{input_tsv} -o ~{output_filename} -l ~{extra_inheritance_gene_list} -t ~{inheritance_type}
+    curl ~{filter_final_tiers_script} > tier.py
+    python3 tier.py -i ~{input_tsv} -o ~{output_filename} \
+        --ECNT-threshold ~{ECNT_threshold} ---NCount-over-proband-DP-threshold ~{ncount_over_proband_DP_threshold} \
+        --GQ-threshold ~{GQ_threshold} -t ~{inheritance_type}
     >>>
 
     output {

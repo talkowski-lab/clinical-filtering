@@ -682,7 +682,8 @@ task flagFromConfirmationMaternalVCF {
     merged_df['top_numeric_tier'] = merged_df.numeric_tiers_list.apply(min)
     merged_df['top_tier_len'] = merged_df.apply(get_len_of_top_numeric_tier, axis=1)  # Longer = worse tier!
     # Get best tier for comphets
-    merged_df.loc[merged_df.variant_category.str.contains('comphet'), 'top_numeric_tier'] = merged_df.comphet_ID.map(
+    merged_df['top_numeric_tier_comphet'] = merged_df['top_numeric_tier']
+    merged_df.loc[merged_df.variant_category.str.contains('comphet'), 'top_numeric_tier_comphet'] = merged_df.comphet_ID.map(
                     merged_df[merged_df.variant_category.str.contains('comphet')].groupby('comphet_ID')['top_numeric_tier'].min())
 
     # Pull flags from Tier column and move to filters column
@@ -707,8 +708,8 @@ task flagFromConfirmationMaternalVCF {
     # Update Tier column to just have Tier (including *, but NO flags)
     merged_df['Tier'] = merged_df.Tier.str.split(',').apply(lambda lst: [x.split(';')[0] for x in lst]).apply(','.join)
 
-    tmp_tier_cols = ['tiers_list','numeric_tiers_list','top_numeric_tier','top_tier_len','tier_filter']
-    merged_df = merged_df.sort_values(['top_numeric_tier','top_tier_len', 'comphet_ID']).drop(tmp_tier_cols, axis=1)
+    tmp_tier_cols = ['tiers_list','numeric_tiers_list','top_numeric_tier_comphet','top_numeric_tier','top_tier_len','tier_filter']
+    merged_df = merged_df.sort_values(['top_numeric_tier_comphet','top_numeric_tier','top_tier_len', 'comphet_ID']).drop(tmp_tier_cols, axis=1)
 
     # Export to Excel, replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
     space_cols = merged_df.columns[merged_df.columns.str.contains('SPACE_')].tolist()

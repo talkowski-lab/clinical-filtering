@@ -105,9 +105,9 @@ mt = mt.annotate_rows(vep=mt.vep.select('transcript_consequences'))
 gnomad_fields = [x for x in list(mt.vep.transcript_consequences[0]) if 'gnomAD' in x]
 mt = mt.annotate_rows(info=mt.info.annotate(
     all_csqs=hl.array(hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence))),  
-    gnomad_popmax_af=hl.max([hl.or_missing(hl.array(hl.set(mt.vep.transcript_consequences[gnomad_field]))[0]!='',
-        hl.float(hl.array(hl.set(mt.vep.transcript_consequences[gnomad_field]))[0])) 
-    for gnomad_field in gnomad_fields])))
+    gnomad_popmax_af=hl.max([hl.or_missing(mt.vep.transcript_consequences[0][gnomad_field]!='',
+                                    hl.float(mt.vep.transcript_consequences[0][gnomad_field])) 
+                             for gnomad_field in gnomad_fields])))
 # add all_csqs and gnomad_popmax_af fields to INFO in VCF header
 header['info']['all_csqs'] = {'Description': "All unique consequences in vep.transcript_consequences.Consequence for each variant.",
     'Number': '.', 'Type': 'String'}

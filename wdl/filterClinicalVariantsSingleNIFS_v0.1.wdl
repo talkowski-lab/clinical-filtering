@@ -711,6 +711,11 @@ task flagFromConfirmationMaternalVCF {
     tmp_tier_cols = ['tiers_list','numeric_tiers_list','top_numeric_tier_comphet','top_numeric_tier','top_tier_len','tier_filter']
     merged_df = merged_df.sort_values(['top_numeric_tier_comphet','comphet_ID','top_numeric_tier','top_tier_len']).drop(tmp_tier_cols, axis=1)
 
+    # Strip out leading commas
+    for col in merged_df.columns:
+        if df[col].dtype=='object':
+            df[col] = df[col].str.lstrip(',')
+            
     # Export to Excel, replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
     space_cols = merged_df.columns[merged_df.columns.str.contains('SPACE_')].tolist()
     merged_df.rename({col: '' for col in space_cols}, axis=1).to_excel(output_filename, index=False)

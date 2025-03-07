@@ -41,6 +41,7 @@ workflow filterClinicalVariants {
         Int ad_alt_threshold=3
         Float spliceAI_threshold=0.8
         Float af_threshold=1  # no AF filter for NIFS
+        Int ac_threshold=3  # NIFS-specific
         Float gnomad_af_threshold=0.05
         Float am_rec_threshold=0.56
         Float am_dom_threshold=0.56
@@ -99,6 +100,7 @@ workflow filterClinicalVariants {
         filter_clinical_variants_snv_indel_script=filter_clinical_variants_snv_indel_script,
         hail_docker=hail_docker,
         af_threshold=af_threshold,
+        ac_threshold=ac_threshold,
         gnomad_af_threshold=gnomad_af_threshold,
         genome_build=genome_build,
         pass_filter=pass_filter,

@@ -16,6 +16,8 @@
 - revert to all ClinVar P/LP, NOT 2*+ only
 3/5/2025:
 - fix string matching for ClinVar P/LP output to exclude 'Conflicting'
+3/7/2025: 
+- added cohort_AC filter
 '''
 ###
 
@@ -33,10 +35,11 @@ cores = sys.argv[3]  # string
 mem = int(np.floor(float(sys.argv[4])))
 ped_uri = sys.argv[5]
 af_threshold = float(sys.argv[6])
-gnomad_af_threshold = float(sys.argv[7])
-build = sys.argv[8]
-pass_filter = ast.literal_eval(sys.argv[9].capitalize())
-include_all_maternal_carrier_variants = ast.literal_eval(sys.argv[10].capitalize())
+ac_threshold = int(sys.argv[7])
+gnomad_af_threshold = float(sys.argv[8])
+build = sys.argv[9]
+pass_filter = ast.literal_eval(sys.argv[10].capitalize())
+include_all_maternal_carrier_variants = ast.literal_eval(sys.argv[11].capitalize())
 
 def filter_mt(mt, filter_csq=True, filter_impact=True):
     '''
@@ -176,8 +179,9 @@ exclude_csqs = ['intergenic_variant', 'upstream_gene_variant', 'downstream_gene_
 
 mt = mt.filter_rows(hl.set(exclude_csqs).intersection(hl.set(mt.info.all_csqs)).size()!=mt.info.all_csqs.size())
 
-# filter by cohort AF and gnomAD AF
-mt = mt.filter_rows(mt.info.cohort_AF<=af_threshold)
+# filter by cohort_AC, cohort AF and gnomAD AF
+# NEW 3/7/2025: added cohort_AC filter
+mt = mt.filter_rows((mt.info.cohort_AC<=ac_threshold) | (mt.info.cohort_AF<=af_threshold))
 mt = mt.filter_rows((mt.info.gnomad_popmax_af<=gnomad_af_threshold) | (hl.is_missing(mt.info.gnomad_popmax_af)))
 
 # export intermediate VCF

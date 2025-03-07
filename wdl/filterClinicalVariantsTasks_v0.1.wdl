@@ -19,6 +19,7 @@ task runClinicalFiltering {
         String hail_docker
         String genome_build
 
+        Int ac_threshold
         Float af_threshold
         Float gnomad_af_threshold
         Boolean pass_filter
@@ -60,7 +61,7 @@ task runClinicalFiltering {
     command {
         curl ~{filter_clinical_variants_snv_indel_script} > filter_vcf.py
         python3 filter_vcf.py ~{vcf_file} ~{prefix} ~{cpu_cores} ~{memory} \
-            ~{ped_uri} ~{af_threshold} ~{gnomad_af_threshold} ~{genome_build} ~{pass_filter} \
+            ~{ped_uri} ~{af_threshold} ~{ac_threshold} ~{gnomad_af_threshold} ~{genome_build} ~{pass_filter} \
             ~{include_all_maternal_carrier_variants}
     }
 

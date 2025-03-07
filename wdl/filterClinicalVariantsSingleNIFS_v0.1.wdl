@@ -713,9 +713,9 @@ task flagFromConfirmationMaternalVCF {
 
     # Strip out leading commas
     for col in merged_df.columns:
-        if df[col].dtype=='object':
-            df[col] = df[col].str.lstrip(',')
-            
+        if merged_df[col].dtype=='object':
+            merged_df[col] = merged_df[col].str.lstrip(',')
+
     # Export to Excel, replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
     space_cols = merged_df.columns[merged_df.columns.str.contains('SPACE_')].tolist()
     merged_df.rename({col: '' for col in space_cols}, axis=1).to_excel(output_filename, index=False)

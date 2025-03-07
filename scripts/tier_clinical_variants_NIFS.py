@@ -33,7 +33,7 @@ for col in df.columns:
 df['Tier'] = 5
 
 # Tier 4: Only native NIFS filters
-passes_filters = (df.filters.isna())
+passes_filters = (df.filters=='')
 df.loc[passes_filters, 'Tier'] = 4
 
 # Tier 3: Include VUS or Conflicting in ClinVar

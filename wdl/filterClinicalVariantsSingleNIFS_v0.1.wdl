@@ -74,7 +74,7 @@ workflow filterClinicalVariants {
                         'variant_category','CLNSIG','Tier','locus', 'alleles',  # disease_title, classification_title inserted here
                         'HGVSc_symbol', 'HGVSc', 'HGVSp', 'Consequence', 'filters', 'gene_list',
                         'proband_entry.GT', 'proband_entry.AD', 'mother_entry.GT', 'mother_entry.AD', 
-                        'am_pathogenicity', 'gnomADe_AF', 'cohort_AC', 'cohort_AF', 'comphet_ID']
+                        'am_pathogenicity', 'spliceAI_score', 'gnomad_popmax_af', 'cohort_AC', 'cohort_AF', 'comphet_ID']
         
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_omim

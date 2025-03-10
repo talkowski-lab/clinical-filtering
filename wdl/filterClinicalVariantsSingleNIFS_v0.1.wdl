@@ -73,7 +73,7 @@ workflow filterClinicalVariants {
         Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']
         Array[String] priority_cols=['id', 'is_female', 'fam_id',
                         'variant_category','CLNSIG','Tier','locus', 'alleles',  # disease_title, classification_title inserted here
-                        'HGVSc_symbol', 'HGVSc', 'HGVSp', 'Consequence', 'filters', 'gene_list',
+                        'HGVSc_symbol', 'HGVSc', 'HGVSp', 'Consequence', 'filters', 'CANONICAL', 'MANE_PLUS_CLINICAL', 'gene_list',
                         'proband_entry.GT', 'proband_entry.AD', 'mother_entry.GT', 'mother_entry.AD', 
                         'am_pathogenicity', 'spliceAI_score', 'gnomad_popmax_af', 'cohort_AC', 'cohort_AF', 'comphet_ID']
         

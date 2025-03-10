@@ -140,11 +140,11 @@ task runClinicalFilteringOMIM {
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py
         curl ~{filter_clinical_variants_snv_indel_omim_script} > filter_vcf.py
-        python3 filter_vcf.py --vcf_file ~{vcf_file} --prefix ~{prefix} --cpu_cores ~{cpu_cores} --memory ~{memory} --ped_uri ~{ped_uri} \
+        python3 filter_vcf.py --vcf_file ~{vcf_file} --prefix ~{prefix} --cores ~{cpu_cores} --mem ~{memory} --ped_uri ~{ped_uri} \
             --ac_rec_threshold ~{ac_rec_threshold} --af_rec_threshold ~{af_rec_threshold} --ac_dom_threshold ~{ac_dom_threshold} --af_dom_threshold ~{af_dom_threshold} \
             --am_rec_threshold ~{am_rec_threshold} --am_dom_threshold ~{am_dom_threshold} --mpc_rec_threshold ~{mpc_rec_threshold} --mpc_dom_threshold ~{mpc_dom_threshold} \
             --gnomad_af_rec_threshold ~{gnomad_af_rec_threshold} --gnomad_af_dom_threshold ~{gnomad_af_dom_threshold} --loeuf_v2_threshold ~{loeuf_v2_threshold} --loeuf_v4_threshold ~{loeuf_v4_threshold} \
-            --genome_build ~{genome_build} --ad_alt_threshold ~{ad_alt_threshold} --include_not_omim ~{include_not_omim} --spliceAI_threshold ~{spliceAI_threshold} --rec_gene_list_tsv ~{rec_gene_list_tsv} --dom_gene_list_tsv ~{dom_gene_list_tsv}
+            --build ~{genome_build} --ad_alt_threshold ~{ad_alt_threshold} --include_not_omim ~{include_not_omim} --spliceAI_threshold ~{spliceAI_threshold} --rec_gene_list_tsv ~{rec_gene_list_tsv} --dom_gene_list_tsv ~{dom_gene_list_tsv}
     }
 
     output {

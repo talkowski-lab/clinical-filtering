@@ -15,6 +15,8 @@
 - filter by AD before outputting recessive_tsv
 3/4/2025:
 - change OMIM_recessive/OMIM_dominant to just recessive/dominant
+3/10/2025: 
+- cohort_AC OR cohort_AF filter
 '''
 ###
 
@@ -27,25 +29,64 @@ import sys
 import ast
 import os
 
-vcf_file = sys.argv[1]
-prefix = sys.argv[2]
-cores = sys.argv[3]  # string
-mem = int(np.floor(float(sys.argv[4])))
-ped_uri = sys.argv[5]
-am_rec_threshold = float(sys.argv[6])
-am_dom_threshold = float(sys.argv[7])
-mpc_rec_threshold = float(sys.argv[8])
-mpc_dom_threshold = float(sys.argv[9])
-gnomad_af_rec_threshold = float(sys.argv[10])
-gnomad_af_dom_threshold = float(sys.argv[11])
-loeuf_v2_threshold = float(sys.argv[12])
-loeuf_v4_threshold = float(sys.argv[13])
-build = sys.argv[14]
-ad_alt_threshold = int(sys.argv[15])
-include_not_omim = ast.literal_eval(sys.argv[16].capitalize())
-spliceAI_threshold = float(sys.argv[17])
-rec_gene_list_tsv = sys.argv[18]
-dom_gene_list_tsv = sys.argv[19]
+import argparse
+import numpy as np
+import ast
+
+# Create the parser
+parser = argparse.ArgumentParser(description='Process some genomic data.')
+
+# Add arguments
+parser.add_argument('--vcf_file', type=str, help='Input VCF file')
+parser.add_argument('--prefix', type=str, help='Output prefix')
+parser.add_argument('--cores', type=str, help='Number of cores')
+parser.add_argument('--mem', type=float, help='Memory (as float)')
+parser.add_argument('--ped_uri', type=str, help='PED file URI')
+parser.add_argument('--ac_rec_threshold', type=int, help='AC rec threshold')
+parser.add_argument('--af_rec_threshold', type=float, help='AF rec threshold')
+parser.add_argument('--ac_dom_threshold', type=int, help='AC dom threshold')
+parser.add_argument('--af_dom_threshold', type=float, help='AF dom threshold')
+parser.add_argument('--am_rec_threshold', type=float, help='AM rec threshold')
+parser.add_argument('--am_dom_threshold', type=float, help='AM dom threshold')
+parser.add_argument('--mpc_rec_threshold', type=float, help='MPC rec threshold')
+parser.add_argument('--mpc_dom_threshold', type=float, help='MPC dom threshold')
+parser.add_argument('--gnomad_af_rec_threshold', type=float, help='gnomAD AF rec threshold')
+parser.add_argument('--gnomad_af_dom_threshold', type=float, help='gnomAD AF dom threshold')
+parser.add_argument('--loeuf_v2_threshold', type=float, help='LOEUF v2 threshold')
+parser.add_argument('--loeuf_v4_threshold', type=float, help='LOEUF v4 threshold')
+parser.add_argument('--build', type=str, help='Build version')
+parser.add_argument('--ad_alt_threshold', type=int, help='AD ALT threshold')
+parser.add_argument('--include_not_omim', type=str, help='Include not OMIM (True/False)')
+parser.add_argument('--spliceAI_threshold', type=float, help='SpliceAI threshold')
+parser.add_argument('--rec_gene_list_tsv', type=str, help='rec gene list TSV')
+parser.add_argument('--dom_gene_list_tsv', type=str, help='dom gene list TSV')
+
+args = parser.parse_args()
+
+mem = int(np.floor(args.mem))
+include_not_omim = ast.literal_eval(args.include_not_omim.capitalize())
+
+vcf_file = args.vcf_file
+prefix = args.prefix
+cores = args.cores
+ped_uri = args.ped_uri
+ac_rec_threshold = args.ac_rec_threshold
+af_rec_threshold = args.af_rec_threshold
+ac_dom_threshold = args.ac_dom_threshold
+af_dom_threshold = args.af_dom_threshold
+am_rec_threshold = args.am_rec_threshold
+am_dom_threshold = args.am_dom_threshold
+mpc_rec_threshold = args.mpc_rec_threshold
+mpc_dom_threshold = args.mpc_dom_threshold
+gnomad_af_rec_threshold = args.gnomad_af_rec_threshold
+gnomad_af_dom_threshold = args.gnomad_af_dom_threshold
+loeuf_v2_threshold = args.loeuf_v2_threshold
+loeuf_v4_threshold = args.loeuf_v4_threshold
+build = args.build
+ad_alt_threshold = args.ad_alt_threshold
+spliceAI_threshold = args.spliceAI_threshold
+rec_gene_list_tsv = args.rec_gene_list_tsv
+dom_gene_list_tsv = args.dom_gene_list_tsv
 
 hl.init(min_block_size=128, 
         spark_conf={"spark.executor.cores": cores, 
@@ -60,6 +101,7 @@ hl.init(min_block_size=128,
                     )
 
 mt = load_split_vep_consequences(vcf_file, build)
+header = hl.get_vcf_metadata(vcf_file)
 
 # NEW 1/9/2025: moved gnomad_popmax_af
 # NEW 1/15/2025: commented out because now annotated (in INFO) in hail_filter_clinical_variants_NIFS_v0.1.py :)
@@ -150,6 +192,8 @@ not_in_omim = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code=
 omim_rec_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('2'))
 # OMIM XLR code
 omim_xlr_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))
+# NEW 3/10/2025: cohort_AC OR cohort_AF filter
+passes_ac_af_rec = ((gene_phased_tm.info.cohort_AC<=ac_rec_threshold) | (gene_phased_tm.info.cohort_AF<=af_rec_threshold))
 # gnomAD AF popmax filter
 passes_gnomad_af_rec = ((gene_phased_tm.info.gnomad_popmax_af<=gnomad_af_rec_threshold) | (hl.is_missing(gene_phased_tm.info.gnomad_popmax_af)))
 # MPC filter
@@ -164,6 +208,7 @@ passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_
 
 if include_not_omim:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
+        (passes_ac_af_rec) &
         (passes_alpha_missense) &
         (
             omim_rec_code |
@@ -178,6 +223,7 @@ if include_not_omim:
     )
 else:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
+        (passes_ac_af_rec) &
         (passes_alpha_missense) &
             (omim_rec_code | omim_xlr_code | in_rec_gene_list)        
     )
@@ -215,6 +261,8 @@ not_in_omim = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code=
 omim_dom_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('1')) 
 # OMIM XLD code
 omim_xld_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('3'))
+# NEW 3/10/2025: cohort_AC OR cohort_AF filter
+passes_ac_af_dom = ((gene_phased_tm.info.cohort_AC<=ac_dom_threshold) | (gene_phased_tm.info.cohort_AF<=af_dom_threshold))
 # gnomAD AF popmax filter
 passes_gnomad_af_dom = ((gene_phased_tm.info.gnomad_popmax_af<=gnomad_af_dom_threshold) | (hl.is_missing(gene_phased_tm.info.gnomad_popmax_af)))
 # MPC filter
@@ -235,6 +283,7 @@ passes_loeuf_v4 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v
 
 if include_not_omim:
     omim_dom = gene_phased_tm.filter_rows(
+        (passes_ac_af_dom) &
         (passes_gnomad_af_dom) &
         (passes_alpha_missense) &
         (
@@ -250,6 +299,7 @@ if include_not_omim:
     )
 else:
     omim_dom = gene_phased_tm.filter_rows(
+        (passes_ac_af_dom) &
         (passes_gnomad_af_dom) &
         (passes_alpha_missense) &
         (omim_dom_code | omim_xld_code | in_dom_gene_list)

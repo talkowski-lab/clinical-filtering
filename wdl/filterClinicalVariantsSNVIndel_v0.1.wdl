@@ -31,7 +31,8 @@ workflow filterClinicalVariants {
         Int ad_alt_threshold=3
         Float spliceAI_threshold=0.8
         Float af_threshold=0.1
-        Int ac_threshold=3
+        Int ac_threshold=10
+        Int ac_dom_threshold=10
         Float gnomad_af_threshold=0.05
         Float am_rec_threshold=0.56
         Float am_dom_threshold=0.56
@@ -93,6 +94,7 @@ workflow filterClinicalVariants {
             filter_clinical_variants_snv_indel_omim_script=filter_clinical_variants_snv_indel_omim_script,
             hail_docker=hail_docker,
             spliceAI_threshold=spliceAI_threshold,
+            ac_dom_threshold=ac_dom_threshold,
             ad_alt_threshold=ad_alt_threshold,
             am_rec_threshold=am_rec_threshold,
             am_dom_threshold=am_dom_threshold,

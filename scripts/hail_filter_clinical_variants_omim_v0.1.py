@@ -28,20 +28,21 @@ prefix = sys.argv[2]
 cores = sys.argv[3]  # string
 mem = int(np.floor(float(sys.argv[4])))
 ped_uri = sys.argv[5]
-am_rec_threshold = float(sys.argv[6])
-am_dom_threshold = float(sys.argv[7])
-mpc_rec_threshold = float(sys.argv[8])
-mpc_dom_threshold = float(sys.argv[9])
-gnomad_af_rec_threshold = float(sys.argv[10])
-gnomad_af_dom_threshold = float(sys.argv[11])
-loeuf_v2_threshold = float(sys.argv[12])
-loeuf_v4_threshold = float(sys.argv[13])
-build = sys.argv[14]
-ad_alt_threshold = int(sys.argv[15])
-include_not_omim = ast.literal_eval(sys.argv[16].capitalize())
-spliceAI_threshold = float(sys.argv[17])
-rec_gene_list_tsv = sys.argv[18]
-dom_gene_list_tsv = sys.argv[19]
+ac_dom_threshold = int(sys.argv[6])
+am_rec_threshold = float(sys.argv[7])
+am_dom_threshold = float(sys.argv[8])
+mpc_rec_threshold = float(sys.argv[9])
+mpc_dom_threshold = float(sys.argv[10])
+gnomad_af_rec_threshold = float(sys.argv[11])
+gnomad_af_dom_threshold = float(sys.argv[12])
+loeuf_v2_threshold = float(sys.argv[13])
+loeuf_v4_threshold = float(sys.argv[14])
+build = sys.argv[15]
+ad_alt_threshold = int(sys.argv[16])
+include_not_omim = ast.literal_eval(sys.argv[17].capitalize())
+spliceAI_threshold = float(sys.argv[18])
+rec_gene_list_tsv = sys.argv[19]
+dom_gene_list_tsv = sys.argv[20]
 
 hl.init(min_block_size=128, 
         spark_conf={"spark.executor.cores": cores, 
@@ -56,6 +57,7 @@ hl.init(min_block_size=128,
                     )
 
 mt = load_split_vep_consequences(vcf_file, build)
+header = hl.get_vcf_metadata(vcf_file)
 
 # NEW 1/9/2025: moved gnomad_popmax_af
 # NEW 1/15/2025: commented out because now annotated (in INFO) in hail_filter_clinical_variants_v0.1.py :)

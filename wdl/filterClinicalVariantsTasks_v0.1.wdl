@@ -15,6 +15,7 @@ task runClinicalFiltering {
         File ped_uri
         File empty_file
 
+        String helper_functions_script
         String filter_clinical_variants_snv_indel_script
         String hail_docker
         String genome_build
@@ -59,6 +60,7 @@ task runClinicalFiltering {
     String prefix = basename(vcf_file, file_ext) + '_filtered'
 
     command {
+        curl ~{helper_functions_script} > clinical_helper_functions.py
         curl ~{filter_clinical_variants_snv_indel_script} > filter_vcf.py
         python3 filter_vcf.py ~{vcf_file} ~{prefix} ~{cpu_cores} ~{memory} \
             ~{ped_uri} ~{af_threshold} ~{ac_threshold} ~{gnomad_af_threshold} ~{genome_build} ~{pass_filter} \
@@ -79,6 +81,7 @@ task runClinicalFilteringOMIM {
         File vcf_file
         File ped_uri
 
+        String helper_functions_script
         String filter_clinical_variants_snv_indel_omim_script
         String hail_docker
         String genome_build
@@ -131,6 +134,7 @@ task runClinicalFilteringOMIM {
     String prefix = basename(vcf_file, file_ext) + '_filtered'
 
     command {
+        curl ~{helper_functions_script} > clinical_helper_functions.py
         curl ~{filter_clinical_variants_snv_indel_omim_script} > filter_vcf.py
         python3 filter_vcf.py ~{vcf_file} ~{prefix} ~{cpu_cores} ~{memory} ~{ped_uri} \
             ~{am_rec_threshold} ~{am_dom_threshold} ~{mpc_rec_threshold} ~{mpc_dom_threshold} \
@@ -158,6 +162,7 @@ task filterCompHetsXLRHomVar {
 
         String genome_build
 
+        String helper_functions_script
         String filter_comphets_xlr_hom_var_script
         String hail_docker
         
@@ -200,6 +205,7 @@ task filterCompHetsXLRHomVar {
     String prefix = basename(vcf_file, file_ext) + '_filtered'
 
     command {
+        curl ~{helper_functions_script} > clinical_helper_functions.py
         curl ~{filter_comphets_xlr_hom_var_script} > filter_vcf.py
         python3 filter_vcf.py ~{snv_indel_vcf} ~{clinvar_vcf} ~{sv_vcf} ~{ped_uri} ~{prefix} ~{genome_build} \
         ~{cpu_cores} ~{memory} ~{ad_alt_threshold} ~{carrier_gene_list}

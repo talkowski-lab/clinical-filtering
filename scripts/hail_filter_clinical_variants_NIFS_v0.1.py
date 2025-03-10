@@ -24,10 +24,14 @@
 - fix string matching for ClinVar P/LP output to exclude 'Conflicting'
 3/7/2025: 
 - added cohort_AC filter
+3/10/2025:
+- change to ClinVar 1*+ P/LP for clinvar_tsv output
+- filter by in gene list in filter_mt (in hail_clinical_helper_functions.py)
 '''
 ###
 
 from pyspark.sql import SparkSession
+from clinical_helper_functions import filter_mt
 import hail as hl
 import numpy as np
 import pandas as pd
@@ -46,33 +50,6 @@ gnomad_af_threshold = float(sys.argv[8])
 build = sys.argv[9]
 pass_filter = ast.literal_eval(sys.argv[10].capitalize())
 include_all_maternal_carrier_variants = ast.literal_eval(sys.argv[11].capitalize())
-
-def filter_mt(mt, filter_csq=True, filter_impact=True):
-    '''
-    mt: can be trio matrix (tm) or matrix table (mt) but must be transcript-level, not variant-level
-    '''
-    # filter by Consequence
-    if filter_csq:
-        exclude_csqs = ['intergenic_variant', 'upstream_gene_variant', 'downstream_gene_variant',
-                        'synonymous_variant', 'coding_sequence_variant', 'sequence_variant']
-        mt = mt.filter_rows(hl.set(exclude_csqs).intersection(
-            hl.set(mt.vep.transcript_consequences.Consequence)).size()!=hl.set(mt.vep.transcript_consequences.Consequence).size())
-
-    # filter only canonical transcript or MANE PLUS CLINICAL
-    mt = mt.filter_rows((mt.vep.transcript_consequences.CANONICAL=='YES') | 
-                        (mt.vep.transcript_consequences.MANE_PLUS_CLINICAL!=''))
-
-    # filter by Impact and splice/noncoding consequence
-    if filter_impact:
-        splice_vars = ['splice_donor_5th_base_variant', 'splice_region_variant', 'splice_donor_region_variant']
-        keep_vars = ['non_coding_transcript_exon_variant']
-        mt = mt.filter_rows(
-            (hl.set(splice_vars + keep_vars).intersection(
-                hl.set(mt.vep.transcript_consequences.Consequence)).size()>0) |
-            (hl.array(['HIGH', 'MODERATE']).contains(
-            mt.vep.transcript_consequences.IMPACT))
-            )
-    return mt 
 
 hl.init(min_block_size=128, 
         spark_conf={"spark.executor.cores": cores, 
@@ -175,10 +152,12 @@ phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_k
 clinvar_mt = mt.filter_rows(hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), mt.info.CLNSIG))
 clinvar_tm = phased_tm.filter_rows(hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), phased_tm.info.CLNSIG))
 # NEW 1/9/2025: Keep 2*+ ClinVar only
-clinvar_two_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided', '_multiple_submitters', '_no_conflicts']]
+clnrevstat_one_star_plus = ["criteria_provided,_multiple_submitters,_no_conflicts", "criteria_provided,_single_submitter", "practice_guideline", "reviewed_by_expert_panel"]
+clnrevstat_two_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided', '_multiple_submitters', '_no_conflicts']]
 # NEW 2/27/2025: Revert to all ClinVar P/LP, NOT 2*+ only
-# clinvar_mt = clinvar_mt.filter_rows(hl.any([clinvar_mt.info.CLNREVSTAT==category for category in clinvar_two_star_plus]))
-# clinvar_tm = clinvar_tm.filter_rows(hl.any([clinvar_tm.info.CLNREVSTAT==category for category in clinvar_two_star_plus]))
+# NEW 3/10/2025: Change to ClinVar 1*+ P/LP
+clinvar_mt = clinvar_mt.filter_rows(hl.any([clinvar_mt.info.CLNREVSTAT==category for category in clnrevstat_one_star_plus]))
+clinvar_tm = clinvar_tm.filter_rows(hl.any([clinvar_tm.info.CLNREVSTAT==category for category in clnrevstat_one_star_plus]))
 
 clinvar_tm = clinvar_tm.filter_entries((clinvar_tm.proband_entry.GT.is_non_ref()) | 
                                    (clinvar_tm.mother_entry.GT.is_non_ref()) |
@@ -200,9 +179,9 @@ gencc_omim_tm = filter_mt(gencc_omim_tm, filter_csq=False, filter_impact=False) 
 # NEW 1/10/2025 filter out 2*+ benign only!
 # NEW: 1/15/2025: fixed bug where empty CLNSIG/CLNREVSTAT (not in ClinVar) gets filtered out
 is_clinvar_benign = ((hl.is_defined(mt.info.CLNSIG)) & (hl.any(lambda x: x.matches('enign'), mt.info.CLNSIG)))
-is_clinvar_two_star_plus = ((hl.is_defined(mt.info.CLNREVSTAT)) & 
-                (hl.any([mt.info.CLNREVSTAT==category for category in clinvar_two_star_plus])))
-mt = mt.filter_rows(is_clinvar_benign & is_clinvar_two_star_plus, keep=False)
+is_clnrevstat_two_star_plus = ((hl.is_defined(mt.info.CLNREVSTAT)) & 
+                (hl.any([mt.info.CLNREVSTAT==category for category in clnrevstat_two_star_plus])))
+mt = mt.filter_rows(is_clinvar_benign & is_clnrevstat_two_star_plus, keep=False)
 
 # filter PASS
 if (pass_filter):

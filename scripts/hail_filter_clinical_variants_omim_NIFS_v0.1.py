@@ -19,6 +19,7 @@
 ###
 
 from pyspark.sql import SparkSession
+from clinical_helper_functions import filter_mt
 import hail as hl
 import numpy as np
 import pandas as pd
@@ -57,31 +58,6 @@ hl.init(min_block_size=128,
                     }, 
         tmp_dir="tmp", local_tmpdir="tmp",
                     )
-
-def filter_mt(mt):
-    '''
-    mt: can be trio matrix (tm) or matrix table (mt) but must be transcript-level, not variant-level
-    '''
-    # filter by Consequence
-    exclude_csqs = ['intergenic_variant', 'upstream_gene_variant', 'downstream_gene_variant',
-                    'synonymous_variant', 'coding_sequence_variant', 'sequence_variant']
-    mt = mt.filter_rows(hl.set(exclude_csqs).intersection(
-        hl.set(mt.vep.transcript_consequences.Consequence)).size()!=hl.set(mt.vep.transcript_consequences.Consequence).size())
-
-    # filter only canonical transcript or MANE PLUS CLINICAL
-    mt = mt.filter_rows((mt.vep.transcript_consequences.CANONICAL=='YES') | 
-                        (mt.vep.transcript_consequences.MANE_PLUS_CLINICAL!=''))
-
-    # filter by Impact and splice/noncoding consequence
-    splice_vars = ['splice_donor_5th_base_variant', 'splice_region_variant', 'splice_donor_region_variant']
-    keep_vars = ['non_coding_transcript_exon_variant']
-    mt = mt.filter_rows(
-        (hl.set(splice_vars + keep_vars).intersection(
-            hl.set(mt.vep.transcript_consequences.Consequence)).size()>0) |
-        (hl.array(['HIGH', 'MODERATE']).contains(
-        mt.vep.transcript_consequences.IMPACT))
-        )
-    return mt 
 
 mt = hl.import_vcf(vcf_file, reference_genome=build, find_replace=('null', ''), force_bgz=True, call_fields=[], array_elements_required=False)
 

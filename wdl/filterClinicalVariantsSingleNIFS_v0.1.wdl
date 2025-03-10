@@ -34,14 +34,16 @@ workflow filterClinicalVariants {
         String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_NIFS_v0.1.py"
         String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py"
         String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/tier_clinical_variants_NIFS.py"
-        
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_clinical_helper_functions.py"
+
         String hail_docker
         String sv_base_mini_docker
 
         Int ad_alt_threshold=3
         Float spliceAI_threshold=0.8
         Float af_threshold=0.1
-        Int ac_threshold=3  # NIFS-specific
+        Int ac_threshold=10  # NIFS-specific
+        Int ac_dom_threshold=3  # NIFS-specific
         Float gnomad_af_threshold=0.05
         Float am_rec_threshold=0.56
         Float am_dom_threshold=0.56
@@ -60,7 +62,7 @@ workflow filterClinicalVariants {
 
         Boolean pass_filter=false
         Boolean include_not_omim=false  # NIFS-specific
-        Boolean include_all_maternal_carrier_variants=true  # NIFS-specific
+        Boolean include_all_maternal_carrier_variants=false
 
         File gene_phenotype_map  # NIFS-specific for now (2/27/2025)
         File carrier_gene_list  # NIFS-specific, TODO: not actually NIFS-specific anymore?
@@ -97,6 +99,7 @@ workflow filterClinicalVariants {
         input:
         vcf_file=vcf_file,
         ped_uri=makeDummyPed.ped_uri,
+        helper_functions_script=helper_functions_script,
         filter_clinical_variants_snv_indel_script=filter_clinical_variants_snv_indel_script,
         hail_docker=hail_docker,
         af_threshold=af_threshold,
@@ -113,6 +116,7 @@ workflow filterClinicalVariants {
         input:
         vcf_file=runClinicalFiltering.filtered_vcf,
         ped_uri=makeDummyPed.ped_uri,
+        helper_functions_script=helper_functions_script,
         filter_clinical_variants_snv_indel_omim_script=filter_clinical_variants_snv_indel_omim_script,
         hail_docker=hail_docker,
         spliceAI_threshold=spliceAI_threshold,
@@ -138,6 +142,7 @@ workflow filterClinicalVariants {
             clinvar_vcf=runClinicalFiltering.clinvar_vcf,
             sv_vcf='NA',
             ped_uri=makeDummyPed.ped_uri,
+            helper_functions_script=helper_functions_script,
             filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
             genome_build=genome_build,
             hail_docker=hail_docker,
@@ -184,7 +189,7 @@ workflow filterClinicalVariants {
 
     call addPhenotypesMergeAndPrettifyOutputs {
         input:
-            input_uris=[finalFilteringTiersCompHet.filtered_tsv,  # ORDER MATTERS (CompHet output first, exclude mat_carrier_tsv)
+            input_uris=[finalFilteringTiersCompHet.filtered_tsv,  # ORDER MATTERS (CompHet output first)
                 finalFilteringTiersRecessive.filtered_tsv,
                 finalFilteringTiersDominant.filtered_tsv,
                 runClinicalFiltering.clinvar],
@@ -211,7 +216,6 @@ workflow filterClinicalVariants {
     }
 
     output {
-        File mat_carrier_tsv = runClinicalFiltering.mat_carrier_tsv
         File clinvar_tsv = runClinicalFiltering.clinvar
         File clinvar_vcf = runClinicalFiltering.clinvar_vcf
         File clinvar_vcf_idx = runClinicalFiltering.clinvar_vcf_idx

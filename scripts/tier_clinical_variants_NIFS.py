@@ -63,15 +63,15 @@ not_inframe_indel = (~df['vep.transcript_consequences.Consequence'].str.contains
 if inheritance_type=='recessive':
     # Treat XLR like AD
     xlr_proband_GT = ((df.locus.str.contains('X')) & 
-                      (df['proband_entry.GT'].isin(['0/1', '1/1'])))
+                      (df['proband_entry.GT'].str.contains('1')))
     # Only HomVar for Tier 1 (except XLR)
-    tier_1_proband_GT = (df['proband_entry.GT']=='1/1') | (xlr_proband_GT)
+    tier_1_proband_GT = (df['proband_entry.GT'].isin(['1/1','1|1'])) | (xlr_proband_GT)
     # Allow Het for Tier 2 if mother has variant
     tier_2_proband_GT = ((tier_1_proband_GT) | 
-                         ((df['proband_entry.GT']=='0/1') & (df['mother_entry.GT']!='0/0')))
+                         ((df['proband_entry.GT'].isin(['0/1','0|1'])) & (df['mother_entry.GT']!='0/0')))
 
 if inheritance_type=='dominant':
-    tier_1_proband_GT = (df['proband_entry.GT'].isin(['0/1', '1/1']))
+    tier_1_proband_GT = (df['proband_entry.GT'].str.contains('1'))
     tier_2_proband_GT = tier_1_proband_GT
 
 passes_tier_1_and_2 = (is_clinvar_P_LP_one_star_plus_or_not_in_clinvar &

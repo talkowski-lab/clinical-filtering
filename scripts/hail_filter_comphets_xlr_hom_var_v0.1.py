@@ -35,7 +35,7 @@
 ###
 
 from pyspark.sql import SparkSession
-from clinical_helper_functions import filter_mt
+from clinical_helper_functions import filter_mt, remove_parent_probands_trio_matrix, load_split_vep_consequences
 import hail as hl
 import numpy as np
 import pandas as pd
@@ -73,44 +73,16 @@ hl.init(min_block_size=128,
         tmp_dir="tmp", local_tmpdir="tmp",
                     )
 
-def load_split_vep_consequences(vcf_uri):
-    mt = hl.import_vcf(vcf_uri, reference_genome=build, find_replace=('null', ''), force_bgz=True, call_fields=[], array_elements_required=False)
-    csq_columns = hl.get_vcf_metadata(vcf_uri)['info']['CSQ']['Description'].split('Format: ')[1].split('|')
-
-    mt = mt.annotate_rows(vep=mt.info)
-    transcript_consequences = mt.vep.CSQ.map(lambda x: x.split('\|'))
-
-    transcript_consequences_strs = transcript_consequences.map(lambda x: hl.if_else(hl.len(x)>1, hl.struct(**
-                                                        {col: x[i] if col!='Consequence' else x[i].split('&')  
-                                                            for i, col in enumerate(csq_columns)}), 
-                                                            hl.struct(**{col: hl.missing('str') if col!='Consequence' else hl.array([hl.missing('str')])  
-                                                            for i, col in enumerate(csq_columns)})))
-
-    mt = mt.annotate_rows(vep=mt.vep.annotate(transcript_consequences=transcript_consequences_strs))
-    mt = mt.annotate_rows(vep=mt.vep.select('transcript_consequences'))
-    # NEW 1/15/2025: commented out because now annotated (in INFO) in hail_filter_clinical_variants_v0.1.py :)
-    # mt = mt.annotate_rows(all_csqs=hl.set(hl.flatmap(lambda x: x, mt.vep.transcript_consequences.Consequence)))
-    return mt
-
-def remove_parent_probands_trio_matrix(tm):
-    '''
-    Function to bypass peculiarity of Hail's trio_matrix() function when complete_trios=False
-    removes "trios" where the "proband" is a parent --> only leaves trios/duos/singletons as entries
-    '''
-    fathers = tm.father.s.collect()
-    mothers = tm.mother.s.collect()
-    return tm.filter_cols(hl.array(fathers + mothers).contains(tm.proband.s), keep=False)
-
 
 ## STEP 1: Merge SNV/Indel VCF with SV VCF (or just one of them)
 # Load SNV/Indel VCF
 if snv_indel_vcf!='NA':
     locus_expr = 'locus'
-    snv_mt = load_split_vep_consequences(snv_indel_vcf)
+    snv_mt = load_split_vep_consequences(snv_indel_vcf, build)
 
     # Load and merge SNV/Indel ClinVar P/LP VCF
     if clinvar_vcf!='NA':
-        clinvar_mt = load_split_vep_consequences(clinvar_vcf) 
+        clinvar_mt = load_split_vep_consequences(clinvar_vcf, build) 
         # NEW 1/14/2025: added variant_source —— ClinVar_P/LP or recessive or both
         snv_mt_no_clinvar = snv_mt
         snv_mt = snv_mt.union_rows(clinvar_mt).distinct_by_row()

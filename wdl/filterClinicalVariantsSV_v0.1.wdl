@@ -32,6 +32,7 @@ workflow filterClinicalVariantsSV {
         String hail_docker
         String variant_interpretation_docker
 
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_clinical_helper_functions.py"
         String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
         String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_gene_level_v0.1.py"
         String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_sv_v0.1.py"
@@ -139,6 +140,7 @@ workflow filterClinicalVariantsSV {
         ped_uri=ped_uri,
         genome_build=genome_build,
         hail_docker=hail_docker,
+        helper_functions_script=helper_functions_script,
         filter_clinical_sv_script=filter_clinical_sv_script,
         runtime_attr_override=runtime_attr_filter_vcf
     }
@@ -552,6 +554,7 @@ task filterVCF {
         File ped_uri
         String genome_build
         String hail_docker
+        String helper_functions_script
         String filter_clinical_sv_script
         RuntimeAttr? runtime_attr_override
     }
@@ -586,6 +589,7 @@ task filterVCF {
 
     command <<<
     set -eou pipefail
+    curl ~{helper_functions_script} > clinical_helper_functions.py
     curl ~{filter_clinical_sv_script} > filter_vcf.py
     python3 filter_vcf.py -i ~{vcf_file} --ped ~{ped_uri} --cores ~{cpu_cores} --mem ~{memory} --build ~{genome_build}
     >>>

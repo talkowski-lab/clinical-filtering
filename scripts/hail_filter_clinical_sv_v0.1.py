@@ -22,6 +22,7 @@
 '''
 ###
 
+from clinical_helper_functions import remove_parent_probands_trio_matrix
 import datetime
 import pandas as pd
 import hail as hl
@@ -67,15 +68,6 @@ def filter_and_annotate_tm(tm, variant_category=None, filter_type='trio'):
     if variant_category:
         tm = tm.annotate_rows(variant_category=variant_category)
     return tm
-
-def remove_parent_probands_trio_matrix(tm):
-    '''
-    Function to bypass peculiarity of Hail's trio_matrix() function when complete_trios=False
-    removes "trios" where the "proband" is a parent --> only leaves trios/duos/singletons as entries
-    '''
-    fathers = tm.father.s.collect()
-    mothers = tm.mother.s.collect()
-    return tm.filter_cols(hl.array(fathers + mothers).contains(tm.proband.s), keep=False)
 
 sv_mt = hl.import_vcf(sv_vcf, force_bgz=sv_vcf.split('.')[-1] in ['gz', 'bgz'], 
     reference_genome=genome_build, array_elements_required=False, call_fields=[])

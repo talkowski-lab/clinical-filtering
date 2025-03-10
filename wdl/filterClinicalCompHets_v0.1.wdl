@@ -25,6 +25,7 @@ workflow filterClinicalCompHets {
 
         Int ad_alt_threshold=3
 
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_clinical_helper_functions.py"
         String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_v0.1.py"
 
         String hail_docker
@@ -100,6 +101,7 @@ workflow filterClinicalCompHets {
                 clinvar_vcf=select_first([subsetVCFSamplesSNVIndelsClinVar.vcf_subset, 'NA']),
                 sv_vcf=select_first([subsetVCFSamplesSVs.vcf_subset, 'NA']),
                 ped_uri=select_first([addSVSamplesToPed.output_ped, ped_uri]),
+                helper_functions_script=helper_functions_script,
                 filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
                 genome_build=genome_build,
                 hail_docker=hail_docker,

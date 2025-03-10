@@ -20,6 +20,8 @@ workflow filterClinicalVariants {
         File empty_file  # for if include_all_maternal_carrier_variants=false
 
         String cohort_prefix
+
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_clinical_helper_functions.py"       
         String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_v0.1.py"
         String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_v0.1.py"
 
@@ -70,6 +72,7 @@ workflow filterClinicalVariants {
             input:
             vcf_file=vcf_file,
             ped_uri=ped_uri,
+            helper_functions_script=helper_functions_script,
             filter_clinical_variants_snv_indel_script=filter_clinical_variants_snv_indel_script,
             hail_docker=hail_docker,
             af_threshold=af_threshold,
@@ -86,6 +89,7 @@ workflow filterClinicalVariants {
             input:
             vcf_file=runClinicalFiltering.filtered_vcf,
             ped_uri=ped_uri,
+            helper_functions_script=helper_functions_script,
             filter_clinical_variants_snv_indel_omim_script=filter_clinical_variants_snv_indel_omim_script,
             hail_docker=hail_docker,
             spliceAI_threshold=spliceAI_threshold,

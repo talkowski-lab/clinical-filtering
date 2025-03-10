@@ -22,7 +22,7 @@
 ###
 
 from pyspark.sql import SparkSession
-from clinical_helper_functions import filter_mt
+from clinical_helper_functions import filter_mt, remove_parent_probands_trio_matrix, load_split_vep_consequences
 import hail as hl
 import numpy as np
 import pandas as pd
@@ -42,15 +42,6 @@ build = sys.argv[9]
 pass_filter = ast.literal_eval(sys.argv[10].capitalize())
 include_all_maternal_carrier_variants = ast.literal_eval(sys.argv[11].capitalize())
 
-def remove_parent_probands_trio_matrix(tm):
-    '''
-    Function to bypass peculiarity of Hail's trio_matrix() function when complete_trios=False
-    removes "trios" where the "proband" is a parent --> only leaves trios/duos/singletons as entries
-    '''
-    fathers = tm.father.s.collect()
-    mothers = tm.mother.s.collect()
-    return tm.filter_cols(hl.array(fathers + mothers).contains(tm.proband.s), keep=False)
-
 hl.init(min_block_size=128, 
         spark_conf={"spark.executor.cores": cores, 
                     "spark.executor.memory": f"{int(np.floor(mem*0.4))}g",
@@ -63,23 +54,7 @@ hl.init(min_block_size=128,
         tmp_dir="tmp", local_tmpdir="tmp",
                     )
 
-mt = hl.import_vcf(vcf_file, reference_genome=build, find_replace=('null', ''), force_bgz=True, call_fields=[], array_elements_required=False)
-
-header = hl.get_vcf_metadata(vcf_file)
-csq_columns = header['info']['CSQ']['Description'].split('Format: ')[1].split('|')
-
-# split VEP CSQ string
-mt = mt.annotate_rows(vep=mt.info)
-transcript_consequences = mt.vep.CSQ.map(lambda x: x.split('\|'))
-
-transcript_consequences_strs = transcript_consequences.map(lambda x: hl.if_else(hl.len(x)>1, hl.struct(**
-                                                       {col: x[i] if col!='Consequence' else x[i].split('&')  
-                                                        for i, col in enumerate(csq_columns)}), 
-                                                        hl.struct(**{col: hl.missing('str') if col!='Consequence' else hl.array([hl.missing('str')])  
-                                                        for i, col in enumerate(csq_columns)})))
-
-mt = mt.annotate_rows(vep=mt.vep.annotate(transcript_consequences=transcript_consequences_strs))
-mt = mt.annotate_rows(vep=mt.vep.select('transcript_consequences'))
+mt = load_split_vep_consequences(vcf_file, build)
 
 # NEW 1/15/2025: moved all_csqs and gnomad_popmax_af annotations to INFO field
 gnomad_fields = [x for x in list(mt.vep.transcript_consequences[0]) if 'gnomAD' in x]

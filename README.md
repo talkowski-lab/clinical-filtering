@@ -25,4 +25,8 @@ Each ```v0.x``` is associated with a published Dockstore workflow.
 **```mergeClinicalVariantsNIFS_v0.1.wdl```**: https://dockstore.org/workflows/github.com/talkowski-lab/clinical-filtering/merge-clinical-variants-NIFS-v01
 - Merge runs of ```filterClinicalVariantsSingleNIFS_v0.1.wdl``` (so that when new samples need to be run, not all samples have to be rerun).
 
+##Utility Scripts
+This folder contains scripts for basic clinical data procesing
+
+
 **TODO**: Generally want to add scripts to the Docker images for each task/workflow instead of having them as WDL inputs, but not a priority.

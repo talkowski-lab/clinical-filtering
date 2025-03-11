@@ -87,7 +87,7 @@ df.loc[(is_clinvar_P_LP_one_star_plus_or_not_in_clinvar | high_or_moderate_impac
         tier_2_proband_GT, 'Tier'] = 2
 
 # Tier 1: ClinVar P/LP 1*+ OR HIGH IMPACT, not in SEGDUP/STR/SIMPLEREP, etc.
-df.loc[(is_clinvar_P_LP_one_star_plus_or_not_in_clinvar | high_impact) &
+df.loc[(is_clinvar_P_LP_one_star_plus | high_impact) &
         passes_tier_1_and_2 & 
         not_in_segdup_str_simplerep &
         tier_1_proband_GT, 'Tier'] = 1

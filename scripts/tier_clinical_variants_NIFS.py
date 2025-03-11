@@ -46,14 +46,15 @@ is_clnrevstat_one_star_plus = (df['info.CLNREVSTAT'].isin(clnrevstat_one_star_pl
 is_clinvar_P_LP_one_star_plus = is_clinvar_P_LP & is_clnrevstat_one_star_plus
 not_in_clinvar = df['info.CLNSIG'].isna()
 is_clinvar_P_LP_one_star_plus_or_not_in_clinvar = is_clinvar_P_LP_one_star_plus | not_in_clinvar
-
-not_in_segdup_str_simplerep = (~df[['info.SEGDUP', 'info.STR', 'info.SIMPLEREP']].any(axis=1))  # Tier 1
-not_in_segdup = (~df['info.SEGDUP'])  # Tier 2
+is_not_clinvar_B_LB = (~df['info.CLNSIG'].astype(str).str.contains('enign'))
 
 ncount_over_proband_DP = df['info.NCount'] / df['proband_entry.DP']
 passes_ncount_over_proband_DP = (ncount_over_proband_DP < ncount_over_proband_DP_threshold)
 
 passes_ECNT = (df['info.ECNT'] < ECNT_threshold)
+
+not_in_segdup_str_simplerep = (~df[['info.SEGDUP', 'info.STR', 'info.SIMPLEREP']].any(axis=1))  # Tier 1
+not_in_segdup = (~df['info.SEGDUP'])  # Tier 2
 
 high_impact = (df['vep.transcript_consequences.IMPACT']=='HIGH')  # Tier 1
 high_or_moderate_impact = df['vep.transcript_consequences.IMPACT'].isin(['HIGH','MODERATE'])  # Tier 2
@@ -74,7 +75,8 @@ if inheritance_type=='dominant':
     # Tier 2: No proband alt allele filter
     tier_2_proband_GT = (df['proband_entry.GT']!='')
 
-passes_tier_1_and_2 = (passes_ncount_over_proband_DP &
+passes_tier_1_and_2 = (is_not_clinvar_B_LB &
+                        passes_ncount_over_proband_DP &
                         passes_ECNT &
                         passes_filters)
 

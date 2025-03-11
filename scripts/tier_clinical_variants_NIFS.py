@@ -76,6 +76,7 @@ if inheritance_type=='dominant':
     tier_2_proband_GT = (df['proband_entry.GT']!='')
 
 passes_tier_1_and_2 = (is_not_clinvar_B_LB &
+                        ~vus_or_conflicting_in_clinvar &
                         passes_ncount_over_proband_DP &
                         passes_ECNT &
                         passes_filters)

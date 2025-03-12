@@ -459,7 +459,7 @@ task splitByInheritance {
     dom_df.to_csv(os.path.basename(input_tsv).split(file_ext)[0] + '.dominant.tsv', sep='\t', index=False)
     EOF
     
-    python3 split_by_inheritance.py -i ~{input_tsv} -c ~{inheritance_code_col} --file_ext ~{file_ext}
+    python3 split_by_inheritance.py -i ~{input_tsv} -c ~{inheritance_code_col} --file-ext ~{file_ext}
     >>>
 
     output {

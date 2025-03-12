@@ -120,6 +120,13 @@ merged_df.columns = merged_df.columns.str.replace('info.','').str.replace('vep.t
 # Drop duplicate columns after renaming
 merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]
 
+# NEW 3/12/2025: Drop columns where all values are empty
+merged_df = merged_df.dropna(axis=1, how='all').copy()
+
+# NEW 3/12/2025: Split HGVSc and HGVSp
+merged_df[['HGVSc_ENST', 'HGVSc']] = merged_df['HGVSc'].str.split(':', expand=True)
+merged_df[['HGVSp_ENSP', 'HGVSp']] = merged_df['HGVSp'].str.split(':', expand=True)
+
 # Drop VarKey column before export
 merged_df = merged_df.drop('VarKey', axis=1).copy()
 remaining_cols = list(np.setdiff1d(merged_df.columns, priority_cols))

@@ -167,7 +167,7 @@ workflow filterClinicalVariants {
 
     call splitByInheritance as splitClinVarByInheritance {
         input:
-            input_tsv=runClinicalFiltering.clinvar,
+            input_tsv=runClinicalFiltering.clinvar_tsv,
             hail_docker=hail_docker,
             inheritance_code_col='vep.transcript_consequences.OMIM_inheritance_code',
             runtime_attr_override=runtime_attr_filter_tiers
@@ -199,7 +199,7 @@ workflow filterClinicalVariants {
 
     call finalFilteringTiers as finalFilteringTiersDominant {
         input:
-            input_tsv=runClinicalFilteringOMIM.dominant,
+            input_tsv=runClinicalFilteringOMIM.dominant_tsv,
             ECNT_threshold=ECNT_threshold,
             ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
             GQ_threshold=GQ_threshold,
@@ -265,13 +265,13 @@ workflow filterClinicalVariants {
     }
 
     output {
-        File clinvar_tsv = runClinicalFiltering.clinvar
+        File clinvar_tsv = runClinicalFiltering.clinvar_tsv
         File clinvar_vcf = runClinicalFiltering.clinvar_vcf
         File clinvar_vcf_idx = runClinicalFiltering.clinvar_vcf_idx
         File recessive_vcf = runClinicalFilteringOMIM.recessive_vcf
         File recessive_vcf_idx = runClinicalFilteringOMIM.recessive_vcf_idx
         File recessive_tsv = runClinicalFilteringOMIM.recessive_tsv  # NEW 1/17/2025
-        File dominant_tsv = runClinicalFilteringOMIM.dominant
+        File dominant_tsv = runClinicalFilteringOMIM.dominant_tsv
         File comphet_xlr_hom_var_mat_carrier_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv
 
         File final_recessive_tsv = finalFilteringTiersRecessive.filtered_tsv  # NEW 2/25/2025

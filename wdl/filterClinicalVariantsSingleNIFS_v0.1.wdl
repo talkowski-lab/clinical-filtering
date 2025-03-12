@@ -455,8 +455,8 @@ task splitByInheritance {
     dom_df = df[(df[inheritance_code_col].astype(str).str.contains('1')) | 
                 (df[inheritance_code_col].astype(str).str.contains('3'))]
 
-    rec_df['variant_category'] = rec_df['variant_category'] + '_recessive'
-    dom_df['variant_category'] = dom_df['variant_category'] + '_dominant'
+    rec_df.loc[:, 'variant_category'] = rec_df['variant_category'] + '_recessive'
+    dom_df.loc[:, 'variant_category'] = dom_df['variant_category'] + '_dominant'
 
     rec_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.recessive.tsv', sep='\t', index=False)
     dom_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.dominant.tsv', sep='\t', index=False)

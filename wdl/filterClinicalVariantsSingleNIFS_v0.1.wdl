@@ -78,7 +78,7 @@ workflow filterClinicalVariants {
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
         Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']
         Array[String] priority_cols=['id', 'is_female', 'fam_id',
-                        'variant_category','CLNSIG', 'CLNREVSTAT', 'Tier','locus', 'alleles',  # disease_title, classification_title inserted here
+                        'variant_category','CLNSIG', 'CLNREVSTAT', 'Tier','locus', 'alleles',  # disease_title_recessive, disease_title_dominant inserted here
                         'HGVSc_symbol', 'HGVSc', 'HGVSp', 'Consequence', 'filters', 
                         'CANONICAL', 'MANE_PLUS_CLINICAL', 'gene_list', 'maternal_carrier',
                         'proband_entry.GT', 'proband_entry.AD', 'mother_entry.GT', 'mother_entry.AD', 
@@ -532,7 +532,7 @@ task finalFilteringTiers {
 task addPhenotypesMergeAndPrettifyOutputs {
     input {
         Array[File] input_uris
-        File gene_phenotype_map  # Expects TSV with gene_symbol, disease_title, classification_title columns
+        File gene_phenotype_map  # Expects TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns
 
         Array[String] dup_exclude_cols  # Columns to exclude when calculating duplicate rows to drop
         Array[String] cols_for_varkey  # Columns to use to create unique string for each row
@@ -586,7 +586,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
     parser = argparse.ArgumentParser(description='Parse arguments')
     parser.add_argument('-i', dest='input_uris', help='Comma-separated list of all input TSVs')
     parser.add_argument('-o', dest='output_filename', help='Output filename')
-    parser.add_argument('-p', dest='gene_phenotype_map', help='TSV with gene_symbol, disease_title, classification_title columns')
+    parser.add_argument('-p', dest='gene_phenotype_map', help='TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns')
     parser.add_argument('--exclude-cols', dest='exclude_cols', help='Columns to exclude when calculating duplicate rows to drop')
     parser.add_argument('--cols-for-varkey', dest='cols_for_varkey', help='Columns to use to create unique string for each row')
     parser.add_argument('--float-cols', dest='float_cols', help='Columns to convert from float to int to str for uniform formatting across inputs')
@@ -673,11 +673,11 @@ task addPhenotypesMergeAndPrettifyOutputs {
 
     # Map phenotypes
     pheno_df = pd.read_csv(pheno_uri, sep='\t')
-    merged_df['disease_title'] = merged_df.HGVSc_symbol.map(pheno_df.set_index('gene_symbol').disease_title.to_dict())
-    merged_df['classification_title'] = merged_df.HGVSc_symbol.map(pheno_df.set_index('gene_symbol').classification_title.to_dict())
-
+    merged_df['disease_title_recessive'] = merged_df.HGVSc_symbol.map(pheno_df.set_index('gene_symbol').disease_title_recessive.to_dict())
+    merged_df['disease_title_dominant'] = merged_df.HGVSc_symbol.map(pheno_df.set_index('gene_symbol').disease_title_dominant.to_dict())
+    
     # Add new phenotype columns to priority columns, before HGVSc_symbol
-    priority_cols = priority_cols[:priority_cols.index('HGVSc_symbol')] + ['disease_title', 'classification_title'] + priority_cols[priority_cols.index('HGVSc_symbol'):]
+    priority_cols = priority_cols[:priority_cols.index('HGVSc_symbol')] + ['disease_title_recessive', 'disease_title_dominant'] + priority_cols[priority_cols.index('HGVSc_symbol'):]
 
     # Add 2 empty columns as spacers after priority columns
     merged_df = merged_df[priority_cols + remaining_cols].copy()

@@ -160,6 +160,38 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_comphets
     }
 
+    call splitByInheritance as splitClinVarByInheritance {
+        input:
+            input_tsv=runClinicalFiltering.clinvar,
+            hail_docker=hail_docker,
+            inheritance_code_col='vep.transcript_consequences.OMIM_inheritance_code',
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
+    call finalFilteringTiers as finalFilteringTiersClinVarDominant {
+        input:
+            input_tsv=splitClinVarByInheritance.dominant_tsv,
+            ECNT_threshold=ECNT_threshold,
+            ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
+            GQ_threshold=GQ_threshold,
+            inheritance_type='dominant',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
+    call finalFilteringTiers as finalFilteringTiersClinVarRecessive {
+        input:
+            input_tsv=splitClinVarByInheritance.recessive_tsv,
+            ECNT_threshold=ECNT_threshold,
+            ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
+            GQ_threshold=GQ_threshold,
+            inheritance_type='recessive',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
     call finalFilteringTiers as finalFilteringTiersDominant {
         input:
             input_tsv=runClinicalFilteringOMIM.dominant,
@@ -201,7 +233,8 @@ workflow filterClinicalVariants {
             input_uris=[finalFilteringTiersCompHet.filtered_tsv,  # ORDER MATTERS (CompHet output first)
                 finalFilteringTiersRecessive.filtered_tsv,
                 finalFilteringTiersDominant.filtered_tsv,
-                runClinicalFiltering.clinvar],
+                finalFilteringTiersClinVarRecessive.filtered_tsv,
+                finalFilteringTiersClinVarDominant.filtered_tsv],
             gene_phenotype_map=gene_phenotype_map,
             dup_exclude_cols=dup_exclude_cols,
             cols_for_varkey=cols_for_varkey,
@@ -352,6 +385,86 @@ task makeDummyPed {
 
     output {
         File ped_uri = out_ped
+    }
+}
+
+task splitByInheritance {
+    input {
+        File input_tsv
+
+        String inheritance_code_col
+        String hail_docker
+        
+        RuntimeAttr? runtime_attr_override
+    }
+    Float input_size = size(input_tsv, 'GB')
+    Float base_disk_gb = 10.0
+    Float input_disk_scale = 5.0
+
+    RuntimeAttr runtime_default = object {
+        mem_gb: 4,
+        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
+        cpu_cores: 1,
+        preemptible_tries: 3,
+        max_retries: 1,
+        boot_disk_gb: 10
+    }
+
+    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
+
+    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
+    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
+    
+    runtime {
+        memory: "~{memory} GB"
+        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
+        cpu: cpu_cores
+        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
+        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
+        docker: hail_docker
+        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
+    }
+
+    String file_ext = if sub(basename(input_tsv), '.tsv.gz', '')!=basename(input_tsv) then '.tsv.gz' else '.tsv'
+
+    command <<<
+    set -eou pipefail
+    cat <<EOF > split_by_inheritance.py
+    import datetime
+    import pandas as pd
+    import numpy as np
+    import sys
+    import ast
+    import os
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Parse arguments')
+    parser.add_argument('-i', dest='input_uri', help='Input TSV')
+    parser.add_argument('-c', dest='inheritance_code_col', help='Column containing the (numeric) inheritance code (e.g. vep.transcript_consequences.OMIM_inheritance_code)')
+    parser.add_argument('--file-ext', dest='file_ext', help='File extension (.tsv or .tsv.gz)')
+
+    args = parser.parse_args()
+    input_uri = args.input_uri
+    inheritance_code_col = args.inheritance_code_col
+    file_ext = args.file_ext
+
+    df = pd.read_csv(input_uri, sep='\t')
+
+    rec_df = df[(df[inheritance_code_col].str.contains('2')) | 
+                (df[inheritance_code_col].str.contains('4'))]
+    dom_df = df[(df[inheritance_code_col].str.contains('1')) | 
+                (df[inheritance_code_col].str.contains('3'))]
+
+    rec_df.to_csv(os.path.basename(input_tsv).split(file_ext)[0] + '.recessive.tsv', sep='\t', index=False)
+    dom_df.to_csv(os.path.basename(input_tsv).split(file_ext)[0] + '.dominant.tsv', sep='\t', index=False)
+    EOF
+    
+    python3 split_by_inheritance.py -i ~{input_tsv} -c ~{inheritance_code_col} --file_ext ~{file_ext}
+    >>>
+
+    output {
+        File recessive_tsv = basename(input_tsv, file_ext) + '.recessive.tsv'
+        File dominant_tsv = basename(input_tsv, file_ext) + '.dominant.tsv'
     }
 }
 

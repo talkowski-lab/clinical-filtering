@@ -57,7 +57,7 @@ task runClinicalFiltering {
     }
 
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = basename(vcf_file, file_ext) + '_filtered'
+    String prefix = basename(vcf_file, file_ext)
 
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py
@@ -135,7 +135,7 @@ task runClinicalFilteringOMIM {
     }
 
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = basename(vcf_file, file_ext) + '_filtered'
+    String prefix = basename(vcf_file, file_ext)
 
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py
@@ -207,7 +207,7 @@ task filterCompHetsXLRHomVar {
 
     String vcf_file = if (variant_types=='SV') then sv_vcf else snv_indel_vcf
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = basename(vcf_file, file_ext) + '_filtered'
+    String prefix = basename(vcf_file, file_ext)
 
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py

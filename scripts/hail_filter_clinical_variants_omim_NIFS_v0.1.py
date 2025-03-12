@@ -17,6 +17,8 @@
 - change OMIM_recessive/OMIM_dominant to just recessive/dominant
 3/10/2025: 
 - cohort_AC OR cohort_AF filter
+3/12/2025:
+- edit prefix for filenames that are too long
 '''
 ###
 
@@ -329,6 +331,16 @@ omim_rec = omim_rec.filter_entries(omim_rec.proband_entry.AD[1]>=ad_alt_threshol
 # variant must be in at least 1 trio
 omim_rec = omim_rec.filter_rows(hl.agg.count_where(hl.is_defined(omim_rec.proband_entry.GT))>0)
 omim_rec = omim_rec.annotate_rows(variant_category='recessive')
+
+# NEW 3/12/2025: Edit prefix for filenames that are too long
+output_filename = f"{prefix}_recessive.vcf.bgz"  # longest output filename
+max_filename_len = os.pathconf('/', 'PC_NAME_MAX')-len('/cromwell_root/.')
+while True:
+    if len(output_filename)<=(max_filename_len): 
+        break 
+    # if filename too long, keep chopping off chunks of filename
+    prefix = '.'.join(prefix.split('.')[:-1])
+    output_filename = f"{prefix}_recessive.vcf.bgz"
 
 # export OMIM Recessive VCF
 hl.export_vcf(omim_rec_mt, prefix+'_recessive.vcf.bgz', metadata=header, tabix=True)

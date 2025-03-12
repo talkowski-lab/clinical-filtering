@@ -27,6 +27,8 @@
 3/10/2025:
 - change to ClinVar 1*+ P/LP for clinvar_tsv output
 - filter by in gene list in filter_mt (in hail_clinical_helper_functions.py)
+3/12/2025:
+- edit prefix for filenames that are too long
 '''
 ###
 
@@ -182,6 +184,16 @@ mt = mt.filter_rows(hl.set(exclude_csqs).intersection(hl.set(mt.info.all_csqs)).
 # NEW 3/7/2025: added cohort_AC filter
 mt = mt.filter_rows((mt.info.cohort_AC<=ac_threshold) | (mt.info.cohort_AF<=af_threshold))
 mt = mt.filter_rows((mt.info.gnomad_popmax_af<=gnomad_af_threshold) | (hl.is_missing(mt.info.gnomad_popmax_af)))
+
+# NEW 3/12/2025: Edit prefix for filenames that are too long
+output_filename = f"{prefix}_mat_carrier_variants.tsv.gz"  # longest output filename
+max_filename_len = os.pathconf('/', 'PC_NAME_MAX')-len('/cromwell_root/.')
+while True:
+    if len(output_filename)<=(max_filename_len): 
+        break 
+    # if filename too long, keep chopping off chunks of filename
+    prefix = '.'.join(prefix.split('.')[:-1])
+    output_filename = f"{prefix}_mat_carrier_variants.tsv.gz"
 
 # export intermediate VCF
 hl.export_vcf(mt, prefix+'_clinical.vcf.bgz', metadata=header)

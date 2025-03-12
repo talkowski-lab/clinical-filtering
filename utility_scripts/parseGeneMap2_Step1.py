@@ -14,13 +14,24 @@
 # Imports
 import sys
 import re
+import argparse
 
-# Read from stdin
+parser = argparse.ArgumentParser()
 
-print("chromosome"+"\t"+"genomicPositionStart" + "\t" + "genomicPositionEnd" + "\t" + "mimNumber"+"\t"+"geneSymbols"+"\t"+"geneName"+"\t"+"approvedGeneSymbol"+"\t"+"entrezGeneID"+"\t"+"ensemblGeneID"+"\t"+"phenotype"+"\t"+"phenotypeMim"+"\t"+"phenotypeMapping"+"\t"+"inheritance")
+parser.add_argument("-g", "--genemap", help="OMIM GeneMap File")
+parser.add_argument("-o", "--output", help="Parsed OMIM Output")
 
-for line in sys.stdin:
+args = parser.parse_args()
 
+genemapFile = open(args.genemap, mode = 'r')
+genemapLines = genemapFile.readlines()
+genemapFile.close()
+
+outputFile = open(args.output, mode = 'w')
+
+outputFile.write("chromosome"+"\t"+"genomicPositionStart" + "\t" + "genomicPositionEnd" + "\t" + "mimNumber"+"\t"+"geneSymbols"+"\t"+"geneName"+"\t"+"approvedGeneSymbol"+"\t"+"entrezGeneID"+"\t"+"ensemblGeneID"+"\t"+"phenotype"+"\t"+"phenotypeMim"+"\t"+"phenotypeMapping"+"\t"+"inheritance" + "\n")
+
+for line in genemapLines:
     # Skip comments
     if line.startswith('#'):
         continue
@@ -49,13 +60,13 @@ for line in sys.stdin:
 
     # Skip empty phenotypes
     if not phenotypeString:
-        print(chromosome+"\t"+ genomicPositionStart + "\t" + genomicPositionEnd + "\t" + mimNumber+"\t"+geneSymbols+"\t"+geneName+"\t"+approvedGeneSymbol+"\t"+entrezGeneID+"\t"+ensemblGeneID+"\n", end="")
+        outputFile.write(chromosome+"\t"+ genomicPositionStart + "\t" + genomicPositionEnd + "\t" + mimNumber+"\t"+geneSymbols+"\t"+geneName+"\t"+approvedGeneSymbol+"\t"+entrezGeneID+"\t"+ensemblGeneID+"\n")
         continue
 
     # Parse the phenotypes
     for phenotype in phenotypeString.split(';'):
 
-        print(chromosome+"\t"+ genomicPositionStart + "\t" + genomicPositionEnd + "\t" + mimNumber+"\t"+geneSymbols+"\t"+geneName+"\t"+approvedGeneSymbol+"\t"+entrezGeneID+"\t"+ensemblGeneID, end="")
+        outputFile.write(chromosome+"\t"+ genomicPositionStart + "\t" + genomicPositionEnd + "\t" + mimNumber+"\t"+geneSymbols+"\t"+geneName+"\t"+approvedGeneSymbol+"\t"+entrezGeneID+"\t"+ensemblGeneID)
 
         # Clean the phenotype
         phenotype = phenotype.strip()
@@ -69,13 +80,13 @@ for line in sys.stdin:
             phenotypeMappingKey = matcher.group(3)
             inheritances = matcher.group(5)
 
-            print("\t"+phenotype+"\t"+phenotypeMimNumber+"\t"+phenotypeMappingKey, end="")
+            outputFile.write("\t"+phenotype+"\t"+phenotypeMimNumber+"\t"+phenotypeMappingKey)
 
             # Get the inheritances, may or may not be there
             if inheritances:
                 for inheritance in inheritances.split(','):
                     inheritance = inheritance.strip()
-                    print("\t"+inheritance, end="")
+                    outputFile.write("\t"+inheritance)
         # Short phenotype
         else:
 
@@ -88,11 +99,11 @@ for line in sys.stdin:
                 phenotypeMappingKey = matcher.group(2)
                 inheritances = matcher.group(3)
 
-                print("\t"+phenotype+"\t"+"NA"+"\t"+phenotypeMappingKey, end="")
+                outputFile.write("\t"+phenotype+"\t"+"NA"+"\t"+phenotypeMappingKey)
 
                 # Get the inheritances, may or may not be there
                 if inheritances:
                     for inheritance in inheritances.split(','):
                         inheritance = inheritance.strip()
-                        print("\t"+inheritance, end="")
-        print("\n", end="")
+                        outputFile.write("\t"+inheritance)
+        outputFile.write("\n")

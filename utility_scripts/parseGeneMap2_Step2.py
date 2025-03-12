@@ -4,31 +4,45 @@
 
 #
 # This takes the output of parseGeneMap2
-# and creates a file with unique gene names and inheritance codes
-# 22 April 2024
+# and creates a file with unique gene names and inheritance codes, geneName /t Inheritance code
+# 12 March 2025
 #
 
 
 # Imports
 import sys
 import re
+import argparse
 
 
-# Read from stdin
+parser = argparse.ArgumentParser()
 
-print("approvedGeneSymbol"+"inheritance_code")
+parser.add_argument("-s", "--step", help="OMIM Step1 Parsed File")
+parser.add_argument("-o", "--output", help="Inheritance Output")
+parser.add_argument("--high", help="Add flag if want to remove suceptibility or low confidence genes", action='store_true')
+parser.set_defaults(high=False)
+
+args = parser.parse_args()
+
+stepFile = open(args.step, mode = 'r')
+stepLines = stepFile.readlines()
+stepFile.close()
+
+outputFile = open(args.output, mode = 'w')
+outputFile.write("approvedGeneSymbol"+ "\t" + "inheritance_code" + "\n")
 
 #Dictionary with genenames as keys (so no duplicates)
 phenoDict = {}
 
-#Possible inheritances
-#NB: X-linked is X-linked recessive
+high = args.high
 
-inheritanceDict = {"Autosomal dominant":1, "?Autosomal dominant":1, "Autosomal recessive":2, "?Autosomal recessive":2, "X-linked dominant":3, "?X-linked dominant":3, "X-linked recessive":4, "?X-linked recessive":4, "Digenic dominant":5, "Digenic recessive":5, "Inherited chromosomal imbalance":5, "Isolated cases":5, "Mitochondrial":5, "Multifactorial":5, "Pseudoautosomal dominant":5, "Pseudoautosomal recessive":5, "Somatic mosaicism":5, "Somatic mutation":5, "X-linked":4, "Y-linked":5}
+#Possible inheritances
+#NB: X-linked is classified as other. 
+inheritanceDict = {"Autosomal dominant":1, "?Autosomal dominant":1, "Autosomal recessive":2, "?Autosomal recessive":2, "X-linked dominant":3, "?X-linked dominant":3, "X-linked recessive":4, "?X-linked recessive":4, "Digenic dominant":5, "Digenic recessive":5, "Inherited chromosomal imbalance":5, "Isolated cases":5, "Mitochondrial":5, "Multifactorial":5, "Pseudoautosomal dominant":5, "Pseudoautosomal recessive":5, "Somatic mosaicism":5, "Somatic mutation":5, "X-linked":5, "Y-linked":5}
 
 lineCounter = 0
 
-for line in sys.stdin:
+for line in stepLines:
 
     # Skip comments
     if line.startswith('#'):
@@ -71,9 +85,9 @@ for line in sys.stdin:
     if approvedGeneSymbol=="":
         continue
 
-    ###CHANGE IF NEEDED
+    #Activated by --h flag
     #Skip any provisional or suceptibility genes
-    if phenotype[0]=="{" or phenotype[0]=="|" or phenotype[0]=="?" or phenotype[0]=="[":
+    if (phenotype[0]=="{" or phenotype[0]=="|" or phenotype[0]=="?" or phenotype[0]=="[") and high==True:
         continue
 
     #Code inheritance
@@ -157,6 +171,6 @@ for line in sys.stdin:
 
 for key in sorted(phenoDict.keys()):
     stringList = [str(x) for x in sorted(list(phenoDict[key][1]))]
-    print(phenoDict[key][0]+"\t"+''.join(stringList))
+    outputFile.write(phenoDict[key][0]+"\t"+''.join(stringList) + "\n")
 
 exit()

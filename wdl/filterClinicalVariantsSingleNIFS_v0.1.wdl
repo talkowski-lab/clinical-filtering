@@ -450,10 +450,10 @@ task splitByInheritance {
 
     df = pd.read_csv(input_uri, sep='\t')
 
-    rec_df = df[(df[inheritance_code_col].str.contains('2')) | 
-                (df[inheritance_code_col].str.contains('4'))]
-    dom_df = df[(df[inheritance_code_col].str.contains('1')) | 
-                (df[inheritance_code_col].str.contains('3'))]
+    rec_df = df[(df[inheritance_code_col].astype(str).str.contains('2')) | 
+                (df[inheritance_code_col].astype(str).str.contains('4'))]
+    dom_df = df[(df[inheritance_code_col].astype(str).str.contains('1')) | 
+                (df[inheritance_code_col].astype(str).str.contains('3'))]
 
     rec_df.to_csv(os.path.basename(input_tsv).split(file_ext)[0] + '.recessive.tsv', sep='\t', index=False)
     dom_df.to_csv(os.path.basename(input_tsv).split(file_ext)[0] + '.dominant.tsv', sep='\t', index=False)

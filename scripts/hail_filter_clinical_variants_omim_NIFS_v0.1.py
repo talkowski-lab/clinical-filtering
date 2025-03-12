@@ -17,8 +17,6 @@
 - change OMIM_recessive/OMIM_dominant to just recessive/dominant
 3/10/2025: 
 - cohort_AC OR cohort_AF filter
-3/11/2025:
-- allow ClinVar 1*+ P/LP for recessive/dominant outputs
 '''
 ###
 
@@ -201,21 +199,17 @@ passes_gnomad_af_rec = ((gene_phased_tm.info.gnomad_popmax_af<=gnomad_af_rec_thr
 # MPC filter
 passes_mpc_rec = ((gene_phased_tm.info.MPC>=mpc_rec_threshold) | (hl.is_missing(gene_phased_tm.info.MPC)))
 # AlphaMissense filter
-# NEW 1/7/2025: only apply on missense variants
+# NEW 1/7/2025 only apply on missense variants
 is_missense_var = (hl.set(['missense_variant']).intersection(
             hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()>0)
 passes_alpha_missense_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.am_pathogenicity=='', 1, 
                 hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_rec_threshold)
 passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_missense_var))
-# NEW 3/11/2025: Allow ClinVar 1*+ P/LP for recessive/dominant outputs
-clnrevstat_one_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided','_multiple_submitters','_no_conflicts'], ['criteria_provided','_single_submitter']]
-is_clinvar_P_LP_one_star_plus = ((hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), gene_phased_tm.info.CLNSIG)) &
-                                (hl.any([gene_phased_tm.info.CLNREVSTAT==category for category in clnrevstat_one_star_plus])))
 
 if include_not_omim:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
-        ((passes_ac_af_rec & passes_alpha_missense) | 
-        is_clinvar_P_LP_one_star_plus) &
+        (passes_ac_af_rec) &
+        (passes_alpha_missense) &
         (
             omim_rec_code |
             omim_xlr_code |
@@ -227,11 +221,10 @@ if include_not_omim:
             )
         )
     )
-
 else:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
-        ((passes_ac_af_rec & passes_alpha_missense) | 
-        is_clinvar_P_LP_one_star_plus) &
+        (passes_ac_af_rec) &
+        (passes_alpha_missense) &
             (omim_rec_code | omim_xlr_code | in_rec_gene_list)        
     )
 
@@ -287,16 +280,12 @@ passes_loeuf_v2 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v
 
 passes_loeuf_v4 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v4=='', 0, 
                         hl.float(gene_phased_tm.vep.transcript_consequences.LOEUF_v4))<=loeuf_v4_threshold)
-# NEW 3/11/2025: Allow ClinVar 1*+ P/LP for recessive/dominant outputs
-clnrevstat_one_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided','_multiple_submitters','_no_conflicts'], ['criteria_provided','_single_submitter']]
-is_clinvar_P_LP_one_star_plus = ((hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), gene_phased_tm.info.CLNSIG)) &
-                                (hl.any([gene_phased_tm.info.CLNREVSTAT==category for category in clnrevstat_one_star_plus])))
 
 if include_not_omim:
     omim_dom = gene_phased_tm.filter_rows(
-        ((passes_ac_af_dom &
-        passes_gnomad_af_dom &
-        passes_alpha_missense) | (is_clinvar_P_LP_one_star_plus)) &
+        (passes_ac_af_dom) &
+        (passes_gnomad_af_dom) &
+        (passes_alpha_missense) &
         (
             omim_dom_code |
             omim_xld_code |
@@ -310,9 +299,9 @@ if include_not_omim:
     )
 else:
     omim_dom = gene_phased_tm.filter_rows(
-        ((passes_ac_af_dom &
-        passes_gnomad_af_dom &
-        passes_alpha_missense) | (is_clinvar_P_LP_one_star_plus)) &
+        (passes_ac_af_dom) &
+        (passes_gnomad_af_dom) &
+        (passes_alpha_missense) &
         (omim_dom_code | omim_xld_code | in_dom_gene_list)
     )
 

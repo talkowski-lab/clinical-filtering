@@ -28,8 +28,6 @@
 3/4/2025:
 - change OMIM_recessive/OMIM_dominant to just recessive/dominant
 - remove redundant gene field from output
-3/12/2025:
-- edit prefix for filenames that are too long
 TODO: remove SV/trio_status/etc. irrelevant code
 '''
 ###
@@ -610,14 +608,5 @@ merged_comphets_xlr_hom_var_mat_carrier_df = pd.concat([merged_comphets_df, xlr_
 # NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)
 merged_comphets_xlr_hom_var_mat_carrier_df = merged_comphets_xlr_hom_var_mat_carrier_df[merged_comphets_xlr_hom_var_mat_carrier_df.id.astype(str).str.contains('_fetal')]
 
-# NEW 3/12/2025: Edit prefix for filenames that are too long
 output_filename = f"{prefix}_{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
-max_filename_len = os.pathconf('/', 'PC_NAME_MAX')-len('/cromwell_root/.')
-while True:
-    if len(output_filename)<=(max_filename_len): 
-        break 
-    # if filename too long, keep chopping off chunks of filename
-    prefix = '.'.join(prefix.split('.')[:-1])
-    output_filename = f"{prefix}_{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
-
 merged_comphets_xlr_hom_var_mat_carrier_df.to_csv(output_filename, sep='\t', index=False)

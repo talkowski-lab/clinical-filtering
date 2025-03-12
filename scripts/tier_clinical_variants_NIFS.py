@@ -1,10 +1,11 @@
 import pandas as pd
 import argparse
+import os
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-i", "--input", dest="input_uri", help="Input TSV")
-parser.add_argument("-o", "--output", dest="output_uri", help="Output filename")
+parser.add_argument("-p", "--prefix", dest="prefix", help="Prefix for output filename")
 parser.add_argument("--ECNT-threshold", dest="ECNT_threshold", help="Upper bound for ECNT (for Tiers 1 and 2)")
 parser.add_argument("--NCount-over-proband-DP-threshold", dest="ncount_over_proband_DP_threshold", help="Upper bound for NCount/proband DP (for Tiers 1 and 2)")
 parser.add_argument("--GQ-threshold", dest="GQ_threshold", help="Lower bound for proband GQ (for Tier 1)")
@@ -14,7 +15,7 @@ args = parser.parse_args()
 
 # INPUTS
 uri = args.input_uri
-output_uri = args.output_uri
+prefix = args.prefix
 ECNT_threshold = int(args.ECNT_threshold)
 ncount_over_proband_DP_threshold = float(args.ncount_over_proband_DP_threshold)
 GQ_threshold = int(args.GQ_threshold)
@@ -105,4 +106,5 @@ df['maternal_carrier'] = ((is_clinvar_P_LP_one_star_plus_or_not_in_clinvar | hig
        passes_ncount_over_proband_DP &
        is_maternal_variant)
 
-df.to_csv(output_uri, sep='\t', index=False)
+output_filename = f"{prefix}_tiers.tsv"
+df.to_csv(output_filename, sep='\t', index=False)

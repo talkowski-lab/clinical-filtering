@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='Parse arguments')
 parser.add_argument('-i', dest='input_tsv', help='Input TSV to annotate with phenotypes')
 parser.add_argument('-c', dest='confirmation_vcf_uri', help='confirmation_vcf')
 parser.add_argument('-m', dest='maternal_vcf_uri', help='maternal_vcf')
-parser.add_argument('-o', dest='output_filename', help='Output filename')
+parser.add_argument('-p', dest='prefix', help='Prefix for output filename')
 parser.add_argument('--build', dest='build', help='Genome build')
 parser.add_argument('--conf-id', dest='confirmation_sample_id', help='confirmation_sample_id')
 parser.add_argument('--mat-id', dest='maternal_sample_id', help='maternal_sample_id')
@@ -20,7 +20,7 @@ args = parser.parse_args()
 input_uri = args.input_tsv
 confirmation_vcf_uri = args.confirmation_vcf_uri
 maternal_vcf_uri = args.maternal_vcf_uri
-output_filename = args.output_filename
+prefix = args.prefix
 build = args.build
 confirmation_sample_id = args.confirmation_sample_id
 maternal_sample_id = args.maternal_sample_id
@@ -104,5 +104,6 @@ for col in merged_df.columns:
         merged_df[col] = merged_df[col].str.lstrip(',')
 
 # Export to Excel, replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
+output_filename = f"{prefix}.conf.mat.flag.xlsx"
 space_cols = merged_df.columns[merged_df.columns.str.contains('SPACE_')].tolist()
 merged_df.rename({col: '' for col in space_cols}, axis=1).to_excel(output_filename, index=False)

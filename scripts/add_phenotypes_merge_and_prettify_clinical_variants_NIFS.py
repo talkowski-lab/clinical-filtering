@@ -8,8 +8,8 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Parse arguments')
 parser.add_argument('-i', dest='input_uris', help='Comma-separated list of all input TSVs')
-parser.add_argument('-o', dest='output_filename', help='Output filename')
-parser.add_argument('-p', dest='gene_phenotype_map', help='TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns')
+parser.add_argument('-p', dest='prefix', help='Prefix for output filename')
+parser.add_argument('-g', dest='gene_phenotype_map', help='TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns')
 parser.add_argument('--exclude-cols', dest='exclude_cols', help='Columns to exclude when calculating duplicate rows to drop')
 parser.add_argument('--cols-for-varkey', dest='cols_for_varkey', help='Columns to use to create unique string for each row')
 parser.add_argument('--float-cols', dest='float_cols', help='Columns to convert from float to int to str for uniform formatting across inputs')
@@ -21,7 +21,7 @@ exclude_cols = args.exclude_cols.split(',')
 cols_for_varkey = args.cols_for_varkey.split(',')
 float_cols = args.float_cols.split(',')
 priority_cols = args.priority_cols.split(',')
-output_filename = args.output_filename
+prefix = args.prefix
 pheno_uri = args.gene_phenotype_map
 
 # Fix float formatting before merging variant_category column
@@ -149,4 +149,5 @@ merged_df = merged_df[priority_cols + remaining_cols].copy()
 for i in range(2):
     merged_df.insert(len(priority_cols)+i, f"SPACE_{i}", np.nan)
 
+output_filename = f"{prefix}.merged.clinical.variants.tsv"
 merged_df.to_csv(output_filename, sep='\t', index=False)

@@ -15,6 +15,7 @@ task runClinicalFiltering {
         File ped_uri
         File empty_file
 
+        String? prefix
         String helper_functions_script
         String filter_clinical_variants_snv_indel_script
         String hail_docker
@@ -57,7 +58,7 @@ task runClinicalFiltering {
     }
 
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = basename(vcf_file, file_ext)
+    String prefix = select_first([prefix, basename(vcf_file, file_ext)])
 
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py
@@ -81,6 +82,7 @@ task runClinicalFilteringOMIM {
         File vcf_file
         File ped_uri
 
+        String? prefix
         String helper_functions_script
         String filter_clinical_variants_snv_indel_omim_script
         String hail_docker
@@ -135,7 +137,7 @@ task runClinicalFilteringOMIM {
     }
 
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = basename(vcf_file, file_ext)
+    String prefix = select_first([prefix, basename(vcf_file, file_ext)])
 
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py
@@ -165,6 +167,7 @@ task filterCompHetsXLRHomVar {
 
         Int ad_alt_threshold
 
+        String? prefix
         String genome_build
 
         String helper_functions_script
@@ -207,7 +210,7 @@ task filterCompHetsXLRHomVar {
 
     String vcf_file = if (variant_types=='SV') then sv_vcf else snv_indel_vcf
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = basename(vcf_file, file_ext)
+    String prefix = select_first([prefix, basename(vcf_file, file_ext)])
 
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py

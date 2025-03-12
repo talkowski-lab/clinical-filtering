@@ -105,6 +105,7 @@ workflow filterClinicalVariants {
     call filterClinicalVariants.runClinicalFiltering as runClinicalFiltering {
         input:
         vcf_file=vcf_file,
+        prefix=sample_id,
         ped_uri=makeDummyPed.ped_uri,
         helper_functions_script=helper_functions_script,
         filter_clinical_variants_snv_indel_script=filter_clinical_variants_snv_indel_script,
@@ -122,6 +123,7 @@ workflow filterClinicalVariants {
     call filterClinicalVariants.runClinicalFilteringOMIM as runClinicalFilteringOMIM {
         input:
         vcf_file=runClinicalFiltering.filtered_vcf,
+        prefix=sample_id,
         ped_uri=makeDummyPed.ped_uri,
         helper_functions_script=helper_functions_script,
         filter_clinical_variants_snv_indel_omim_script=filter_clinical_variants_snv_indel_omim_script,
@@ -152,6 +154,7 @@ workflow filterClinicalVariants {
             snv_indel_vcf=runClinicalFilteringOMIM.recessive_vcf,
             clinvar_vcf=runClinicalFiltering.clinvar_vcf,
             sv_vcf='NA',
+            prefix=sample_id,
             ped_uri=makeDummyPed.ped_uri,
             helper_functions_script=helper_functions_script,
             filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
@@ -243,7 +246,7 @@ workflow filterClinicalVariants {
             float_cols=float_cols,
             priority_cols=priority_cols,
             add_phenotypes_merge_and_prettify_script=add_phenotypes_merge_and_prettify_script,
-            output_filename=sample_id + '.merged.clinical.variants.tsv',
+            prefix=sample_id,
             hail_docker=hail_docker,
             runtime_attr_override=runtime_attr_merge_prettify
     }
@@ -518,18 +521,18 @@ task finalFilteringTiers {
     }
 
     String file_ext = if sub(basename(input_tsv), '.tsv.gz', '')!=basename(input_tsv) then '.tsv.gz' else '.tsv'
-    String output_filename = basename(input_tsv, file_ext) + '.tiers.tsv'
+    String prefix = basename(input_tsv, file_ext)
 
     command <<<
     set -eou pipefail
     curl ~{filter_final_tiers_script} > tier.py
-    python3 tier.py -i ~{input_tsv} -o ~{output_filename} \
+    python3 tier.py -i ~{input_tsv} -p ~{prefix} \
         --ECNT-threshold ~{ECNT_threshold} --NCount-over-proband-DP-threshold ~{ncount_over_proband_DP_threshold} \
         --GQ-threshold ~{GQ_threshold} -t ~{inheritance_type}
     >>>
 
     output {
-        File filtered_tsv = output_filename
+        File filtered_tsv = prefix + '_tiers.tsv'
     }
 }
 
@@ -543,8 +546,8 @@ task addPhenotypesMergeAndPrettifyOutputs {
         Array[String] float_cols  # Columns to convert from float to int to str for uniform formatting across inputs
         Array[String] priority_cols  # Columns to prioritize/put at front of output
         
+        String prefix
         String add_phenotypes_merge_and_prettify_script
-        String output_filename
         String hail_docker
 
         RuntimeAttr? runtime_attr_override
@@ -581,13 +584,13 @@ task addPhenotypesMergeAndPrettifyOutputs {
     set -eou pipefail
     curl ~{add_phenotypes_merge_and_prettify_script} > add_phenotypes_merge_and_prettify.py
 
-    python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -o ~{output_filename} -p ~{gene_phenotype_map} \
+    python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -p ~{prefix} -g ~{gene_phenotype_map} \
         --exclude-cols "~{sep=',' dup_exclude_cols}" --cols-for-varkey "~{sep=',' cols_for_varkey}" \
         --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=',' priority_cols}"
     >>>
 
     output {
-        File merged_output = output_filename
+        File merged_output = prefix + '.merged.clinical.variants.tsv'
     }
 }
 
@@ -633,17 +636,17 @@ task flagFromConfirmationMaternalVCF {
         bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
     }
 
-    String output_filename = basename(input_tsv, '.tsv') + '.conf.mat.flag.xlsx'  # Excel file
+    String prefix = basename(input_tsv, '.tsv')
     command <<<
     set -eou pipefail
     curl ~{flag_from_confirmation_maternal_vcf_script} > add_GT_flags.py
     
-    python3 add_GT_flags.py -i ~{input_tsv} -c ~{confirmation_vcf} -m ~{maternal_vcf} -o ~{output_filename} \
+    python3 add_GT_flags.py -i ~{input_tsv} -c ~{confirmation_vcf} -m ~{maternal_vcf} -p ~{prefix} \
         --build ~{genome_build} --conf-id ~{confirmation_sample_id} --mat-id ~{maternal_sample_id}
     >>>
 
     output {
-        File flagged_excel = output_filename
+        File flagged_excel = prefix + '.conf.mat.flag.xlsx'
     }
 
 }

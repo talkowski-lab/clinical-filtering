@@ -3,7 +3,7 @@
 
 #
 # This takes the homo sapiens gene file from gene and from HGNC, and converts a list of genes to the appropriate format. 
-# It will print the original gene name, the converted gene name. If a gene is not in the list, it will print the original gene name, and flag with an "x".
+# It will print the converted gene name or ambiguous if needed. If a gene is not in the list, it will print the original gene name, and flag with an "x".
 #
 
 # Imports
@@ -120,17 +120,24 @@ for key in master_keys:
             reverseDict[item]=key
 
 #Compare gene list with reverseDict; if ambiguous assume gene name if in master_keys
+#Only output conversion and any ambiguous or missing tags
+
+flag = "N"
 for line in inputLines:
     line = line.strip('\n')
     valueList = line.split('\t')
     geneName = valueList[0].strip()
     if geneName in reverseDict.keys():
         if reverseDict[geneName]=="ambiguous" and geneName in master_keys:
-            output_File.write(geneName + "\t" + geneName + "\t" + "\n")
+            output_File.write(geneName + "\t" + "\n")
         else:
-            output_File.write(geneName + "\t" + reverseDict[geneName] + "\t" + "\n")
+            output_File.write(reverseDict[geneName] + "\t" + "\n")
     else: 
         output_File.write(geneName + "\t" + "X" + "\n")
+        flag = "Y"
+
+if flag == "Y":
+    print(args.output + "_flag")
 
 output_File.close()
 input_File.close()

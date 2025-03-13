@@ -130,8 +130,11 @@ for line in inputLines:
     if geneName in reverseDict.keys():
         if reverseDict[geneName]=="ambiguous" and geneName in master_keys:
             output_File.write(geneName + "\t" + "\n")
-        else:
-            output_File.write(reverseDict[geneName] + "\t" + "\n")
+        elif reverseDict[geneName]=="ambiguous":
+            output_File.write(geneName + "\t" + reverseDict[geneName] + "\n")
+            flag = "Y"
+        else: 
+            output_File.write(reverseDict[geneName] + "\n")
     else: 
         output_File.write(geneName + "\t" + "X" + "\n")
         flag = "Y"

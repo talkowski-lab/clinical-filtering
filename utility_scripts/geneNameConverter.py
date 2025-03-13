@@ -112,21 +112,23 @@ for key in master_keys:
     #Entries for each master key
     dictList = sorted(list(masterDict[key]))
 
-#If item is repeated require a manual lookup
+#Ambiguous if multiple aliases map to different validated symbols. 
     for item in dictList:
         if item in reverseDict.keys():
             reverseDict[item]="ambiguous"
         else:
             reverseDict[item]=key
 
-#Compare gene list with reverseDict
-
+#Compare gene list with reverseDict; if ambiguous assume gene name if in master_keys
 for line in inputLines:
     line = line.strip('\n')
     valueList = line.split('\t')
     geneName = valueList[0].strip()
     if geneName in reverseDict.keys():
-        output_File.write(geneName + "\t" + reverseDict[geneName] + "\t" + "\n")
+        if reverseDict[geneName]=="ambiguous" and geneName in master_keys:
+            output_File.write(geneName + "\t" + geneName + "\t" + "\n")
+        else:
+            output_File.write(geneName + "\t" + reverseDict[geneName] + "\t" + "\n")
     else: 
         output_File.write(geneName + "\t" + "X" + "\n")
 

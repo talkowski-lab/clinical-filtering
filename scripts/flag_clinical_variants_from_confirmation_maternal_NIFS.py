@@ -38,19 +38,19 @@ if confirmation_vcf_uri!='NA' and confirmation_sample_id!='NA':
     # Annotate with temporary confirmation_sample_id
     merged_ht = merged_ht.annotate(confirmation_sample_id=confirmation_sample_id)
     # Annotate GT from confirmation_vcf
-    merged_ht = merged_ht.annotate(confirmation_GT=conf_mt[merged_ht.key, merged_ht.confirmation_sample_id].GT)
+    merged_ht = merged_ht.annotate(confirmation_GT=hl.str(conf_mt[merged_ht.key, merged_ht.confirmation_sample_id].GT))
     # Flag if GT matches 
-    merged_ht = merged_ht.annotate(GT_matches_confirmation_vcf=merged_ht.confirmation_GT==hl.parse_call(merged_ht['proband_entry.GT']))
+    merged_ht = merged_ht.annotate(GT_matches_confirmation_vcf=hl.parse_call(merged_ht.confirmation_GT)==hl.parse_call(merged_ht['proband_entry.GT']))
 
 # maternal_vcf
 if maternal_vcf_uri!='NA' and maternal_sample_id!='NA':
-    conf_mt = hl.import_vcf(maternal_vcf_uri, force_bgz=True, array_elements_required=False)
+    mat_mt = hl.import_vcf(maternal_vcf_uri, force_bgz=True, array_elements_required=False)
     # Annotate with temporary maternal_sample_id
     merged_ht = merged_ht.annotate(maternal_sample_id=maternal_sample_id)
     # Annotate GT from maternal_vcf
-    merged_ht = merged_ht.annotate(maternal_GT=conf_mt[merged_ht.key, merged_ht.maternal_sample_id].GT)
+    merged_ht = merged_ht.annotate(maternal_GT=hl.str(mat_mt[merged_ht.key, merged_ht.maternal_sample_id].GT))
     # Flag if GT matches 
-    merged_ht = merged_ht.annotate(GT_matches_maternal_vcf=merged_ht.maternal_GT==hl.parse_call(merged_ht['mother_entry.GT']))
+    merged_ht = merged_ht.annotate(GT_matches_maternal_vcf=hl.parse_call(merged_ht.maternal_GT)==hl.parse_call(merged_ht['mother_entry.GT']))
 
 # Drop temporary fields before export
 tmp_fields = ['confirmation_sample_id','maternal_sample_id','hail_locus','hail_alleles']

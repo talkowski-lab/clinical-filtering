@@ -15,7 +15,7 @@ task runClinicalFiltering {
         File ped_uri
         File empty_file
 
-        String? prefix
+        String? prefix  # optional, for if vcf_file has a very long filename (e.g. NIFS)
         String helper_functions_script
         String filter_clinical_variants_snv_indel_script
         String hail_docker
@@ -82,7 +82,7 @@ task runClinicalFilteringOMIM {
         File vcf_file
         File ped_uri
 
-        String? prefix
+        String? prefix  # optional, for if vcf_file has a very long filename (e.g. NIFS)
         String helper_functions_script
         String filter_clinical_variants_snv_indel_omim_script
         String hail_docker
@@ -167,7 +167,7 @@ task filterCompHetsXLRHomVar {
 
         Int ad_alt_threshold
 
-        String? prefix
+        String? prefix  # optional, for if vcf_file has a very long filename (e.g. NIFS)
         String genome_build
 
         String helper_functions_script

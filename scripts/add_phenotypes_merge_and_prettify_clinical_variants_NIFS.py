@@ -73,7 +73,7 @@ merged_df['variant_category'] = merged_df.VarKey.map(merged_df.groupby('VarKey')
 
 # Temporary lists for condensing tiers
 merged_df['output_category_list'] = merged_df.VarKey.map(merged_df.groupby('VarKey').output_category.apply(list).to_dict())
-merged_df['Tier_List'] = merged_df.VarKey.map(merged_df.groupby('VarKey').Tier.apply(lambda lst: pd.Series(lst).dropna().tolist()).to_dict())
+merged_df['Tier_List'] = merged_df.VarKey.map(merged_df.groupby('VarKey').Tier.apply(lambda lst: pd.Series(lst).dropna().astype(str).tolist()).to_dict())
 
 recessive_substrings = ['recessive', 'XLR', 'maternal_carrier', 'hom_var']
 

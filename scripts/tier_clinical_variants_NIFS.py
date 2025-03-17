@@ -65,16 +65,18 @@ if inheritance_type=='recessive':
     # Treat XLR like AD (proband has alt allele)
     xlr_proband_GT = ((df.locus.str.contains('X')) & 
                       (df['proband_entry.GT'].str.contains('1')))
+    ar_proband_GT = df['proband_entry.GT'].isin(['1/1','1|1'])
     # Tier 1: Only HomVar (except XLR)
-    tier_1_proband_GT = (df['proband_entry.GT'].isin(['1/1','1|1'])) | (xlr_proband_GT)
-    # Tier 2: Exclude C0 for AR, except for comphets
-    tier_2_proband_GT = (df['variant_category']=='comphet') | (df['info.CA_from_GT']!=0)
+    tier_1_proband_GT = (ar_proband_GT) | (xlr_proband_GT)
+    # Tier 2: Same as Tier 1 but allow 0/1 for comphets
+    comphet_proband_het = (df['variant_category']=='comphet') & (df['proband_entry.GT'].isin(['0/1','0|1']))
+    tier_2_proband_GT = (tier_1_proband_GT) | (comphet_proband_het) 
 
 if inheritance_type=='dominant':
     # Tier 1: Proband has alt allele
     tier_1_proband_GT = (df['proband_entry.GT'].str.contains('1'))
-    # Tier 2: No proband alt allele filter
-    tier_2_proband_GT = (df['proband_entry.GT']!='')
+    # Tier 2: Same as Tier 1
+    tier_2_proband_GT = tier_1_proband_GT
 
 passes_tier_1_and_2 = (is_not_clinvar_B_LB &
                         ~vus_or_conflicting_in_clinvar &

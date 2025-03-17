@@ -54,6 +54,8 @@ for i, uri in enumerate(input_uris):
     df['VarKey'] = df[cols_for_varkey].astype(str).apply(':'.join, axis=1)
     for col in float_cols:
         df[col] = df[col].apply(convert_to_uniform_format)
+    # NEW 3/12/2025: output_category for getting unique tiers below
+    df['output_category'] = df.variant_category
     # Check if variant_category already has multiple values (e.g. CompHet/XLR/hom_var/mat_carrier output)
     n_variant_categories = df['variant_category'].value_counts().index.size
     if n_variant_categories>1:
@@ -62,8 +64,6 @@ for i, uri in enumerate(input_uris):
         # Drop duplicate rows using all columns except variant_source (can be different because of comphets) 
         all_cols_minus_variant_source = [col for col in df.columns if col!='variant_source'] 
         df = df.drop_duplicates(all_cols_minus_variant_source)
-    # NEW 3/12/2025: output_category for getting unique tiers below
-    df['output_category'] = df.variant_category.str.replace(',', '_')
 
     all_cols += df.columns.tolist()
     merged_df = pd.concat([merged_df, df])

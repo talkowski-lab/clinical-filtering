@@ -138,8 +138,8 @@ merged_df.loc[merged_df.variant_category.str.contains('comphet'), 'comphet_ID'] 
 
 # Map phenotypes
 pheno_df = pd.read_csv(pheno_uri, sep='\t')
-merged_df['disease_title_recessive'] = merged_df.HGVSc_symbol.map(pheno_df.set_index('gene_symbol').disease_title_recessive.to_dict())
-merged_df['disease_title_dominant'] = merged_df.HGVSc_symbol.map(pheno_df.set_index('gene_symbol').disease_title_dominant.to_dict())
+merged_df['disease_title_recessive'] = merged_df.SYMBOL.map(pheno_df.set_index('gene_symbol').disease_title_recessive.to_dict())
+merged_df['disease_title_dominant'] = merged_df.SYMBOL.map(pheno_df.set_index('gene_symbol').disease_title_dominant.to_dict())
 
 # Add new phenotype columns to priority columns, before HGVSc_symbol
 priority_cols = priority_cols[:priority_cols.index('HGVSc_symbol')] + ['disease_title_recessive', 'disease_title_dominant'] + priority_cols[priority_cols.index('HGVSc_symbol'):]

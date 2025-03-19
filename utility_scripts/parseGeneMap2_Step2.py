@@ -20,7 +20,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-s", "--step", help="OMIM Step1 Parsed File")
 parser.add_argument("-o", "--output", help="Inheritance Output")
 parser.add_argument("--high", help="Add flag if want to remove suceptibility or low confidence genes", action='store_true')
+parser.add_argument("--limit5", help="Add flag if only want to report 5 if only output", action='store_true')
 parser.set_defaults(high=False)
+parser.set_defaults(limit5=False)
+
 
 args = parser.parse_args()
 
@@ -35,6 +38,7 @@ outputFile.write("approvedGeneSymbol"+ "\t" + "inheritance_code" + "\n")
 phenoDict = {}
 
 high = args.high
+limit5 = args.limit5
 
 #Possible inheritances
 #NB: X-linked is classified as other. 
@@ -171,6 +175,12 @@ for line in stepLines:
 
 for key in sorted(phenoDict.keys()):
     stringList = [str(x) for x in sorted(list(phenoDict[key][1]))]
-    outputFile.write(phenoDict[key][0]+"\t"+''.join(stringList) + "\n")
+
+    if limit5==True and len(stringList)>1 and ("5" in stringList):
+        stringList.remove("5")
+
+    string_inh = "".join(stringList)
+    
+    outputFile.write(phenoDict[key][0]+"\t"+ string_inh + "\n")
 
 exit()

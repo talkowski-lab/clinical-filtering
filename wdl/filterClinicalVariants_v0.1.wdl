@@ -28,7 +28,7 @@ workflow filterClinicalVariants {
         # for SVs
         File annot_beds_with_header_tsv
         File gene_list_tsv
-        File omim_uri
+        File inheritance_uri
         File constrained_uri
         File prec_uri
         File hi_uri
@@ -46,9 +46,9 @@ workflow filterClinicalVariants {
         String variant_interpretation_docker  # for SVs, svtk vcf2bed
 
         ## SV inputs that are optional and already have defaults in the imported workflow
-        # String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
-        # String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_gene_level_v0.1.py"
-        # String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_sv_v0.1.py"
+        # String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
+        # String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_annotate_sv_gene_level_v0.1.py"
+        # String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_sv_v0.1.py"
 
         # Array[String] sv_gene_fields = ["PREDICTED_BREAKEND_EXONIC","PREDICTED_COPY_GAIN","PREDICTED_DUP_PARTIAL",
         #         "PREDICTED_INTRAGENIC_EXON_DUP","PREDICTED_INTRONIC","PREDICTED_INV_SPAN","PREDICTED_LOF","PREDICTED_MSV_EXON_OVERLAP",
@@ -81,11 +81,11 @@ workflow filterClinicalVariants {
         # Float loeuf_v4_threshold=0.6
         
         # Boolean pass_filter=false
-        # Boolean include_not_omim=true  # NIFS-specific
+        # Boolean include_not_inheritance=true  # NIFS-specific
 
-        # String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_v0.1.py"
-        # String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_v0.1.py"
-        # String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_v0.1.py"
+        # String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_v0.1.py"
+        # String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_inheritance_v0.1.py"
+        # String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_comphets_xlr_hom_var_v0.1.py"
     }
     
     # SNV/Indel
@@ -102,7 +102,7 @@ workflow filterClinicalVariants {
             rec_gene_list_tsv=rec_gene_list_tsv,
             dom_gene_list_tsv=dom_gene_list_tsv
             # filter_clinical_variants_snv_indel_script=filter_clinical_variants_snv_indel_script,
-            # filter_clinical_variants_snv_indel_omim_script=filter_clinical_variants_snv_indel_omim_script,
+            # filter_clinical_variants_snv_indel_inheritance_script=filter_clinical_variants_snv_indel_inheritance_script,
             # spliceAI_threshold=spliceAI_threshold,
             # af_threshold=af_threshold,
             # gnomad_af_threshold=gnomad_af_threshold,
@@ -116,7 +116,7 @@ workflow filterClinicalVariants {
             # loeuf_v4_threshold=loeuf_v4_threshold,
             # families_per_chunk=families_per_chunk,
             # pass_filter=pass_filter,
-            # include_not_omim=include_not_omim,
+            # include_not_inheritance=include_not_inheritance,
         }
     }
 
@@ -128,7 +128,7 @@ workflow filterClinicalVariants {
             vcf_idx=select_first([sv_vcf_idx]),
             ped_uri=ped_uri,
             gene_list_tsv=gene_list_tsv,
-            omim_uri=omim_uri,
+            inheritance_uri=inheritance_uri,
             constrained_uri=constrained_uri,
             prec_uri=prec_uri,
             hi_uri=hi_uri,

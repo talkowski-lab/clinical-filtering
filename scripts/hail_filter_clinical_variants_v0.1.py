@@ -105,7 +105,7 @@ clinvar_tm = filter_mt(clinvar_tm, filter_csq=False, filter_impact=False)  # fil
 # Output 2: grab all GenCC_OMIM variants
 gencc_omim_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
 # NEW 1/27/2025: grab anything in GenCC_OMIM gene list and het in mother
-gencc_omim_tm = gencc_omim_tm.filter_rows(gencc_omim_tm.vep.transcript_consequences.OMIM_inheritance_code!='')
+gencc_omim_tm = gencc_omim_tm.filter_rows(gencc_omim_tm.vep.transcript_consequences.inheritance_code!='')
 gencc_omim_tm = gencc_omim_tm.filter_entries((gencc_omim_tm.mother_entry.GT.is_het()) & 
                                              (gencc_omim_tm.proband_entry.GT.is_non_ref()))
 gencc_omim_tm = gencc_omim_tm.annotate_rows(variant_category='GenCC_OMIM')
@@ -133,6 +133,10 @@ mt = mt.filter_rows(hl.set(exclude_csqs).intersection(hl.set(mt.info.all_csqs)).
 # NEW 3/7/2025: added cohort_AC filter
 mt = mt.filter_rows((mt.info.cohort_AC<=ac_threshold) | (mt.info.cohort_AF<=af_threshold))
 mt = mt.filter_rows((mt.info.gnomad_popmax_af<=gnomad_af_threshold) | (hl.is_missing(mt.info.gnomad_popmax_af)))
+
+output_filename = f"{prefix}_{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
+if len(output_filename)>(os.pathconf('/', 'PC_NAME_MAX')-len('/cromwell_root/.')):  # if filename too long
+    output_filename = f"{variant_types}_comp_hets_xlr_hom_var_mat_carrier.tsv.gz"
 
 # export intermediate VCF
 hl.export_vcf(mt, prefix+'_clinical.vcf.bgz', metadata=header)

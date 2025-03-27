@@ -19,7 +19,7 @@ workflow filterClinicalVariantsSV {
         File ped_uri
 
         File gene_list_tsv
-        File omim_uri
+        File inheritance_uri
         File constrained_uri
         File prec_uri
         File hi_uri
@@ -32,10 +32,10 @@ workflow filterClinicalVariantsSV {
         String hail_docker
         String variant_interpretation_docker
 
-        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_clinical_helper_functions.py"
-        String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
-        String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_gene_level_v0.1.py"
-        String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_sv_v0.1.py"
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_clinical_helper_functions.py"
+        String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
+        String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_annotate_sv_gene_level_v0.1.py"
+        String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_sv_v0.1.py"
 
         Array[String] permissive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN",
                          "PREDICTED_PARTIAL_EXON_DUP", "PREDICTED_DUP_PARTIAL", "PREDICTED_INTRONIC",
@@ -114,7 +114,7 @@ workflow filterClinicalVariantsSV {
         input:
         vcf_file=combineBedAnnotations.combined_vcf,
         gene_list_tsv=gene_list_tsv,
-        omim_uri=omim_uri,
+        inheritance_uri=inheritance_uri,
         constrained_uri=constrained_uri,
         prec_uri=prec_uri,
         hi_uri=hi_uri,
@@ -378,7 +378,7 @@ task annotateGeneLevelVCF {
     input {
         File vcf_file
         File gene_list_tsv
-        File omim_uri
+        File inheritance_uri
         File constrained_uri
         File prec_uri
         File hi_uri
@@ -436,7 +436,7 @@ task annotateGeneLevelVCF {
     set -eou pipefail
     curl ~{annotate_sv_gene_level_script} > annotate_vcf.py
     python3 annotate_vcf.py -i ~{vcf_file} -o ~{output_filename} -l ~{gene_list_tsv} -s ~{size_threshold} \
-        --omim ~{omim_uri} --cores ~{cpu_cores} --mem ~{memory} --build ~{genome_build} \
+        --inheritance ~{inheritance_uri} --cores ~{cpu_cores} --mem ~{memory} --build ~{genome_build} \
         --permissive-csq-fields ~{sep=',' permissive_csq_fields} --restrictive-csq-fields ~{sep=',' restrictive_csq_fields} \
         --constrained-uri ~{constrained_uri} --prec-uri ~{prec_uri} --hi-uri ~{hi_uri} --ts-uri ~{ts_uri} \
         --dom-af ~{dom_af_threshold} --rec-af ~{rec_af_threshold} \

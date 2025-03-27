@@ -30,13 +30,13 @@ workflow filterClinicalVariants {
 
         String predicted_sex_chrom_ploidy  # XX or XY, NIFS-specific
 
-        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_NIFS_v0.1.py"
-        String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_NIFS_v0.1.py"
-        String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py"
-        String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/tier_clinical_variants_NIFS.py"
-        String add_phenotypes_merge_and_prettify_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/add_phenotypes_merge_and_prettify_clinical_variants_NIFS.py"
-        String flag_from_confirmation_maternal_vcf_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/flag_clinical_variants_from_confirmation_maternal_NIFS.py"
-        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_clinical_helper_functions.py"
+        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_NIFS_v0.1.py"
+        String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_omim_NIFS_v0.1.py"
+        String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py"
+        String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/tier_clinical_variants_NIFS.py"
+        String add_phenotypes_merge_and_prettify_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/add_phenotypes_merge_and_prettify_clinical_variants_NIFS.py"
+        String flag_from_confirmation_maternal_vcf_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/flag_clinical_variants_from_confirmation_maternal_NIFS.py"
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_clinical_helper_functions.py"
 
         String hail_docker
         String sv_base_mini_docker
@@ -169,7 +169,7 @@ workflow filterClinicalVariants {
         input:
             input_tsv=runClinicalFiltering.clinvar_tsv,
             hail_docker=hail_docker,
-            inheritance_code_col='vep.transcript_consequences.OMIM_inheritance_code',
+            inheritance_code_col='vep.transcript_consequences.inheritance_code',
             runtime_attr_override=runtime_attr_filter_tiers
     }
 
@@ -447,7 +447,7 @@ task splitByInheritance {
 
     parser = argparse.ArgumentParser(description='Parse arguments')
     parser.add_argument('-i', dest='input_uri', help='Input TSV')
-    parser.add_argument('-c', dest='inheritance_code_col', help='Column containing the (numeric) inheritance code (e.g. vep.transcript_consequences.OMIM_inheritance_code)')
+    parser.add_argument('-c', dest='inheritance_code_col', help='Column containing the (numeric) inheritance code (e.g. vep.transcript_consequences.inheritance_code)')
     parser.add_argument('--file-ext', dest='file_ext', help='File extension (.tsv or .tsv.gz)')
 
     args = parser.parse_args()

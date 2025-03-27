@@ -158,7 +158,7 @@ if sv_vcf!='NA':
     # NEW 1/30/2025: combine gene-level annotations in INFO where there is a value for each gene
     # Annotate gene to match SNV/Indels (to explode on and keep original genes annotation)
     sv_mt = sv_mt.annotate_rows(gene=sv_mt.genes)
-    gene_fields = ['gene', 'OMIM_inheritance_code', 'gene_list']
+    gene_fields = ['gene', 'inheritance_code', 'gene_list']
 
     sv_mt = sv_mt.annotate_rows(gene_level=hl.zip(*[sv_mt[field] for field in gene_fields])\
             .map(lambda x: hl.struct(**{field: x[i] 
@@ -170,9 +170,9 @@ if sv_vcf!='NA':
     sv_mt = sv_mt.annotate_rows(variant_source='SV')
 
     # OMIM recessive code
-    omim_rec_code = (sv_mt.OMIM_inheritance_code.matches('2'))
+    omim_rec_code = (sv_mt.inheritance_code.matches('2'))
     # OMIM XLR code
-    omim_xlr_code = (sv_mt.OMIM_inheritance_code.matches('4'))
+    omim_xlr_code = (sv_mt.inheritance_code.matches('4'))
     sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code)
 
 # Unify SNV/Indel MT and SV MT row and entry fields
@@ -765,14 +765,14 @@ gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(mer
 
 # NEW 1/13/2025: maternal carrier variants
 # NEW 1/30/2025: edited gene_phased_tm.vep.transcript_consequences.SYMBOL --> gene_phased_tm.gene,
-# gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code --> gene_phased_tm.OMIM_inheritance_code
+# gene_phased_tm.vep.transcript_consequences.inheritance_code --> gene_phased_tm.inheritance_code
 # in carrier gene list and mother is het
 carrier_genes = pd.read_csv(carrier_gene_list, sep='\t', header=None)[0].tolist()
 mat_carrier = gene_phased_tm.filter_rows(hl.array(carrier_genes).contains(gene_phased_tm.gene))
 mat_carrier = mat_carrier.filter_entries(mat_carrier.mother_entry.GT.is_het()).key_rows_by(locus_expr, 'alleles').entries()
 
 # XLR only
-xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm.OMIM_inheritance_code.matches('4'))   # OMIM XLR
+xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm.inheritance_code.matches('4'))   # OMIM XLR
 xlr_phased = xlr_phased_tm.filter_entries((xlr_phased_tm.proband_entry.GT.is_non_ref()) &
                             (~xlr_phased_tm.is_female)).key_rows_by(locus_expr, 'alleles').entries()
 

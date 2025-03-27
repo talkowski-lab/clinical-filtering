@@ -191,14 +191,14 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
         
         # Category 4: OMIM AD and XLD (dominant_freq)
         hl.if_else(
-            (hl.any(lambda x: x.matches('1') | x.matches('3'), phased_sv_tm.info.OMIM_inheritance_code)) & (phased_sv_tm.info.dominant_freq),
+            (hl.any(lambda x: x.matches('1') | x.matches('3'), phased_sv_tm.info.inheritance_code)) & (phased_sv_tm.info.dominant_freq),
             'dominant', 
             hl.missing(hl.tstr)
         ),
         
         # Category 5: OMIM AR and XLR (recessive_freq)
         hl.if_else(
-            (hl.any(lambda x: x.matches('2') | x.matches('4'), phased_sv_tm.info.OMIM_inheritance_code)) & (phased_sv_tm.info.recessive_freq),
+            (hl.any(lambda x: x.matches('2') | x.matches('4'), phased_sv_tm.info.inheritance_code)) & (phased_sv_tm.info.recessive_freq),
             'recessive', 
             hl.missing(hl.tstr)
         ),

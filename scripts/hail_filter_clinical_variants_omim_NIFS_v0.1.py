@@ -187,11 +187,11 @@ if rec_gene_list_tsv!='NA':
 else:
     in_rec_gene_list = False
 
-not_in_omim = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code=='')
+not_in_omim = (gene_phased_tm.vep.transcript_consequences.inheritance_code=='')
 # OMIM recessive code
-omim_rec_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('2'))
+omim_rec_code = (gene_phased_tm.vep.transcript_consequences.inheritance_code.matches('2'))
 # OMIM XLR code
-omim_xlr_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))
+omim_xlr_code = (gene_phased_tm.vep.transcript_consequences.inheritance_code.matches('4'))
 # NEW 3/10/2025: cohort_AC OR cohort_AF filter
 passes_ac_af_rec = ((gene_phased_tm.info.cohort_AC<=ac_rec_threshold) | (gene_phased_tm.info.cohort_AF<=af_rec_threshold))
 # gnomAD AF popmax filter
@@ -256,11 +256,11 @@ if dom_gene_list_tsv!='NA':
 else:
     in_dom_gene_list = False
 
-not_in_omim = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code=='')
+not_in_omim = (gene_phased_tm.vep.transcript_consequences.inheritance_code=='')
 # OMIM dominant code
-omim_dom_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('1')) 
+omim_dom_code = (gene_phased_tm.vep.transcript_consequences.inheritance_code.matches('1')) 
 # OMIM XLD code
-omim_xld_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('3'))
+omim_xld_code = (gene_phased_tm.vep.transcript_consequences.inheritance_code.matches('3'))
 # NEW 3/10/2025: cohort_AC OR cohort_AF filter
 passes_ac_af_dom = ((gene_phased_tm.info.cohort_AC<=ac_dom_threshold) | (gene_phased_tm.info.cohort_AF<=af_dom_threshold))
 # gnomAD AF popmax filter

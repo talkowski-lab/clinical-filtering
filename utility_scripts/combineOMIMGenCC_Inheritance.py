@@ -37,11 +37,14 @@ parser.add_argument("-g", "--OMIM_curated", help="OMIM Curated Input")
 parser.add_argument("--a", dest="gen_CC_complete", help="genCC complete gene list as .txt")
 parser.add_argument("-o", "--output", help="Output File")
 parser.add_argument("--genCC", help="Add flag if want to add OMIM inheritance ONLY IF 1) non-autosomal OR 2) gene not in genCC. --a required if this flag is ticked.", action='store_true')
-parser.set_defaults(high=False)
+parser.add_argument("--limit5", help="Add flag if only want to report 5 if only output", action='store_true')
+parser.set_defaults(genCC=False)
+parser.set_defaults(limit5=False)
 
 args = parser.parse_args()
 
-high = args.high
+genCC = args.genCC
+limit5 = args.limit5
 
 #Make list of input gene names
 OMIM_File = open(args.OMIM_curated, mode = 'r')
@@ -58,9 +61,9 @@ OMIMDict={}
 genCC_List = []
 
 #Make list of genCC genes
-if high==True: 
+if genCC==True: 
     genCCCompFile = open(args.gen_CC_complete, mode = 'r')
-    genCC_Comp_Lines = geneCCCompFile.readlines()
+    genCC_Comp_Lines = genCCCompFile.readlines()
     counter = 0
     for line in genCCLines:
         if counter == 0:
@@ -101,10 +104,10 @@ for line in OMIMLines:
     inheritanceValue = valueList[1]
 
 #only include OMIM genes if (not in genCC AND in OMIM strong) OR (if in genCC AND in OMIM strong AND have inheritance 3 or 4)
-    if high == True:
+    if genCC == True:
         if (geneSymbol not in genCC_List) or (geneSymbol in genCC_List and (3 in separate_digits(inheritanceValue) or 4 in separate_digits(inheritanceValue))):
             OMIMDict[geneSymbol]=inheritanceValue
-    if high == False: 
+    if genCC == False: 
         OMIMDict[geneSymbol]=inheritanceValue
 
 #Sorted master gene list
@@ -125,6 +128,10 @@ for key in master_keys:
     joint_inh_list = sorted(list(OMIM_inh.union(genCC_inh)))
   
     string_list = [str(item) for item in joint_inh_list]
+
+    if limit5==True and len(string_list)>1 and ("5" in string_list):
+        string_list.remove("5")
+
     string_inh = "".join(string_list)
     output_File.write(key + "\t" + string_inh + "\n")
 

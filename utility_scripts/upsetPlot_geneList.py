@@ -44,6 +44,8 @@ for key in listDict.keys():
 #remove duplicates
 masterdf = masterdf.sort_values(by=[0]).drop_duplicates().reset_index(drop=True)
 
+print(len(masterdf[0]))
+
 #clone masterdf to use as rownames; colnames are listDict.keys()
 bool_df = masterdf
 colnames = list(listDict.keys())

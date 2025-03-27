@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-g", "--genCC", help="genCC tsv Input file")
 parser.add_argument("-o", "--output", help="Parsed genCC Output")
 parser.add_argument("--high", help="Add flag if only want to return genes/inheritance for strong/definitive entries", action='store_true')
+parser.add_argument("--limit5", help="Only output a 5 inheritance code if no other inheritance code", action='store_true')
 parser.set_defaults(high=False)
 
 args = parser.parse_args()
@@ -25,7 +26,8 @@ genCCFile = open(args.genCC, mode = 'r')
 genCCLines = genCCFile.readlines()
 genCCFile.close()
 
-high - args.high
+high = args.high
+limit5 = args.limit5
 
 outputFile = open(args.output, mode = 'w')
 
@@ -79,9 +81,9 @@ for line in genCCLines:
             geneDict[geneSymbol] = {inheritanceDict[inheritance]}
 
     if high == False: 
-         if geneSymbol in geneDict.keys():
+        if geneSymbol in geneDict.keys():
             geneDict[geneSymbol].add(inheritanceDict[inheritance])
-        else: 
+        else:
             geneDict[geneSymbol] = {inheritanceDict[inheritance]}
     #Keys: 
     #1 AD only
@@ -100,7 +102,12 @@ for line in genCCLines:
 
 for key in sorted(geneDict.keys()):
     string_list = [str(item) for item in sorted(list(geneDict[key]))]
+
+    if limit5==True and len(string_list)>1 and ("5" in string_list):
+        string_list.remove("5")
+
     string_inh = "".join(string_list)
+    
     outputFile.write(key + "\t" + string_inh + "\n")
 
 outputFile.close()

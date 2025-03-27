@@ -144,11 +144,11 @@ if rec_gene_list_tsv!='NA':
 else:
     in_rec_gene_list = False
 
-not_in_omim = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code=='')
+not_in_omim = (gene_phased_tm.vep.transcript_consequences.inheritance_code=='')
 # OMIM recessive code
-omim_rec_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('2'))
+omim_rec_code = (gene_phased_tm.vep.transcript_consequences.inheritance_code.matches('2'))
 # OMIM XLR code
-omim_xlr_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))
+omim_xlr_code = (gene_phased_tm.vep.transcript_consequences.inheritance_code.matches('4'))
 # gnomAD AF popmax filter
 passes_gnomad_af_rec = ((gene_phased_tm.info.gnomad_popmax_af<=gnomad_af_rec_threshold) | (hl.is_missing(gene_phased_tm.info.gnomad_popmax_af)))
 # MPC filter
@@ -209,11 +209,11 @@ if dom_gene_list_tsv!='NA':
 else:
     in_dom_gene_list = False
 
-not_in_omim = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code=='')
+not_in_omim = (gene_phased_tm.vep.transcript_consequences.inheritance_code=='')
 # OMIM dominant code
-omim_dom_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('1')) 
+omim_dom_code = (gene_phased_tm.vep.transcript_consequences.inheritance_code.matches('1')) 
 # OMIM XLD code
-omim_xld_code = (gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('3'))
+omim_xld_code = (gene_phased_tm.vep.transcript_consequences.inheritance_code.matches('3'))
 # gnomAD AF popmax filter
 passes_gnomad_af_dom = ((gene_phased_tm.info.gnomad_popmax_af<=gnomad_af_dom_threshold) | (hl.is_missing(gene_phased_tm.info.gnomad_popmax_af)))
 # MPC filter

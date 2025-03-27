@@ -28,7 +28,7 @@ parser.add_argument('-i', dest='vcf_file', help='Input VCF file')
 parser.add_argument('-o', dest='output_filename', help='Output filename')
 parser.add_argument('-l', dest='gene_list_tsv', help='Gene list tsv for annotations')
 parser.add_argument('-s', dest='size_threshold', help='Size threshold in BP for SVLEN flag')
-parser.add_argument('--omim', dest='omim_uri', help='OMIM file for annotations')
+parser.add_argument('--inheritance', dest='inheritance_uri', help='inheritance file for annotations')
 parser.add_argument('--cores', dest='cores', help='CPU cores')
 parser.add_argument('--mem', dest='mem', help='Memory')
 parser.add_argument('--build', dest='build', help='Genome build')
@@ -53,7 +53,7 @@ cores = args.cores  # string
 mem = int(np.floor(float(args.mem)))
 genome_build = args.build
 gene_list_tsv = args.gene_list_tsv
-omim_uri = args.omim_uri
+inheritance_uri = args.inheritance_uri
 size_threshold = int(args.size_threshold)
 restrictive_csq_fields = (args.restrictive_csq_fields).split(',')
 permissive_csq_fields = (args.permissive_csq_fields).split(',')
@@ -103,11 +103,11 @@ def get_predicted_sources_expr(row_expr, sv_gene_fields):
 sv_gene_mt = sv_gene_mt.annotate_rows(
     gene_source=get_predicted_sources_expr(sv_gene_mt, sv_gene_fields))
 
-# Annotate OMIM in SVs
-omim = hl.import_table(omim_uri).key_by('approvedGeneSymbol')
+# Annotate inheritance in SVs
+inheritance_ht = hl.import_table(inheritance_uri).key_by('approvedGeneSymbol')
 sv_gene_mt = sv_gene_mt.key_rows_by(sv_gene_mt.info.genes)
 sv_gene_mt = sv_gene_mt.annotate_rows(
-    OMIM_inheritance_code=hl.or_missing(hl.is_defined(omim[sv_gene_mt.row_key]), omim[sv_gene_mt.row_key].inheritance_code))
+    inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.row_key]), inheritance_ht[sv_gene_mt.row_key].inheritance_code))
 
 # Annotate gene list(s)
 if gene_list_tsv!='NA':
@@ -129,7 +129,7 @@ sv_gene_mt = sv_gene_mt.annotate_rows(
 # Aggregate gene-level annotations by unique rsid
 sv_gene_agg_mt = (sv_gene_mt.group_rows_by(sv_gene_mt.rsid)
         .aggregate_rows(gene_source = hl.agg.collect(sv_gene_mt.gene_source),
-                        OMIM_inheritance_code = hl.agg.collect(sv_gene_mt.OMIM_inheritance_code),
+                        inheritance_code = hl.agg.collect(sv_gene_mt.inheritance_code),
                         gene_list = hl.agg.collect(sv_gene_mt.gene_list))).result()
 
 # Annotate original sv_mt INFO with gene-level annotations
@@ -166,11 +166,11 @@ info=sv_mt.info.annotate(
     **{f"any_{name.split('_genes')[0]}": sv_mt.info[name].size()>0 for name in gene_list_map.keys()})
 )
 
-# Add flag for any genes in gene lists (from gene_list_tsv) and any genes in OMIM
+# Add flag for any genes in gene lists (from gene_list_tsv) and any genes in inheritance_uri
 sv_mt = sv_mt.annotate_rows(
     info=sv_mt.info.annotate(
         any_genelist=sv_mt.info.gene_list.filter(hl.is_defined).size()>0,
-        any_omim=sv_mt.info.OMIM_inheritance_code.filter(hl.is_defined).size()>0
+        any_inheritance=sv_mt.info.inheritance_code.filter(hl.is_defined).size()>0
     )
 )
 
@@ -217,7 +217,7 @@ header['info']['genes'] = {'Description': f"All genes from (union of restrictive
 header['info']['restrictive_csq'] = {'Description': f"All genes from {', '.join(restrictive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
 header['info']['permissive_csq'] = {'Description': f"All genes from {', '.join(permissive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
 header['info']['gene_source'] = {'Description': f"Sources for genes in genes field, considered fields: {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}
-header['info']['OMIM_inheritance_code'] = {'Description': f"Inheritance codes from {os.path.basename(omim_uri)}.", 'Number': '.', 'Type': 'String'}
+header['info']['inheritance_code'] = {'Description': f"Inheritance codes from {os.path.basename(inheritance_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['gene_list'] = {'Description': f"Gene lists for each gene in genes field (&-delimited for multiple gene lists) from {os.path.basename(gene_list_tsv)}.", 'Number': '.', 'Type': 'String'}
 header['info']['constrained_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(constrained_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['prec_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(prec_uri)}.", 'Number': '.', 'Type': 'String'}
@@ -230,7 +230,7 @@ header['info']['any_prec'] = {'Description': f"Any gene in genes field is in {os
 header['info']['any_hi'] = {'Description': f"Any gene in genes field is in {os.path.basename(hi_uri)}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['any_ts'] = {'Description': f"Any gene in genes field is in {os.path.basename(ts_uri)}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['any_genelist'] = {'Description': f"Any gene in genes field is in gene lists from {os.path.basename(gene_list_tsv)}.", 'Number': '0', 'Type': 'Flag'}
-header['info']['any_omim'] = {'Description': f"Any gene in genes field is in {os.path.basename(omim_uri)}.", 'Number': '0', 'Type': 'Flag'}
+header['info']['any_inheritance'] = {'Description': f"Any gene in genes field is in {os.path.basename(inheritance_uri)}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['dominant_freq'] = {'Description': f"Passes cohort AF <= {dom_af_threshold} AND gnomAD AF <= {gnomad_af_dom_threshold}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['recessive_freq'] = {'Description': f"Passes cohort AF <= {rec_af_threshold} AND gnomAD AF <= {gnomad_af_rec_threshold}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['gnomad_popmax_freq'] = {'Description': f"Passes gnomAD popmax AF <= {gnomad_popmax_af_threshold}.", 'Number': '0', 'Type': 'Flag'}

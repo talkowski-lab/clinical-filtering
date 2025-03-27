@@ -169,7 +169,7 @@ workflow filterClinicalVariants {
         input:
             input_tsv=runClinicalFiltering.clinvar_tsv,
             hail_docker=hail_docker,
-            inheritance_code_col='vep.transcript_consequences.OMIM_inheritance_code',
+            inheritance_code_col='vep.transcript_consequences.inheritance_code',
             runtime_attr_override=runtime_attr_filter_tiers
     }
 
@@ -447,7 +447,7 @@ task splitByInheritance {
 
     parser = argparse.ArgumentParser(description='Parse arguments')
     parser.add_argument('-i', dest='input_uri', help='Input TSV')
-    parser.add_argument('-c', dest='inheritance_code_col', help='Column containing the (numeric) inheritance code (e.g. vep.transcript_consequences.OMIM_inheritance_code)')
+    parser.add_argument('-c', dest='inheritance_code_col', help='Column containing the (numeric) inheritance code (e.g. vep.transcript_consequences.inheritance_code)')
     parser.add_argument('--file-ext', dest='file_ext', help='File extension (.tsv or .tsv.gz)')
 
     args = parser.parse_args()

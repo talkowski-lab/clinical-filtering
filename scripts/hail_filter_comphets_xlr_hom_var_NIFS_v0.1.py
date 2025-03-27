@@ -573,7 +573,7 @@ mat_carrier = gene_phased_tm.filter_rows((hl.array(carrier_genes).contains(gene_
                            (hl.array([1, 2, 3]).contains(gene_phased_tm.info.CA_from_GT))).key_rows_by(locus_expr, 'alleles').entries()
 
 # XLR only
-xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm.vep.transcript_consequences.OMIM_inheritance_code.matches('4'))   # OMIM XLR
+xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm.vep.transcript_consequences.inheritance_code.matches('4'))   # XLR
 xlr_phased = xlr_phased_tm.filter_entries((xlr_phased_tm.proband_entry.GT.is_non_ref()) &
                             (~xlr_phased_tm.is_female)).key_rows_by(locus_expr, 'alleles').entries()
 

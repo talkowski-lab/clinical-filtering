@@ -155,7 +155,7 @@ clinvar_tm = filter_mt(clinvar_tm, filter_csq=False, filter_impact=False)  # fil
 # Output 2: grab all GenCC_OMIM variants
 gencc_omim_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
 # grab anything in GenCC_OMIM gene list and in clusters 1-3 (maternal het clusters)
-gencc_omim_tm = gencc_omim_tm.filter_rows((gencc_omim_tm.vep.transcript_consequences.OMIM_inheritance_code!='') &
+gencc_omim_tm = gencc_omim_tm.filter_rows((gencc_omim_tm.vep.transcript_consequences.inheritance_code!='') &
                        (hl.array([1, 2, 3]).contains(gencc_omim_tm.info.CA_from_GT)))
 gencc_omim_tm = gencc_omim_tm.annotate_rows(variant_category='GenCC_OMIM')
 gencc_omim_tm = filter_mt(gencc_omim_tm, filter_csq=False, filter_impact=False)  # filter to CANONICAL and/or MANE_PLUS_CLINICAL

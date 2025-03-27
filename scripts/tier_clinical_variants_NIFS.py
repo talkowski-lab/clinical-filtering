@@ -36,19 +36,19 @@ df['Tier'] = 5
 passes_filters = (df.filters=='')
 df.loc[passes_filters, 'Tier'] = 4
 
-# Tier 3: Include VUS or Conflicting in ClinVar
-vus_or_conflicting_in_clinvar = (df['info.CLNSIG'].str.contains('Uncertain') | df['info.CLNSIG'].str.contains('Conflicting'))
-df.loc[passes_filters & vus_or_conflicting_in_clinvar, 'Tier'] = 3
-
-# CRITERIA FOR BOTH TIER 1 AND TIER 2
+# ClinVar criteria
 is_clinvar_P_LP = ((df['info.CLNSIG'].astype(str).str.contains('athogenic')) 
                 & (~df['info.CLNSIG'].astype(str).str.contains('Conflicting')))
 is_clnrevstat_one_star_plus = (df['info.CLNREVSTAT'].isin(clnrevstat_one_star_plus))
 is_clinvar_P_LP_one_star_plus = is_clinvar_P_LP & is_clnrevstat_one_star_plus
-not_in_clinvar = df['info.CLNSIG'].isna()
-is_clinvar_P_LP_one_star_plus_or_not_in_clinvar = is_clinvar_P_LP_one_star_plus | not_in_clinvar
 is_not_clinvar_B_LB = (~df['info.CLNSIG'].astype(str).str.contains('enign'))
 
+# Tier 3: Include VUS or Conflicting in ClinVar
+vus_or_conflicting_in_clinvar = (df['info.CLNSIG'].str.contains('Uncertain') | df['info.CLNSIG'].str.contains('Conflicting'))
+df.loc[passes_filters & 
+       (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 3
+
+# CRITERIA FOR BOTH TIER 1 AND TIER 2
 ncount_over_proband_DP = df['info.NCount'] / df['proband_entry.DP']
 passes_ncount_over_proband_DP = (ncount_over_proband_DP < ncount_over_proband_DP_threshold)
 
@@ -85,7 +85,7 @@ passes_tier_1_and_2 = (is_not_clinvar_B_LB &
                         passes_filters)
 
 # Tier 2: ClinVar P/LP 1*+ OR HIGH/MODERATE IMPACT, not in SEGDUP, etc.
-df.loc[(is_clinvar_P_LP_one_star_plus_or_not_in_clinvar | high_or_moderate_impact) &
+df.loc[(is_clinvar_P_LP_one_star_plus | high_or_moderate_impact) &
         passes_tier_1_and_2 & 
         not_in_segdup &
         tier_2_proband_GT, 'Tier'] = 2
@@ -101,12 +101,12 @@ df['Tier'] = df['Tier'].astype(str)
 df.loc[(~passes_ECNT | ~passes_ncount_over_proband_DP), 'Tier'] = df.loc[(~passes_ECNT | ~passes_ncount_over_proband_DP), 'Tier'] + ';LQ'
 df.loc[vus_or_conflicting_in_clinvar, 'Tier'] = df.loc[vus_or_conflicting_in_clinvar, 'Tier'] + ';VUS'
 
-# maternal_carrier column
+# Add maternal_carrier column: same as Tier 2 except tier_2_proband_GT (alt allele) filter
 is_maternal_variant = df['mother_entry.GT'].str.contains('1')
-df['maternal_carrier'] = ((is_clinvar_P_LP_one_star_plus_or_not_in_clinvar | high_or_moderate_impact) &
-       passes_ECNT &
-       passes_ncount_over_proband_DP &
-       is_maternal_variant)
+df['maternal_carrier'] = ((is_clinvar_P_LP_one_star_plus | high_or_moderate_impact) &
+        passes_tier_1_and_2 & 
+        not_in_segdup &
+        is_maternal_variant)
 
 output_filename = f"{prefix}_tiers.tsv"
 df.to_csv(output_filename, sep='\t', index=False)

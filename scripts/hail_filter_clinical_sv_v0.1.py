@@ -84,7 +84,6 @@ ped_ht = hl.import_table(cropped_ped_uri, delimiter='\t').key_by('sample_id')
 sv_mt = sv_mt.annotate_cols(phenotype=ped_ht[sv_mt.s].phenotype)
 
 # Get cohort unaffected/affected het and homvar counts
-# Get cohort unaffected/affected het and homvar counts
 sv_mt = sv_mt.annotate_rows(**{
     "n_cohort_het_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_het())),
     "n_cohort_hom_var_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_hom_var())),

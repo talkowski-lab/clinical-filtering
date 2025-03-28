@@ -70,6 +70,7 @@ task runClinicalFiltering {
 
     output {
         File mat_carrier_tsv = if include_all_maternal_carrier_variants then prefix + '_mat_carrier_variants.tsv.gz' else empty_file
+        File inheritance_other_tsv = prefix + '_inheritance_other_variants.tsv.gz'
         File clinvar_tsv = prefix + '_clinvar_variants.tsv.gz'
         File clinvar_vcf = prefix + '_clinvar_variants.vcf.bgz'
         File clinvar_vcf_idx = prefix + '_clinvar_variants.vcf.bgz.tbi'

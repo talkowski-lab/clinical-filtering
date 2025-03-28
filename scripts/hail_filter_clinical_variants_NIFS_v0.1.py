@@ -27,6 +27,8 @@
 3/10/2025:
 - change to ClinVar 1*+ P/LP for clinvar_tsv output
 - filter by in gene list in filter_mt (in hail_clinical_helper_functions.py)
+3/28/2025:
+- output 'other' inheritance as separate output
 '''
 ###
 
@@ -132,6 +134,18 @@ all_errors, per_fam, per_sample, per_variant = hl.mendel_errors(mt['GT'], pedigr
 all_errors_mt = all_errors.key_by().to_matrix_table(row_key=['locus','alleles'], col_key=['s'], row_fields=['fam_id'])
 phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_key, phased_tm.col_key].mendel_code)
 
+# NEW 3/28/2025: Output 'other' inheritance as separate output
+inheritance_other_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
+# Filter by inheritance codes 5 and 6 for 'other'
+inheritance_other_tm = inheritance_other_tm.filter_rows((inheritance_other_tm.vep.transcript_consequences.inheritance_code.matches('5')) | 
+                                                        (inheritance_other_tm.vep.transcript_consequences.inheritance_code.matches('6')))
+# Filter by variant in trio
+inheritance_other_tm = inheritance_other_tm.filter_entries((inheritance_other_tm.proband_entry.GT.is_non_ref()) | 
+                                   (inheritance_other_tm.mother_entry.GT.is_non_ref()) |
+                                   (inheritance_other_tm.father_entry.GT.is_non_ref()))
+inheritance_other_tm = inheritance_other_tm.annotate_rows(variant_category='inheritance_other')
+inheritance_other_tm = filter_mt(inheritance_other_tm)
+
 # Output 1: grab ClinVar only
 # NEW 3/5/2025: Fix string matching for ClinVar P/LP output to exclude 'Conflicting'
 clinvar_mt = mt.filter_rows(hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), mt.info.CLNSIG))
@@ -197,3 +211,6 @@ clinvar_tm.filter_cols(clinvar_tm.proband.s.matches('_fetal')).entries().flatten
 # export GenCC_OMIM TSV
 if include_all_maternal_carrier_variants:
     gencc_omim_tm.filter_cols(gencc_omim_tm.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_mat_carrier_variants.tsv.gz', delimiter='\t')
+
+# export inheritance_other TSV
+inheritance_other_tm.filter_cols(inheritance_other_tm.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_inheritance_other_variants.tsv.gz', delimiter='\t')

@@ -173,6 +173,18 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_tiers
     }
 
+    call finalFilteringTiers as finalFilteringTiersInheritanceOther {
+        input:
+            input_tsv=runClinicalFiltering.inheritance_other_tsv,
+            ECNT_threshold=ECNT_threshold,
+            ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
+            GQ_threshold=GQ_threshold,
+            inheritance_type='other',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
     call finalFilteringTiers as finalFilteringTiersClinVarDominant {
         input:
             input_tsv=splitClinVarByInheritance.dominant_tsv,
@@ -252,7 +264,8 @@ workflow filterClinicalVariants {
                 finalFilteringTiersDominant.filtered_tsv,
                 finalFilteringTiersClinVarRecessive.filtered_tsv,
                 finalFilteringTiersClinVarDominant.filtered_tsv,
-                finalFilteringTiersClinVarOther.filtered_tsv],
+                finalFilteringTiersClinVarOther.filtered_tsv,
+                finalFilteringTiersInheritanceOther.filtered_tsv],
             gene_phenotype_map=gene_phenotype_map,
             dup_exclude_cols=dup_exclude_cols,
             cols_for_varkey=cols_for_varkey,
@@ -290,6 +303,7 @@ workflow filterClinicalVariants {
         File final_recessive_tsv = finalFilteringTiersRecessive.filtered_tsv  # NEW 2/25/2025
         File final_dominant_tsv = finalFilteringTiersDominant.filtered_tsv  # NEW 2/10/2025
         File final_comphet_xlr_hom_var_mat_carrier_tsv = finalFilteringTiersCompHet.filtered_tsv  # NEW 2/10/2025
+        File final_inheritance_other_tsv = finalFilteringTiersInheritanceOther.filtered_tsv  # NEW 3/28/2025
 
         File final_merged_clinical_excel = flagFromConfirmationMaternalVCF.flagged_excel
     }

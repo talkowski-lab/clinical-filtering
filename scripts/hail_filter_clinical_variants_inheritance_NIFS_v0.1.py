@@ -56,7 +56,7 @@ parser.add_argument('--loeuf_v2_threshold', type=float, help='LOEUF v2 threshold
 parser.add_argument('--loeuf_v4_threshold', type=float, help='LOEUF v4 threshold')
 parser.add_argument('--build', type=str, help='Build version')
 parser.add_argument('--ad_alt_threshold', type=int, help='AD ALT threshold')
-parser.add_argument('--include_not_omim', type=str, help='Include not OMIM (True/False)')
+parser.add_argument('--include_not_genCC_OMIM', type=str, help='Include not GenCC_OMIM (True/False)')
 parser.add_argument('--spliceAI_threshold', type=float, help='SpliceAI threshold')
 parser.add_argument('--rec_gene_list_tsv', type=str, help='rec gene list TSV')
 parser.add_argument('--dom_gene_list_tsv', type=str, help='dom gene list TSV')
@@ -64,7 +64,7 @@ parser.add_argument('--dom_gene_list_tsv', type=str, help='dom gene list TSV')
 args = parser.parse_args()
 
 mem = int(np.floor(args.mem))
-include_not_omim = ast.literal_eval(args.include_not_omim.capitalize())
+include_not_genCC_OMIM = ast.literal_eval(args.include_not_genCC_OMIM.capitalize())
 
 vcf_file = args.vcf_file
 prefix = args.prefix
@@ -206,7 +206,7 @@ passes_alpha_missense_score = (hl.if_else(gene_phased_tm.vep.transcript_conseque
                 hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_rec_threshold)
 passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_missense_var))
 
-if include_not_omim:
+if include_not_genCC_OMIM:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
         (passes_ac_af_rec) &
         (passes_alpha_missense) &
@@ -281,7 +281,7 @@ passes_loeuf_v2 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v
 passes_loeuf_v4 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v4=='', 0, 
                         hl.float(gene_phased_tm.vep.transcript_consequences.LOEUF_v4))<=loeuf_v4_threshold)
 
-if include_not_omim:
+if include_not_genCC_OMIM:
     omim_dom = gene_phased_tm.filter_rows(
         (passes_ac_af_dom) &
         (passes_gnomad_af_dom) &

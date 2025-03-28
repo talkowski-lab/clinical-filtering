@@ -39,7 +39,7 @@ loeuf_v2_threshold = float(sys.argv[13])
 loeuf_v4_threshold = float(sys.argv[14])
 build = sys.argv[15]
 ad_alt_threshold = int(sys.argv[16])
-include_not_omim = ast.literal_eval(sys.argv[17].capitalize())
+include_not_genCC_OMIM = ast.literal_eval(sys.argv[17].capitalize())
 spliceAI_threshold = float(sys.argv[18])
 rec_gene_list_tsv = sys.argv[19]
 dom_gene_list_tsv = sys.argv[20]
@@ -161,7 +161,7 @@ passes_alpha_missense_score = (hl.if_else(gene_phased_tm.vep.transcript_conseque
                 hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_rec_threshold)
 passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_missense_var))
 
-if include_not_omim:
+if include_not_genCC_OMIM:
     omim_rec_gene_phased_tm = gene_phased_tm.filter_rows(
         (passes_alpha_missense) &
         (
@@ -232,7 +232,7 @@ passes_loeuf_v2 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v
 passes_loeuf_v4 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v4=='', 0, 
                         hl.float(gene_phased_tm.vep.transcript_consequences.LOEUF_v4))<=loeuf_v4_threshold)
 
-if include_not_omim:
+if include_not_genCC_OMIM:
     omim_dom = gene_phased_tm.filter_rows(
         (passes_gnomad_af_dom) &
         (passes_alpha_missense) &

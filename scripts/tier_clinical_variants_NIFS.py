@@ -1,3 +1,13 @@
+###
+# Created 3/5/2025 to implement new tiering.
+
+## CHANGE LOG:
+'''
+3/28/2025:
+- Add Strong/Definitive criteria for Tiers 1-3
+'''
+###
+
 import pandas as pd
 import argparse
 import os
@@ -43,9 +53,12 @@ is_clnrevstat_one_star_plus = (df['info.CLNREVSTAT'].isin(clnrevstat_one_star_pl
 is_clinvar_P_LP_one_star_plus = is_clinvar_P_LP & is_clnrevstat_one_star_plus
 is_not_clinvar_B_LB = (~df['info.CLNSIG'].astype(str).str.contains('enign'))
 
+# CRITERIA FOR TIERS 1-3: STRONG/DEFINITIVE
+has_strong_definitive_evidence = (df['vep.transcript_consequences.genCC_classification']=='Strong/Definitive')
+
 # Tier 3: Include VUS or Conflicting in ClinVar
 vus_or_conflicting_in_clinvar = (df['info.CLNSIG'].str.contains('Uncertain') | df['info.CLNSIG'].str.contains('Conflicting'))
-df.loc[passes_filters & 
+df.loc[passes_filters & has_strong_definitive_evidence &
        (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 3
 
 # CRITERIA FOR BOTH TIER 1 AND TIER 2
@@ -82,7 +95,8 @@ passes_tier_1_and_2 = (is_not_clinvar_B_LB &
                         ~vus_or_conflicting_in_clinvar &
                         passes_ncount_over_proband_DP &
                         passes_ECNT &
-                        passes_filters)
+                        passes_filters &
+                        has_strong_definitive_evidence)
 
 # Tier 2: ClinVar P/LP 1*+ OR HIGH/MODERATE IMPACT, not in SEGDUP, etc.
 df.loc[(is_clinvar_P_LP_one_star_plus | high_or_moderate_impact) &

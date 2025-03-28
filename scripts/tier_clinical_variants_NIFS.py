@@ -4,7 +4,8 @@
 ## CHANGE LOG:
 '''
 3/28/2025:
-- Add Strong/Definitive criteria for Tiers 1-3
+- add Strong/Definitive criteria for Tiers 1-3
+- add 'other' inheritance_type
 '''
 ###
 
@@ -91,6 +92,10 @@ if inheritance_type=='dominant':
     # Tier 2: Same as Tier 1
     tier_2_proband_GT = tier_1_proband_GT
 
+else:  # 'other' inheritance_type --> no alt allele/GT criteria
+    tier_1_proband_GT = (~df['proband_entry.GT'].isna())
+    tier_2_proband_GT = tier_1_proband_GT
+    
 passes_tier_1_and_2 = (is_not_clinvar_B_LB &
                         ~vus_or_conflicting_in_clinvar &
                         passes_ncount_over_proband_DP &

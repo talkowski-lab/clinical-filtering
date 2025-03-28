@@ -31,7 +31,7 @@ workflow filterClinicalVariants {
         String predicted_sex_chrom_ploidy  # XX or XY, NIFS-specific
 
         String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_NIFS_v0.1.py"
-        String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_omim_NIFS_v0.1.py"
+        String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_inheritance_NIFS_v0.1.py"
         String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py"
         String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/tier_clinical_variants_NIFS.py"
         String add_phenotypes_merge_and_prettify_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/add_phenotypes_merge_and_prettify_clinical_variants_NIFS.py"
@@ -67,7 +67,7 @@ workflow filterClinicalVariants {
         String genome_build='GRCh38'
 
         Boolean pass_filter=false
-        Boolean include_not_omim=false  # NIFS-specific
+        Boolean include_not_genCC_OMIM=false  # NIFS-specific
         Boolean include_all_maternal_carrier_variants=false
 
         File gene_phenotype_map  # NIFS-specific for now (2/27/2025)
@@ -87,7 +87,7 @@ workflow filterClinicalVariants {
                         'am_pathogenicity', 'spliceAI_score', 'gnomad_popmax_af', 'cohort_AC', 'cohort_AF', 'comphet_ID']
         
         RuntimeAttr? runtime_attr_filter
-        RuntimeAttr? runtime_attr_filter_omim
+        RuntimeAttr? runtime_attr_filter_inheritance
         RuntimeAttr? runtime_attr_filter_comphets
         RuntimeAttr? runtime_attr_filter_tiers
         RuntimeAttr? runtime_attr_merge_prettify
@@ -120,13 +120,13 @@ workflow filterClinicalVariants {
         runtime_attr_override=runtime_attr_filter
     }
 
-    call filterClinicalVariants.runClinicalFilteringOMIM as runClinicalFilteringOMIM {
+    call filterClinicalVariants.runClinicalFilteringInheritance as runClinicalFilteringInheritance {
         input:
         vcf_file=runClinicalFiltering.filtered_vcf,
         prefix=sample_id,
         ped_uri=makeDummyPed.ped_uri,
         helper_functions_script=helper_functions_script,
-        filter_clinical_variants_snv_indel_omim_script=filter_clinical_variants_snv_indel_omim_script,
+        filter_clinical_variants_snv_indel_inheritance_script=filter_clinical_variants_snv_indel_inheritance_script,
         hail_docker=hail_docker,
         spliceAI_threshold=spliceAI_threshold,
         ac_rec_threshold=ac_rec_threshold,
@@ -143,15 +143,15 @@ workflow filterClinicalVariants {
         loeuf_v2_threshold=loeuf_v2_threshold,
         loeuf_v4_threshold=loeuf_v4_threshold,
         genome_build=genome_build,
-        include_not_omim=include_not_omim,
+        include_not_genCC_OMIM=include_not_genCC_OMIM,
         rec_gene_list_tsv=rec_gene_list_tsv,
         dom_gene_list_tsv=dom_gene_list_tsv,
-        runtime_attr_override=runtime_attr_filter_omim
+        runtime_attr_override=runtime_attr_filter_inheritance
     }
 
     call filterClinicalVariants.filterCompHetsXLRHomVar as filterCompHetsXLRHomVar {
         input:
-            snv_indel_vcf=runClinicalFilteringOMIM.recessive_vcf,
+            snv_indel_vcf=runClinicalFilteringInheritance.recessive_vcf,
             clinvar_vcf=runClinicalFiltering.clinvar_vcf,
             sv_vcf='NA',
             prefix=sample_id,
@@ -197,9 +197,21 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_tiers
     }
 
+    call finalFilteringTiers as finalFilteringTiersClinVarOther {
+        input:
+            input_tsv=splitClinVarByInheritance.other_tsv,
+            ECNT_threshold=ECNT_threshold,
+            ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
+            GQ_threshold=GQ_threshold,
+            inheritance_type='other',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
     call finalFilteringTiers as finalFilteringTiersDominant {
         input:
-            input_tsv=runClinicalFilteringOMIM.dominant_tsv,
+            input_tsv=runClinicalFilteringInheritance.dominant_tsv,
             ECNT_threshold=ECNT_threshold,
             ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
             GQ_threshold=GQ_threshold,
@@ -211,7 +223,7 @@ workflow filterClinicalVariants {
 
     call finalFilteringTiers as finalFilteringTiersRecessive {
         input:
-            input_tsv=runClinicalFilteringOMIM.recessive_tsv,
+            input_tsv=runClinicalFilteringInheritance.recessive_tsv,
             ECNT_threshold=ECNT_threshold,
             ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
             GQ_threshold=GQ_threshold,
@@ -239,7 +251,8 @@ workflow filterClinicalVariants {
                 finalFilteringTiersRecessive.filtered_tsv,
                 finalFilteringTiersDominant.filtered_tsv,
                 finalFilteringTiersClinVarRecessive.filtered_tsv,
-                finalFilteringTiersClinVarDominant.filtered_tsv],
+                finalFilteringTiersClinVarDominant.filtered_tsv,
+                finalFilteringTiersClinVarOther.filtered_tsv],
             gene_phenotype_map=gene_phenotype_map,
             dup_exclude_cols=dup_exclude_cols,
             cols_for_varkey=cols_for_varkey,
@@ -268,10 +281,10 @@ workflow filterClinicalVariants {
         File clinvar_tsv = runClinicalFiltering.clinvar_tsv
         File clinvar_vcf = runClinicalFiltering.clinvar_vcf
         File clinvar_vcf_idx = runClinicalFiltering.clinvar_vcf_idx
-        File recessive_vcf = runClinicalFilteringOMIM.recessive_vcf
-        File recessive_vcf_idx = runClinicalFilteringOMIM.recessive_vcf_idx
-        File recessive_tsv = runClinicalFilteringOMIM.recessive_tsv  # NEW 1/17/2025
-        File dominant_tsv = runClinicalFilteringOMIM.dominant_tsv
+        File recessive_vcf = runClinicalFilteringInheritance.recessive_vcf
+        File recessive_vcf_idx = runClinicalFilteringInheritance.recessive_vcf_idx
+        File recessive_tsv = runClinicalFilteringInheritance.recessive_tsv  # NEW 1/17/2025
+        File dominant_tsv = runClinicalFilteringInheritance.dominant_tsv
         File comphet_xlr_hom_var_mat_carrier_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv
 
         File final_recessive_tsv = finalFilteringTiersRecessive.filtered_tsv  # NEW 2/25/2025
@@ -461,12 +474,16 @@ task splitByInheritance {
                 (df[inheritance_code_col].astype(str).str.contains('4'))]
     dom_df = df[(df[inheritance_code_col].astype(str).str.contains('1')) | 
                 (df[inheritance_code_col].astype(str).str.contains('3'))]
+    other_df = df[(df[inheritance_code_col].astype(str).str.contains('5')) | 
+                (df[inheritance_code_col].astype(str).str.contains('6'))]
 
     rec_df.loc[:, 'variant_category'] = rec_df['variant_category'] + '_recessive'
     dom_df.loc[:, 'variant_category'] = dom_df['variant_category'] + '_dominant'
+    other_df.loc[:, 'variant_category'] = other_df['variant_category'] + '_other'
 
     rec_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.recessive.tsv', sep='\t', index=False)
     dom_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.dominant.tsv', sep='\t', index=False)
+    other_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.other.tsv', sep='\t', index=False)
     EOF
     
     python3 split_by_inheritance.py -i ~{input_tsv} -c ~{inheritance_code_col} --file-ext ~{file_ext}
@@ -475,6 +492,7 @@ task splitByInheritance {
     output {
         File recessive_tsv = basename(input_tsv, file_ext) + '.recessive.tsv'
         File dominant_tsv = basename(input_tsv, file_ext) + '.dominant.tsv'
+        File other_tsv = basename(input_tsv, file_ext) + '.other.tsv'
     }
 }
 

@@ -23,7 +23,7 @@ workflow filterClinicalVariants {
 
         String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_clinical_helper_functions.py"       
         String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_v0.1.py"
-        String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_omim_v0.1.py"
+        String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_inheritance_v0.1.py"
 
         String hail_docker
         String sv_base_mini_docker
@@ -48,7 +48,7 @@ workflow filterClinicalVariants {
 
         Boolean include_all_maternal_carrier_variants=false
         Boolean pass_filter=false
-        Boolean include_not_omim=true  # NIFS-specific
+        Boolean include_not_genCC_OMIM=true  # NIFS-specific
 
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
         String dom_gene_list_tsv='NA' 
@@ -57,15 +57,15 @@ workflow filterClinicalVariants {
 
         # merge TSVs
         RuntimeAttr? runtime_attr_merge_clinvar
-        RuntimeAttr? runtime_attr_merge_omim_dom
-        RuntimeAttr? runtime_attr_merge_omim_rec
+        RuntimeAttr? runtime_attr_merge_inheritance_dom
+        RuntimeAttr? runtime_attr_merge_inheritance_rec
         RuntimeAttr? runtime_attr_merge_mat_carriers
         # merge VCFs
-        RuntimeAttr? runtime_attr_merge_omim_rec_vcfs
+        RuntimeAttr? runtime_attr_merge_inheritance_rec_vcfs
         RuntimeAttr? runtime_attr_merge_clinvar_vcfs
         # filtering steps
         RuntimeAttr? runtime_attr_filter
-        RuntimeAttr? runtime_attr_filter_omim
+        RuntimeAttr? runtime_attr_filter_inheritance
     }
 
     scatter (vcf_file in annot_vcf_files) {
@@ -86,12 +86,12 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter
         }
 
-        call filterClinicalVariants.runClinicalFilteringOMIM as runClinicalFilteringOMIM {
+        call filterClinicalVariants.runClinicalFilteringInheritance as runClinicalFilteringInheritance {
             input:
             vcf_file=runClinicalFiltering.filtered_vcf,
             ped_uri=ped_uri,
             helper_functions_script=helper_functions_script,
-            filter_clinical_variants_snv_indel_omim_script=filter_clinical_variants_snv_indel_omim_script,
+            filter_clinical_variants_snv_indel_inheritance_script=filter_clinical_variants_snv_indel_inheritance_script,
             hail_docker=hail_docker,
             spliceAI_threshold=spliceAI_threshold,
             ac_dom_threshold=ac_dom_threshold,
@@ -105,29 +105,29 @@ workflow filterClinicalVariants {
             loeuf_v2_threshold=loeuf_v2_threshold,
             loeuf_v4_threshold=loeuf_v4_threshold,
             genome_build=genome_build,
-            include_not_omim=include_not_omim,
+            include_not_genCC_OMIM=include_not_genCC_OMIM,
             rec_gene_list_tsv=rec_gene_list_tsv,
             dom_gene_list_tsv=dom_gene_list_tsv,
-            runtime_attr_override=runtime_attr_filter_omim
+            runtime_attr_override=runtime_attr_filter_inheritance
         }
     }   
 
     call helpers.mergeResultsPython as mergeClinVar {
         input:
-            tsvs=runClinicalFiltering.clinvar,
+            tsvs=runClinicalFiltering.clinvar_tsv,
             hail_docker=hail_docker,
-            input_size=size(runClinicalFiltering.clinvar, 'GB'),
+            input_size=size(runClinicalFiltering.clinvar_tsv, 'GB'),
             merged_filename=cohort_prefix+'_clinvar_variants.tsv.gz',
             runtime_attr_override=runtime_attr_merge_clinvar
     }
 
-    call helpers.mergeResultsPython as mergeOMIMDominant {
+    call helpers.mergeResultsPython as mergeInheritanceDominant {
         input:
-            tsvs=runClinicalFilteringOMIM.dominant,
+            tsvs=runClinicalFilteringInheritance.dominant_tsv,
             hail_docker=hail_docker,
-            input_size=size(runClinicalFilteringOMIM.dominant, 'GB'),
+            input_size=size(runClinicalFilteringInheritance.dominant_tsv, 'GB'),
             merged_filename=cohort_prefix+'_dominant.tsv.gz',
-            runtime_attr_override=runtime_attr_merge_omim_dom
+            runtime_attr_override=runtime_attr_merge_inheritance_dom
     }
 
     if (include_all_maternal_carrier_variants) {
@@ -141,22 +141,22 @@ workflow filterClinicalVariants {
         }
     }
 
-    call helpers.mergeResultsPython as mergeOMIMRecessive {
+    call helpers.mergeResultsPython as mergeInheritanceRecessive {
         input:
-            tsvs=runClinicalFilteringOMIM.recessive_tsv,
+            tsvs=runClinicalFilteringInheritance.recessive_tsv,
             hail_docker=hail_docker,
-            input_size=size(runClinicalFilteringOMIM.recessive_tsv, 'GB'),
+            input_size=size(runClinicalFilteringInheritance.recessive_tsv, 'GB'),
             merged_filename=cohort_prefix+'_recessive.tsv.gz',
-            runtime_attr_override=runtime_attr_merge_omim_rec
+            runtime_attr_override=runtime_attr_merge_inheritance_rec
     }
 
-    call mergeVCFs.mergeVCFs as mergeOMIMRecessiveVCFs {
+    call mergeVCFs.mergeVCFs as mergeInheritanceRecessiveVCFs {
         input:  
-            vcf_files=runClinicalFilteringOMIM.recessive_vcf,
+            vcf_files=runClinicalFilteringInheritance.recessive_vcf,
             sv_base_mini_docker=sv_base_mini_docker,
             cohort_prefix=cohort_prefix + '_recessive',
             sort_after_merge=sort_after_merge,
-            runtime_attr_override=runtime_attr_merge_omim_rec_vcfs
+            runtime_attr_override=runtime_attr_merge_inheritance_rec_vcfs
     }
 
     call mergeVCFs.mergeVCFs as mergeClinVarVCFs {
@@ -173,9 +173,9 @@ workflow filterClinicalVariants {
         File clinvar_tsv = mergeClinVar.merged_tsv
         File clinvar_vcf = mergeClinVarVCFs.merged_vcf_file
         File clinvar_vcf_idx = mergeClinVarVCFs.merged_vcf_idx
-        File recessive_vcf = mergeOMIMRecessiveVCFs.merged_vcf_file
-        File recessive_vcf_idx = mergeOMIMRecessiveVCFs.merged_vcf_idx
-        File recessive_tsv = mergeOMIMRecessive.merged_tsv
-        File dominant_tsv = mergeOMIMDominant.merged_tsv
+        File recessive_vcf = mergeInheritanceRecessiveVCFs.merged_vcf_file
+        File recessive_vcf_idx = mergeInheritanceRecessiveVCFs.merged_vcf_idx
+        File recessive_tsv = mergeInheritanceRecessive.merged_tsv
+        File dominant_tsv = mergeInheritanceDominant.merged_tsv
     }
 }

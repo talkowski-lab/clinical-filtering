@@ -41,6 +41,9 @@ all_cols = []
 
 for i, uri in enumerate(input_uris):
     df = pd.concat(pd.read_csv(uri, sep='\t', chunksize=100_000))
+    # Skip empty df
+    if df.empty:
+        continue
     # Strip quotes etc. from every column
     for col in df.columns:
         if df[col].dtype=='object':

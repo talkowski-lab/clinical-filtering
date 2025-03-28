@@ -6,10 +6,6 @@
 3/28/2025:
 - add Strong/Definitive criteria for Tiers 1-3
 - add 'other' inheritance_type
-3/31/2025:
-- add Tier 6, shift other Tiers
-4/11/2025:
-- add Tier 7, shift other Tiers (for Conflicting CLNSIGCONF P/LP status)
 '''
 ###
 
@@ -119,8 +115,8 @@ elif inheritance_type=='dominant':
     # Tier 2: Same as Tier 1
     tier_2_proband_GT = tier_1_proband_GT
 
-else:  # 'other' inheritance_type --> force into Tiers 3 and above
-    tier_1_proband_GT = (df['proband_entry.GT'].isna())  # Assumes proband_entry.GT is defined for all
+else:  # 'other' inheritance_type --> no alt allele/GT criteria
+    tier_1_proband_GT = (~df['proband_entry.GT'].isna())
     tier_2_proband_GT = tier_1_proband_GT
     
 passes_tier_1_and_2 = (is_not_clinvar_B_LB &

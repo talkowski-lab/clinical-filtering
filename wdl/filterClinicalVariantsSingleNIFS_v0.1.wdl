@@ -185,7 +185,7 @@ workflow filterClinicalVariants {
 
     call finalFilteringTiers as finalFilteringTiersInheritanceOther {
         input:
-            input_tsv=runClinicalFilteringInheritance.inheritance_other_tsv,
+            input_tsv=runClinicalFiltering.inheritance_other_tsv,
             ECNT_threshold=ECNT_threshold,
             ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
             GQ_threshold=GQ_threshold,
@@ -274,7 +274,8 @@ workflow filterClinicalVariants {
                 finalFilteringTiersDominant.filtered_tsv,
                 finalFilteringTiersClinVarRecessive.filtered_tsv,
                 finalFilteringTiersClinVarDominant.filtered_tsv,
-                finalFilteringTiersClinVarOther.filtered_tsv],
+                finalFilteringTiersClinVarOther.filtered_tsv,
+                finalFilteringTiersInheritanceOther.filtered_tsv],
             gene_phenotype_map=gene_phenotype_map,
             dup_exclude_cols=dup_exclude_cols,
             cols_for_varkey=cols_for_varkey,

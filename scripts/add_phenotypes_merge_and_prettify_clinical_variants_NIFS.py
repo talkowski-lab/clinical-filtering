@@ -38,6 +38,7 @@ def convert_to_uniform_format(num):
 
 merged_df = pd.DataFrame()
 all_cols = []
+n_inputs_to_merge = 0
 
 for i, uri in enumerate(input_uris):
     df = pd.concat(pd.read_csv(uri, sep='\t', chunksize=100_000))
@@ -69,6 +70,7 @@ for i, uri in enumerate(input_uris):
         df = df.drop_duplicates(all_cols_minus_variant_source)
 
     all_cols += df.columns.tolist()
+    n_inputs_to_merge += 1
     merged_df = pd.concat([merged_df, df])
 
 # Merge variant_category as comma separated string for various outputs
@@ -109,8 +111,9 @@ merged_df[['inheritance_mode', 'Tier']] = merged_df.apply(condense_output_catego
 merged_df = merged_df.drop(['output_category','output_category_list', 'Tier_List'], axis=1).copy()
 
 # Prioritize CompHet/XLR/hom_var/mat_carrier output because extra columns
+# NEW 3/28/2025: Use n_inputs_to_merge to account for empty inputs
 col_counts = pd.Series(all_cols).value_counts()
-extra_cols = col_counts[col_counts<len(input_uris)].index.tolist()
+extra_cols = col_counts[col_counts<n_inputs_to_merge].index.tolist()
 cols_for_duplicate = list(np.setdiff1d(merged_df.columns, extra_cols+exclude_cols))
 merged_df = merged_df.drop_duplicates(cols_for_duplicate)
 

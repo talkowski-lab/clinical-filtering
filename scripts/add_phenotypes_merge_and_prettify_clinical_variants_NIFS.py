@@ -81,9 +81,7 @@ for i, uri in enumerate(input_uris):
     df['VarKey'] = df[cols_for_varkey].astype(str).apply(':'.join, axis=1)
     # NEW 3/31/2025: run across all columns, not just select float_cols
     for col in df.columns:
-        # NEW 4/2/2025: skip boolean columns
-        if df[col].dtype!='bool':
-            df[col] = df[col].apply(convert_to_uniform_format)
+        df[col] = df[col].apply(convert_to_uniform_format)
     # NEW 3/12/2025: output_category for getting unique tiers below
     df['output_category'] = df.variant_category
     # Check if variant_category already has multiple values (e.g. CompHet/XLR/hom_var/mat_carrier output)
@@ -125,7 +123,7 @@ def condense_output_category_and_tier(row):
             tier_dict['dominant'].append(tier)
         if 'other' in output_category:
             tier_dict['other'].append(tier)
-                
+
     output_categories_to_return, tiers_to_return = [], []
 
     # Sanity check that there is only one unique tier (for recessives and dominants)

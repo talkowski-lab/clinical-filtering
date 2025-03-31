@@ -125,7 +125,7 @@ def condense_output_category_and_tier(row):
             tier_dict['dominant'].append(tier)
         if 'other' in output_category:
             tier_dict['other'].append(tier)
-
+                
     output_categories_to_return, tiers_to_return = [], []
 
     # Sanity check that there is only one unique tier (for recessives and dominants)

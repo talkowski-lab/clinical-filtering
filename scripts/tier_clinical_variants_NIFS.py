@@ -6,6 +6,8 @@
 3/28/2025:
 - add Strong/Definitive criteria for Tiers 1-3
 - add 'other' inheritance_type
+3/31/2025:
+- add Tier 6, shift other Tiers
 '''
 ###
 
@@ -40,12 +42,12 @@ for col in df.columns:
     if df[col].dtype=='object':
         df[col] = df[col].str.strip('\n').str.replace('\"','').str.replace('[','').str.replace(']','')
 
-# Tier 5: default/lowest tier
-df['Tier'] = 5
+# Tier 6: default/lowest tier
+df['Tier'] = 6
 
-# Tier 4: Only native NIFS filters
+# Tier 5: Only native NIFS filters
 passes_filters = (df.filters=='')
-df.loc[passes_filters, 'Tier'] = 4
+df.loc[passes_filters, 'Tier'] = 5
 
 # ClinVar criteria
 is_clinvar_P_LP = ((df['info.CLNSIG'].astype(str).str.contains('athogenic')) 
@@ -54,11 +56,17 @@ is_clnrevstat_one_star_plus = (df['info.CLNREVSTAT'].isin(clnrevstat_one_star_pl
 is_clinvar_P_LP_one_star_plus = is_clinvar_P_LP & is_clnrevstat_one_star_plus
 is_not_clinvar_B_LB = (~df['info.CLNSIG'].astype(str).str.contains('enign'))
 
+# CRITERIA FOR BOTH TIER 3 AND TIER 4
+vus_or_conflicting_in_clinvar = (df['info.CLNSIG'].str.contains('Uncertain') | df['info.CLNSIG'].str.contains('Conflicting'))
+
+# Tier 4: Include VUS or Conflicting in ClinVar
+df.loc[passes_filters &
+        (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 4
+
 # CRITERIA FOR TIERS 1-3: STRONG/DEFINITIVE
 has_strong_definitive_evidence = (df['vep.transcript_consequences.genCC_classification']=='Strong/Definitive')
 
-# Tier 3: Include VUS or Conflicting in ClinVar
-vus_or_conflicting_in_clinvar = (df['info.CLNSIG'].str.contains('Uncertain') | df['info.CLNSIG'].str.contains('Conflicting'))
+# Tier 3: Include VUS or Conflicting in ClinVar AND Strong/Definitive
 df.loc[passes_filters & has_strong_definitive_evidence &
        (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 3
 
@@ -92,8 +100,8 @@ elif inheritance_type=='dominant':
     # Tier 2: Same as Tier 1
     tier_2_proband_GT = tier_1_proband_GT
 
-else:  # 'other' inheritance_type --> no alt allele/GT criteria
-    tier_1_proband_GT = (~df['proband_entry.GT'].isna())
+else:  # 'other' inheritance_type --> force into Tiers 3 and above
+    tier_1_proband_GT = (df['proband_entry.GT'].isna())  # Assumes proband_entry.GT is defined for all
     tier_2_proband_GT = tier_1_proband_GT
     
 passes_tier_1_and_2 = (is_not_clinvar_B_LB &

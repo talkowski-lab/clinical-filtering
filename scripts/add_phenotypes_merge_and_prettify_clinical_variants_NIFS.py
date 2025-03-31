@@ -56,7 +56,8 @@ for i, uri in enumerate(input_uris):
     
     # Make unique VarKey
     df['VarKey'] = df[cols_for_varkey].astype(str).apply(':'.join, axis=1)
-    for col in float_cols:
+    # NEW 3/31/2025: run across all columns, not just select float_cols
+    for col in df.columns:
         df[col] = df[col].apply(convert_to_uniform_format)
     # NEW 3/12/2025: output_category for getting unique tiers below
     df['output_category'] = df.variant_category
@@ -99,7 +100,7 @@ def condense_output_category_and_tier(row):
             tier_dict['dominant'].append(tier)
         if 'other' in output_category:
             tier_dict['other'].append(tier)
-                
+
     output_categories_to_return, tiers_to_return = [], []
 
     # Sanity check that there is only one unique tier (for recessives and dominants)

@@ -69,6 +69,9 @@ for i, uri in enumerate(input_uris):
         all_cols_minus_variant_source = [col for col in df.columns if col!='variant_source'] 
         df = df.drop_duplicates(all_cols_minus_variant_source)
 
+    # NEW 3/31/2025: convert Tier to string
+    df['Tier'] = df.Tier.astype(str)
+
     all_cols += df.columns.tolist()
     n_inputs_to_merge += 1
     merged_df = pd.concat([merged_df, df])
@@ -82,8 +85,9 @@ merged_df['Tier_List'] = merged_df.VarKey.map(merged_df.groupby('VarKey').Tier.a
 
 recessive_substrings = ['recessive', 'XLR', 'maternal_carrier', 'hom_var']
 
+# NEW 3/31/2025: add 'other' category
 def condense_output_category_and_tier(row):
-    tier_dict = {'comphet': [], 'recessive': [], 'dominant': []}
+    tier_dict = {'comphet': [], 'recessive': [], 'dominant': [], 'other': []}
     
     # Iterate through the output categories and their corresponding tiers
     for output_category, tier in zip(row.output_category_list, row.Tier_List):
@@ -93,7 +97,9 @@ def condense_output_category_and_tier(row):
             tier_dict['recessive'].append(tier)
         if 'dominant' in output_category:
             tier_dict['dominant'].append(tier)
-    
+        if 'other' in output_category:
+            tier_dict['other'].append(tier)
+                
     output_categories_to_return, tiers_to_return = [], []
 
     # Sanity check that there is only one unique tier (for recessives and dominants)

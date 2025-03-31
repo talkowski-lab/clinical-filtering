@@ -86,7 +86,7 @@ if inheritance_type=='recessive':
     comphet_proband_het = (df['variant_category']=='comphet') & (df['proband_entry.GT'].isin(['0/1','0|1']))
     tier_2_proband_GT = (tier_1_proband_GT) | (comphet_proband_het) 
 
-if inheritance_type=='dominant':
+elif inheritance_type=='dominant':
     # Tier 1: Proband has alt allele
     tier_1_proband_GT = (df['proband_entry.GT'].str.contains('1'))
     # Tier 2: Same as Tier 1

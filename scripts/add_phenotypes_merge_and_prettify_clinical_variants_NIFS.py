@@ -21,7 +21,7 @@ input_uris = args.input_uris.split(',')
 exclude_cols = args.exclude_cols.split(',')    
 cols_for_varkey = args.cols_for_varkey.split(',')
 float_cols = args.float_cols.split(',')
-priority_cols = args.priority_cols.split(',')
+priority_cols = args.priority_cols.split(';')
 prefix = args.prefix
 pheno_uri = args.gene_phenotype_map
 cols_to_rename = pd.read_csv(args.cols_to_rename, sep='\t', header=None, names=['old_name', 'new_name'])\

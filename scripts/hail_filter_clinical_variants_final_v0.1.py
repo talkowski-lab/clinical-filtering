@@ -170,12 +170,12 @@ hl.export_vcf(clinvar_mt, prefix+'_clinvar_variants.vcf.bgz', metadata=header, t
 
 # NEW 1/17/2025: only include fetal sample in output (mother_entry will be filled)
 # export ClinVar TSV
-clinvar_tm.filter_cols(clinvar_tm.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_clinvar_variants.tsv.gz', delimiter='\t')
+clinvar_tm.entries().flatten().export(prefix+'_clinvar_variants.tsv.gz', delimiter='\t')
 
 # NEW 2/10/2025: added include_all_maternal_carrier_variants parameter
 # export GenCC_OMIM TSV
 if include_all_maternal_carrier_variants:
-    gencc_omim_tm.filter_cols(gencc_omim_tm.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_mat_carrier_variants.tsv.gz', delimiter='\t')
+    gencc_omim_tm.entries().flatten().export(prefix+'_mat_carrier_variants.tsv.gz', delimiter='\t')
 
 # export inheritance_other TSV
-inheritance_other_tm.filter_cols(inheritance_other_tm.proband.s.matches('_fetal')).entries().flatten().export(prefix+'_inheritance_other_variants.tsv.gz', delimiter='\t')
+inheritance_other_tm.entries().flatten().export(prefix+'_inheritance_other_variants.tsv.gz', delimiter='\t')

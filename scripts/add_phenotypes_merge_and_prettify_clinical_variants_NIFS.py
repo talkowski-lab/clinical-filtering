@@ -14,6 +14,7 @@ parser.add_argument('--exclude-cols', dest='exclude_cols', help='[DEPRECATED AS 
 parser.add_argument('--cols-for-varkey', dest='cols_for_varkey', help='Columns to use to create unique string for each row')
 parser.add_argument('--float-cols', dest='float_cols', help='[DEPRECATED AS OF 4/1/2025, TODO: REMOVE] Columns to convert from float to int to str for uniform formatting across inputs')
 parser.add_argument('--priority-cols', dest='priority_cols', help='Columns to prioritize/put at front of output')
+parser.add_argument('--cols-to-rename', dest='cols_to_rename', help='TSV with columns to rename after removing vep.transcript_consequences. and info. prefixes')
 
 args = parser.parse_args()
 input_uris = args.input_uris.split(',')
@@ -23,6 +24,8 @@ float_cols = args.float_cols.split(',')
 priority_cols = args.priority_cols.split(',')
 prefix = args.prefix
 pheno_uri = args.gene_phenotype_map
+cols_to_rename = pd.read_csv(args.cols_to_rename, sep='\t', header=None, names=['old_name', 'new_name'])\
+    .set_index('old_name').new_name.to_dict()  # dict mapping old name to new name
 
 # Fix float formatting before merging variant_category column
 def convert_to_uniform_format(num):
@@ -143,6 +146,18 @@ merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]
 
 # NEW 3/12/2025: Drop columns where all values are empty
 merged_df = merged_df.dropna(axis=1, how='all').copy()
+
+# NEW 4/2/2025: Remove all mother_entry columns that are identical to proband_entry
+mother_entry_cols = merged_df.columns[merged_df.columns.str.contains('mother_entry')]
+original_format_cols = mother_entry_cols.str.split('.').str[1]
+redundant_mother_entry_cols = []
+for format_col in original_format_cols:
+    if (merged_df[f"mother_entry.{format_col}"]==merged_df[f"proband_entry.{format_col}"]).all():
+        redundant_mother_entry_cols.append(f"mother_entry.{format_col}")
+merged_df = merged_df.drop(redundant_mother_entry_cols, axis=1)
+
+# NEW 4/2/2025: Rename columns based on cols_to_rename input
+merged_df = merged_df.rename(cols_to_rename, axis=1)
 
 # NEW 3/12/2025: Split HGVSc and HGVSp
 merged_df[['HGVSc_ENST', 'HGVSc']] = merged_df['HGVSc'].str.split(':', expand=True)

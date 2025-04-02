@@ -76,16 +76,18 @@ workflow filterClinicalVariants {
         String dom_gene_list_tsv='NA'
 
         # ALL NIFS-specific, for addPhenotypesMergeAndPrettifyOutputs task
-        Array[String] dup_exclude_cols=['info.CSQ','Tier','variant_source']
+        Array[String] dup_exclude_cols=['info.CSQ','Tier','variant_source']  # DEPRECATED 4/1/2025, TODO: REMOVE
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
-        Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']
+        Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']  # DEPRECATED 4/1/2025, TODO: REMOVE
         Array[String] priority_cols=['id', 'is_female', 'fam_id',
                         'Tier', 'inheritance_mode', 'CLNSIG', 'CLNREVSTAT','locus', 'alleles',  # disease_title_recessive, disease_title_dominant inserted here
                         'HGVSc_symbol', 'HGVSc', 'HGVSp', 'Consequence', 'filters', 
                         'CANONICAL', 'MANE_PLUS_CLINICAL', 'gene_list', 'maternal_carrier',
-                        'proband_entry.GT', 'proband_entry.AD', 'mother_entry.GT', 'mother_entry.AD', 
-                        'am_pathogenicity', 'spliceAI_score', 'gnomad_popmax_af', 'cohort_AC', 'cohort_AF', 'comphet_ID']
-        
+                        'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 
+                        'AlphaMissense', 'REVEL', 'spliceAI_score', 'gnomad_popmax_af', 'cohort_AC', 'cohort_AF', 'comphet_ID']
+        # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
+        Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense'}
+
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_inheritance
         RuntimeAttr? runtime_attr_filter_comphets
@@ -271,6 +273,7 @@ workflow filterClinicalVariants {
             cols_for_varkey=cols_for_varkey,
             float_cols=float_cols,
             priority_cols=priority_cols,
+            cols_to_rename=cols_to_rename,
             add_phenotypes_merge_and_prettify_script=add_phenotypes_merge_and_prettify_script,
             prefix=sample_id,
             hail_docker=hail_docker,
@@ -577,7 +580,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
         Array[String] cols_for_varkey  # Columns to use to create unique string for each row
         Array[String] float_cols  # Columns to convert from float to int to str for uniform formatting across inputs
         Array[String] priority_cols  # Columns to prioritize/put at front of output
-        
+        Map[String, String] cols_to_rename  # Columns to rename after removing 'vep.transcript_consequences.' and 'info.' prefixes
         String prefix
         String add_phenotypes_merge_and_prettify_script
         String hail_docker
@@ -618,7 +621,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
 
     python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -p ~{prefix} -g ~{gene_phenotype_map} \
         --exclude-cols "~{sep=',' dup_exclude_cols}" --cols-for-varkey "~{sep=',' cols_for_varkey}" \
-        --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=',' priority_cols}"
+        --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=',' priority_cols}" --cols-to-rename ~{write_map(cols_to_rename)}
     >>>
 
     output {

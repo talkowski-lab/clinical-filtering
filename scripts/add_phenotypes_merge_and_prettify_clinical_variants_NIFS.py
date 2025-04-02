@@ -10,11 +10,15 @@ parser = argparse.ArgumentParser(description='Parse arguments')
 parser.add_argument('-i', dest='input_uris', help='Comma-separated list of all input TSVs')
 parser.add_argument('-p', dest='prefix', help='Prefix for output filename')
 parser.add_argument('-g', dest='gene_phenotype_map', help='TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns')
+parser.add_argument('-s', dest='sample_id', help='Sample ID')
 parser.add_argument('--exclude-cols', dest='exclude_cols', help='[DEPRECATED AS OF 4/1/2025, TODO: REMOVE] Columns to exclude when calculating duplicate rows to drop')
 parser.add_argument('--cols-for-varkey', dest='cols_for_varkey', help='Columns to use to create unique string for each row')
 parser.add_argument('--float-cols', dest='float_cols', help='[DEPRECATED AS OF 4/1/2025, TODO: REMOVE] Columns to convert from float to int to str for uniform formatting across inputs')
 parser.add_argument('--priority-cols', dest='priority_cols', help='Columns to prioritize/put at front of output')
 parser.add_argument('--cols-to-rename', dest='cols_to_rename', help='TSV with columns to rename after removing vep.transcript_consequences. and info. prefixes')
+parser.add_argument('--ff-estimate', dest='xgenotyping_nomat_fetal_fraction_estimate', help='Fetal fraction estimate')
+parser.add_argument('--hpo-uri', dest='sample_hpo_uri', help='Path to file with HPO terms for each sample')
+parser.add_argument('--hpo-col', dest='hpo_col', help='Column in HPO file to annotate with')
 
 args = parser.parse_args()
 input_uris = args.input_uris.split(',')
@@ -26,6 +30,10 @@ prefix = args.prefix
 pheno_uri = args.gene_phenotype_map
 cols_to_rename = pd.read_csv(args.cols_to_rename, sep='\t', header=None, names=['old_name', 'new_name'])\
     .set_index('old_name').new_name.to_dict()  # dict mapping old name to new name
+xgenotyping_nomat_fetal_fraction_estimate = float(args.xgenotyping_nomat_fetal_fraction_estimate)
+sample_id = args.sample_id
+sample_hpo_uri = args.sample_hpo_uri
+hpo_col = args.hpo_col
 
 # Fix float formatting before merging variant_category column
 def convert_to_uniform_format(num):
@@ -177,8 +185,12 @@ pheno_df = pd.read_csv(pheno_uri, sep='\t')
 merged_df['disease_title_recessive'] = merged_df.SYMBOL.map(pheno_df.set_index('gene_symbol').disease_title_recessive.to_dict())
 merged_df['disease_title_dominant'] = merged_df.SYMBOL.map(pheno_df.set_index('gene_symbol').disease_title_dominant.to_dict())
 
-# Add new phenotype columns to priority columns, before HGVSc_symbol
-priority_cols = priority_cols[:priority_cols.index('HGVSc_symbol')] + ['disease_title_recessive', 'disease_title_dominant'] + priority_cols[priority_cols.index('HGVSc_symbol'):]
+# NEW 4/2/2025: Add sample fetal fraction
+merged_df['Fetal_Fraction'] = xgenotyping_nomat_fetal_fraction_estimate
+
+# NEW 4/2/2025: Add sample HPO terms
+hpo_df = pd.read_csv(sample_hpo_uri, sep='\t', dtype='str').set_index('Participant')
+merged_df['Case_Pheno'] = hpo_df.loc[sample_id, hpo_col]
 
 # Add 2 empty columns as spacers after priority columns
 merged_df = merged_df[priority_cols + remaining_cols].copy()

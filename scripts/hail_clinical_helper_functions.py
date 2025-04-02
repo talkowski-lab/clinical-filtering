@@ -63,4 +63,3 @@ def load_split_vep_consequences(vcf_uri, build):
     mt = mt.annotate_rows(vep=mt.vep.annotate(transcript_consequences=transcript_consequences_strs))
     mt = mt.annotate_rows(vep=mt.vep.select('transcript_consequences'))
     return mt
-

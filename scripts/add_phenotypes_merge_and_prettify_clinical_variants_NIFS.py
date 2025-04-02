@@ -10,9 +10,9 @@ parser = argparse.ArgumentParser(description='Parse arguments')
 parser.add_argument('-i', dest='input_uris', help='Comma-separated list of all input TSVs')
 parser.add_argument('-p', dest='prefix', help='Prefix for output filename')
 parser.add_argument('-g', dest='gene_phenotype_map', help='TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns')
-parser.add_argument('--exclude-cols', dest='exclude_cols', help='Columns to exclude when calculating duplicate rows to drop')
+parser.add_argument('--exclude-cols', dest='exclude_cols', help='[DEPRECATED AS OF 4/1/2025, TODO: REMOVE] Columns to exclude when calculating duplicate rows to drop')
 parser.add_argument('--cols-for-varkey', dest='cols_for_varkey', help='Columns to use to create unique string for each row')
-parser.add_argument('--float-cols', dest='float_cols', help='Columns to convert from float to int to str for uniform formatting across inputs')
+parser.add_argument('--float-cols', dest='float_cols', help='[DEPRECATED AS OF 4/1/2025, TODO: REMOVE] Columns to convert from float to int to str for uniform formatting across inputs')
 parser.add_argument('--priority-cols', dest='priority_cols', help='Columns to prioritize/put at front of output')
 
 args = parser.parse_args()
@@ -32,9 +32,15 @@ def convert_to_uniform_format(num):
     if pd.isna(num):
         return num
     try:
-        return str(int(float(num)))
+        as_float = float(num)
+        as_int = int(as_float)
+        # only convert to int and then to str if it matches the original float
+        if as_int==as_float:
+            return str(as_int)  
+        else:
+            return as_float
     except Exception as e:
-        return str(num)
+        return num
 
 merged_df = pd.DataFrame()
 all_cols = []
@@ -122,6 +128,8 @@ merged_df = merged_df.drop(['output_category','output_category_list', 'Tier_List
 col_counts = pd.Series(all_cols).value_counts()
 extra_cols = col_counts[col_counts<n_inputs_to_merge].index.tolist()
 cols_for_duplicate = list(np.setdiff1d(merged_df.columns, extra_cols+exclude_cols))
+# NEW 4/1/2025: Simplify dropping duplicates by just using select columns
+cols_for_duplicate = ['Tier', 'inheritance_mode', 'VarKey']
 merged_df = merged_df.drop_duplicates(cols_for_duplicate)
 
 # Drop duplicate columns from tiering script

@@ -75,7 +75,9 @@ for i, uri in enumerate(input_uris):
     df['VarKey'] = df[cols_for_varkey].astype(str).apply(':'.join, axis=1)
     # NEW 3/31/2025: run across all columns, not just select float_cols
     for col in df.columns:
-        df[col] = df[col].apply(convert_to_uniform_format)
+        # NEW 4/2/2025: skip boolean columns
+        if df[col].dtype!='bool':
+            df[col] = df[col].apply(convert_to_uniform_format)
     # NEW 3/12/2025: output_category for getting unique tiers below
     df['output_category'] = df.variant_category
     # Check if variant_category already has multiple values (e.g. CompHet/XLR/hom_var/mat_carrier output)

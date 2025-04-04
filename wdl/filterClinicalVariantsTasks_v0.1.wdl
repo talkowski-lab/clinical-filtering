@@ -63,14 +63,14 @@ task runClinicalFiltering {
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py
         curl ~{filter_clinical_variants_snv_indel_script} > filter_vcf.py
-        python3 filter_vcf.py ~{vcf_file} ~{prefix} ~{cpu_cores} ~{memory} \
-            ~{ped_uri} ~{af_threshold} ~{ac_threshold} ~{gnomad_af_threshold} ~{genome_build} ~{pass_filter} \
-            ~{include_all_maternal_carrier_variants}
+        python3 filter_vcf.py --vcf_file ~{vcf_file} --prefix ~{prefix} --cores ~{cpu_cores} --mem ~{memory} \
+            --ped_uri ~{ped_uri} --af_threshold ~{af_threshold} --ac_threshold ~{ac_threshold} \
+            --gnomad_af_threshold ~{gnomad_af_threshold} --build ~{genome_build} --pass_filter ~{pass_filter} \
+            --include_all_maternal_carrier_variants ~{include_all_maternal_carrier_variants}
     }
 
     output {
         File mat_carrier_tsv = if include_all_maternal_carrier_variants then prefix + '_mat_carrier_variants.tsv.gz' else empty_file
-        File inheritance_other_tsv = prefix + '_inheritance_other_variants.tsv.gz'
         File clinvar_tsv = prefix + '_clinvar_variants.tsv.gz'
         File clinvar_vcf = prefix + '_clinvar_variants.vcf.bgz'
         File clinvar_vcf_idx = prefix + '_clinvar_variants.vcf.bgz.tbi'
@@ -155,6 +155,7 @@ task runClinicalFilteringInheritance {
         File recessive_vcf_idx = prefix + '_recessive.vcf.bgz.tbi'
         File dominant_tsv = prefix + '_dominant.tsv.gz'
         File recessive_tsv = prefix + '_recessive.tsv.gz'  # NEW 1/17/2025
+        File inheritance_other_tsv = prefix + '_inheritance_other_variants.tsv.gz'
     }
 }
 

@@ -22,7 +22,7 @@ import numpy as np
 import ast
 
 # Create the parser
-parser = argparse.ArgumentParser(description='Process some genomic data.')
+parser = argparse.ArgumentParser(description='Further filtering clinical variants using inheritance code and other filters.')
 
 # Add arguments
 parser.add_argument('--vcf_file', type=str, help='Input VCF file')
@@ -140,6 +140,19 @@ fails_spliceAI_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.sp
 is_moderate_or_high_impact = (hl.array(['HIGH','MODERATE']).contains(gene_phased_tm.vep.transcript_consequences.IMPACT))
 gene_phased_tm = gene_phased_tm.filter_rows((is_splice_var_only | 
                                              (has_splice_var & ~is_moderate_or_high_impact)) & fails_spliceAI_score, keep=False)
+
+# NEW 3/28/2025: Output 'other' inheritance as separate output
+# Output 1: Other inheritance
+inheritance_other_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
+# Filter by inheritance codes 5 and 6 for 'other'
+inheritance_other_tm = inheritance_other_tm.filter_rows((inheritance_other_tm.vep.transcript_consequences.inheritance_code.matches('5')) | 
+                                                        (inheritance_other_tm.vep.transcript_consequences.inheritance_code.matches('6')))
+# Filter by variant in trio
+inheritance_other_tm = inheritance_other_tm.filter_entries((inheritance_other_tm.proband_entry.GT.is_non_ref()) | 
+                                   (inheritance_other_tm.mother_entry.GT.is_non_ref()) |
+                                   (inheritance_other_tm.father_entry.GT.is_non_ref()))
+inheritance_other_tm = inheritance_other_tm.annotate_rows(variant_category='inheritance_other')
+inheritance_other_tm = filter_mt(inheritance_other_tm)
 
 # Output 2: Recessive
 # Filter by gene list(s)
@@ -310,3 +323,6 @@ dom_mt.entries().flatten().export(prefix+'_dominant.tsv.gz', delimiter='\t')
 
 # export Recessive TSV
 rec_mt.entries().flatten().export(prefix+'_recessive.tsv.gz', delimiter='\t')
+
+# export inheritance_other TSV
+inheritance_other_tm.entries().flatten().export(prefix+'_inheritance_other_variants.tsv.gz', delimiter='\t')

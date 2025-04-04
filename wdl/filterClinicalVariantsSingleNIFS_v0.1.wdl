@@ -175,7 +175,7 @@ workflow filterClinicalVariants {
 
     call finalFilteringTiers as finalFilteringTiersInheritanceOther {
         input:
-            input_tsv=runClinicalFiltering.inheritance_other_tsv,
+            input_tsv=runClinicalFilteringInheritance.inheritance_other_tsv,
             ECNT_threshold=ECNT_threshold,
             ncount_over_proband_DP_threshold=ncount_over_proband_DP_threshold,
             GQ_threshold=GQ_threshold,

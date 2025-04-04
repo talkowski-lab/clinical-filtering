@@ -62,6 +62,7 @@ workflow filterClinicalVariants {
         RuntimeAttr? runtime_attr_merge_clinvar
         RuntimeAttr? runtime_attr_merge_inheritance_dom
         RuntimeAttr? runtime_attr_merge_inheritance_rec
+        RuntimeAttr? runtime_attr_merge_inheritance_other
         RuntimeAttr? runtime_attr_merge_mat_carriers
         # merge VCFs
         RuntimeAttr? runtime_attr_merge_inheritance_rec_vcfs
@@ -127,15 +128,6 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_merge_clinvar
     }
 
-    call helpers.mergeResultsPython as mergeInheritanceDominant {
-        input:
-            tsvs=runClinicalFilteringInheritance.dominant_tsv,
-            hail_docker=hail_docker,
-            input_size=size(runClinicalFilteringInheritance.dominant_tsv, 'GB'),
-            merged_filename=cohort_prefix+'_dominant.tsv.gz',
-            runtime_attr_override=runtime_attr_merge_inheritance_dom
-    }
-
     if (include_all_maternal_carrier_variants) {
         call helpers.mergeResultsPython as mergeMaternalCarriers {
             input:
@@ -147,6 +139,16 @@ workflow filterClinicalVariants {
         }
     }
 
+    # Merge TSVs
+    call helpers.mergeResultsPython as mergeInheritanceDominant {
+        input:
+            tsvs=runClinicalFilteringInheritance.dominant_tsv,
+            hail_docker=hail_docker,
+            input_size=size(runClinicalFilteringInheritance.dominant_tsv, 'GB'),
+            merged_filename=cohort_prefix+'_dominant.tsv.gz',
+            runtime_attr_override=runtime_attr_merge_inheritance_dom
+    }
+
     call helpers.mergeResultsPython as mergeInheritanceRecessive {
         input:
             tsvs=runClinicalFilteringInheritance.recessive_tsv,
@@ -156,6 +158,16 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_merge_inheritance_rec
     }
 
+    call helpers.mergeResultsPython as mergeInheritanceOther {
+        input:
+            tsvs=runClinicalFilteringInheritance.inheritance_other_tsv,
+            hail_docker=hail_docker,
+            input_size=size(runClinicalFilteringInheritance.inheritance_other_tsv, 'GB'),
+            merged_filename=cohort_prefix+'_inheritance_other_variants.tsv.gz',
+            runtime_attr_override=runtime_attr_merge_inheritance_other
+    }
+
+    # Merge VCFs
     call mergeVCFs.mergeVCFs as mergeInheritanceRecessiveVCFs {
         input:  
             vcf_files=runClinicalFilteringInheritance.recessive_vcf,
@@ -183,5 +195,6 @@ workflow filterClinicalVariants {
         File recessive_vcf_idx = mergeInheritanceRecessiveVCFs.merged_vcf_idx
         File recessive_tsv = mergeInheritanceRecessive.merged_tsv
         File dominant_tsv = mergeInheritanceDominant.merged_tsv
+        File inheritance_other_tsv = mergeInheritanceOther.merged_tsv
     }
 }

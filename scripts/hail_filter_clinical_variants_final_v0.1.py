@@ -17,17 +17,40 @@ import sys
 import ast
 import os
 
-vcf_file = sys.argv[1]
-prefix = sys.argv[2]
-cores = sys.argv[3]  # string
-mem = int(np.floor(float(sys.argv[4])))
-ped_uri = sys.argv[5]
-af_threshold = float(sys.argv[6])
-ac_threshold = int(sys.argv[7])
-gnomad_af_threshold = float(sys.argv[8])
-build = sys.argv[9]
-pass_filter = ast.literal_eval(sys.argv[10].capitalize())
-include_all_maternal_carrier_variants = ast.literal_eval(sys.argv[11].capitalize())
+import argparse
+import numpy as np
+import ast
+
+# Set up argument parser
+parser = argparse.ArgumentParser(description="First-pass filtering clinical variants.")
+
+# Define the arguments
+parser.add_argument('vcf_file', type=str, help="The VCF file path")
+parser.add_argument('prefix', type=str, help="Prefix for output files")
+parser.add_argument('cores', type=str, help="Number of cores to use (as string)")
+parser.add_argument('mem', type=int, help="Memory in GB (as integer, floor converted from float)")
+parser.add_argument('ped_uri', type=str, help="URI to the PED file")
+parser.add_argument('af_threshold', type=float, help="Allele frequency threshold")
+parser.add_argument('ac_threshold', type=int, help="Allele count threshold")
+parser.add_argument('gnomad_af_threshold', type=float, help="gnomAD allele frequency threshold")
+parser.add_argument('build', type=str, help="Genome build (e.g., GRCh38, hg19)")
+parser.add_argument('pass_filter', type=str, help="Whether to apply the PASS filter (True/False)")
+parser.add_argument('include_all_maternal_carrier_variants', type=str, help="Include all maternal carrier variants (True/False)")
+
+# Parse arguments
+args = parser.parse_args()
+
+vcf_file = args.vcf_file
+prefix = args.prefix
+cores = args.cores
+mem = np.floor(float(args.mem))  # Ensure it's floored as a float
+ped_uri = args.ped_uri
+af_threshold = args.af_threshold
+ac_threshold = args.ac_threshold
+gnomad_af_threshold = args.gnomad_af_threshold
+build = args.build
+pass_filter = ast.literal_eval(args.pass_filter.capitalize())
+include_all_maternal_carrier_variants = ast.literal_eval(args.include_all_maternal_carrier_variants.capitalize())
 
 hl.init(min_block_size=128, 
         spark_conf={"spark.executor.cores": cores, 
@@ -99,18 +122,6 @@ all_errors, per_fam, per_sample, per_variant = hl.mendel_errors(mt['GT'], pedigr
 all_errors_mt = all_errors.key_by().to_matrix_table(row_key=['locus','alleles'], col_key=['s'], row_fields=['fam_id'])
 phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_key, phased_tm.col_key].mendel_code)
 
-# NEW 3/28/2025: Output 'other' inheritance as separate output
-inheritance_other_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
-# Filter by inheritance codes 5 and 6 for 'other'
-inheritance_other_tm = inheritance_other_tm.filter_rows((inheritance_other_tm.vep.transcript_consequences.inheritance_code.matches('5')) | 
-                                                        (inheritance_other_tm.vep.transcript_consequences.inheritance_code.matches('6')))
-# Filter by variant in trio
-inheritance_other_tm = inheritance_other_tm.filter_entries((inheritance_other_tm.proband_entry.GT.is_non_ref()) | 
-                                   (inheritance_other_tm.mother_entry.GT.is_non_ref()) |
-                                   (inheritance_other_tm.father_entry.GT.is_non_ref()))
-inheritance_other_tm = inheritance_other_tm.annotate_rows(variant_category='inheritance_other')
-inheritance_other_tm = filter_mt(inheritance_other_tm)
-
 # Output 1: grab ClinVar only
 # NEW 3/5/2025: Fix string matching for ClinVar P/LP output to exclude 'Conflicting'
 clinvar_mt = mt.filter_rows(hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), mt.info.CLNSIG))
@@ -176,6 +187,3 @@ clinvar_tm.entries().flatten().export(prefix+'_clinvar_variants.tsv.gz', delimit
 # export GenCC_OMIM TSV
 if include_all_maternal_carrier_variants:
     gencc_omim_tm.entries().flatten().export(prefix+'_mat_carrier_variants.tsv.gz', delimiter='\t')
-
-# export inheritance_other TSV
-inheritance_other_tm.entries().flatten().export(prefix+'_inheritance_other_variants.tsv.gz', delimiter='\t')

@@ -25,17 +25,17 @@ import ast
 parser = argparse.ArgumentParser(description="First-pass filtering clinical variants.")
 
 # Define the arguments
-parser.add_argument('vcf_file', type=str, help="The VCF file path")
-parser.add_argument('prefix', type=str, help="Prefix for output files")
-parser.add_argument('cores', type=str, help="Number of cores to use (as string)")
-parser.add_argument('mem', type=float, help="Memory in GB (as integer, floor converted from float)")
-parser.add_argument('ped_uri', type=str, help="URI to the PED file")
-parser.add_argument('af_threshold', type=float, help="Allele frequency threshold")
-parser.add_argument('ac_threshold', type=int, help="Allele count threshold")
-parser.add_argument('gnomad_af_threshold', type=float, help="gnomAD allele frequency threshold")
-parser.add_argument('build', type=str, help="Genome build (e.g., GRCh38, hg19)")
-parser.add_argument('pass_filter', type=str, help="Whether to apply the PASS filter (True/False)")
-parser.add_argument('include_all_maternal_carrier_variants', type=str, help="Include all maternal carrier variants (True/False)")
+parser.add_argument('--vcf_file', type=str, help="The VCF file path")
+parser.add_argument('--prefix', type=str, help="Prefix for output files")
+parser.add_argument('--cores', type=str, help="Number of cores to use (as string)")
+parser.add_argument('--mem', type=float, help="Memory in GB (as integer, floor converted from float)")
+parser.add_argument('--ped_uri', type=str, help="URI to the PED file")
+parser.add_argument('--af_threshold', type=float, help="Allele frequency threshold")
+parser.add_argument('--ac_threshold', type=int, help="Allele count threshold")
+parser.add_argument('--gnomad_af_threshold', type=float, help="gnomAD allele frequency threshold")
+parser.add_argument('--build', type=str, help="Genome build (e.g., GRCh38, hg19)")
+parser.add_argument('--pass_filter', type=str, help="Whether to apply the PASS filter (True/False)")
+parser.add_argument('--include_all_maternal_carrier_variants', type=str, help="Include all maternal carrier variants (True/False)")
 
 # Parse arguments
 args = parser.parse_args()

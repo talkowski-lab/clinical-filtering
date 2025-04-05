@@ -83,7 +83,7 @@ task runClinicalFilteringInheritance {
         File vcf_file
         File ped_uri
 
-        String? prefix  # optional, for if vcf_file has a very long filename (e.g. NIFS)
+        String prefix='NA'  # optional, for if vcf_file has a very long filename (e.g. NIFS)
         String helper_functions_script
         String filter_clinical_variants_snv_indel_inheritance_script
         String hail_docker
@@ -138,12 +138,12 @@ task runClinicalFilteringInheritance {
     }
 
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = select_first([prefix, basename(vcf_file, file_ext)])
+    String new_prefix = if prefix!='NA' then prefix else basename(vcf_file, file_ext)
 
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py
         curl ~{filter_clinical_variants_snv_indel_inheritance_script} > filter_vcf.py
-        python3 filter_vcf.py --vcf_file ~{vcf_file} --prefix ~{prefix} --cores ~{cpu_cores} --mem ~{memory} --ped_uri ~{ped_uri} \
+        python3 filter_vcf.py --vcf_file ~{vcf_file} --prefix ~{new_prefix} --cores ~{cpu_cores} --mem ~{memory} --ped_uri ~{ped_uri} \
             --ac_rec_threshold ~{ac_rec_threshold} --af_rec_threshold ~{af_rec_threshold} --ac_dom_threshold ~{ac_dom_threshold} --af_dom_threshold ~{af_dom_threshold} \
             --am_rec_threshold ~{am_rec_threshold} --am_dom_threshold ~{am_dom_threshold} --mpc_rec_threshold ~{mpc_rec_threshold} --mpc_dom_threshold ~{mpc_dom_threshold} \
             --gnomad_af_rec_threshold ~{gnomad_af_rec_threshold} --gnomad_af_dom_threshold ~{gnomad_af_dom_threshold} --loeuf_v2_threshold ~{loeuf_v2_threshold} --loeuf_v4_threshold ~{loeuf_v4_threshold} \

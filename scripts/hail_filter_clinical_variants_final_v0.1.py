@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser(description="First-pass filtering clinical vari
 parser.add_argument('vcf_file', type=str, help="The VCF file path")
 parser.add_argument('prefix', type=str, help="Prefix for output files")
 parser.add_argument('cores', type=str, help="Number of cores to use (as string)")
-parser.add_argument('mem', type=int, help="Memory in GB (as integer, floor converted from float)")
+parser.add_argument('mem', type=float, help="Memory in GB (as integer, floor converted from float)")
 parser.add_argument('ped_uri', type=str, help="URI to the PED file")
 parser.add_argument('af_threshold', type=float, help="Allele frequency threshold")
 parser.add_argument('ac_threshold', type=int, help="Allele count threshold")

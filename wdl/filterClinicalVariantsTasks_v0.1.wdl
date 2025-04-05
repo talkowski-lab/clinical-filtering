@@ -15,7 +15,7 @@ task runClinicalFiltering {
         File ped_uri
         File empty_file
 
-        String? prefix  # optional, for if vcf_file has a very long filename (e.g. NIFS)
+        String prefix='NA'  # optional, for if vcf_file has a very long filename (e.g. NIFS)
         String helper_functions_script
         String filter_clinical_variants_snv_indel_script
         String hail_docker
@@ -58,12 +58,12 @@ task runClinicalFiltering {
     }
 
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = select_first([prefix, basename(vcf_file, file_ext)])
+    String new_prefix = if prefix!='NA' then prefix else basename(vcf_file, file_ext)
 
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py
         curl ~{filter_clinical_variants_snv_indel_script} > filter_vcf.py
-        python3 filter_vcf.py --vcf_file ~{vcf_file} --prefix ~{prefix} --cores ~{cpu_cores} --mem ~{memory} \
+        python3 filter_vcf.py --vcf_file ~{vcf_file} --prefix ~{new_prefix} --cores ~{cpu_cores} --mem ~{memory} \
             --ped_uri ~{ped_uri} --af_threshold ~{af_threshold} --ac_threshold ~{ac_threshold} \
             --gnomad_af_threshold ~{gnomad_af_threshold} --build ~{genome_build} --pass_filter ~{pass_filter} \
             --include_all_maternal_carrier_variants ~{include_all_maternal_carrier_variants}

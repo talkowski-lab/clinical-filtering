@@ -206,15 +206,13 @@ workflow filterClinicalVariants {
     }
 
     # Merge VCFs
-    if (merge_first_pass_filtered_vcfs) {
-        call mergeVCFs.mergeVCFs as mergeFirstPassFilteredVCFs {
-            input:
-                vcf_files=runClinicalFiltering.filtered_vcf,
-                sv_base_mini_docker=sv_base_mini_docker,
-                cohort_prefix=cohort_prefix + '_first_pass_filtered',
-                sort_after_merge=sort_after_merge,
-                runtime_attr_override=runtime_attr_merge_filtered_vcfs
-        }     
+    call mergeVCFs.mergeVCFs as mergePassFirstFilteredVCFs {
+        input:
+            vcf_files=runClinicalFiltering.filtered_vcf,
+            sv_base_mini_docker=sv_base_mini_docker,
+            cohort_prefix=cohort_prefix + '_first_pass_filtered',
+            sort_after_merge=sort_after_merge,
+            runtime_attr_override=runtime_attr_merge_filtered_vcfs
     }
 
     call mergeVCFs.mergeVCFs as mergeInheritanceRecessiveVCFs {
@@ -363,8 +361,8 @@ workflow filterClinicalVariants {
         File clinvar_tsv = mergeClinVar.merged_tsv
         File clinvar_vcf = mergeClinVarVCFs.merged_vcf_file
         File clinvar_vcf_idx = mergeClinVarVCFs.merged_vcf_idx
-        File first_pass_filtered_vcf = select_first([mergeFirstPassFilteredVCFs.merged_vcf_file, empty_file])
-        File first_pass_filtered_vcf_idx = select_first([mergeFirstPassFilteredVCFs.merged_vcf_idx, empty_file])
+        File first_pass_filtered_vcf = mergePassFirstFilteredVCFs.merged_vcf_file
+        File first_pass_filtered_vcf_idx = mergePassFirstFilteredVCFs.merged_vcf_idx
         File recessive_vcf = mergeInheritanceRecessiveVCFs.merged_vcf_file
         File recessive_vcf_idx = mergeInheritanceRecessiveVCFs.merged_vcf_idx
         File recessive_tsv = mergeInheritanceRecessive.merged_tsv

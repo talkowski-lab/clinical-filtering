@@ -34,7 +34,7 @@ ncount_over_proband_DP_threshold = float(args.ncount_over_proband_DP_threshold)
 GQ_threshold = int(args.GQ_threshold)
 inheritance_type = args.type
 
-clnrevstat_one_star_plus = ["criteria_provided,_multiple_submitters,_no_conflicts", "criteria_provided,_single_submitter", "practice_guideline", "reviewed_by_expert_panel"]
+clnrevstat_one_star_plus = ["criteria_provided,_multiple_submitters,_no_conflicts", "criteria_provided,_conflicting_classifications", "criteria_provided,_single_submitter", "practice_guideline", "reviewed_by_expert_panel"]
 
 df = pd.read_csv(uri, sep='\t')
 # Strip quotes etc. from every column

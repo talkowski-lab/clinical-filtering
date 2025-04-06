@@ -129,8 +129,8 @@ clinvar_CLNSIG_P_LP_no_conflicting_mt_cond = hl.any(lambda x: (x.matches('athoge
 clinvar_CLNSIGCONF_P_LP_mt_cond = hl.any(lambda x: x.matches('athogenic'), mt.info.CLNSIGCONF)
 clinvar_mt = mt.filter_rows(clinvar_CLNSIG_P_LP_no_conflicting_mt_cond | clinvar_CLNSIGCONF_P_LP_mt_cond)
 
-clinvar_CLNSIG_P_LP_no_conflicting_tm_cond = hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), tm.info.CLNSIG)
-clinvar_CLNSIGCONF_P_LP_tm_cond = hl.any(lambda x: x.matches('athogenic'), tm.info.CLNSIGCONF)
+clinvar_CLNSIG_P_LP_no_conflicting_tm_cond = hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), phased_tm.info.CLNSIG)
+clinvar_CLNSIGCONF_P_LP_tm_cond = hl.any(lambda x: x.matches('athogenic'), phased_tm.info.CLNSIGCONF)
 clinvar_tm = phased_tm.filter_rows(clinvar_CLNSIG_P_LP_no_conflicting_tm_cond | clinvar_CLNSIGCONF_P_LP_tm_cond)
 
 # NEW 1/9/2025: Keep 2*+ ClinVar only

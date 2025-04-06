@@ -124,8 +124,15 @@ phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_k
 
 # Output 1: grab ClinVar only
 # NEW 3/5/2025: Fix string matching for ClinVar P/LP output to exclude 'Conflicting'
-clinvar_mt = mt.filter_rows(hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), mt.info.CLNSIG))
-clinvar_tm = phased_tm.filter_rows(hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), phased_tm.info.CLNSIG))
+# NEW 4/5/2025: TEST including ClinVar 1*+ P/LP in CLNSIGCONF
+clinvar_CLNSIG_P_LP_no_conflicting_mt_cond = hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), mt.info.CLNSIG)
+clinvar_CLNSIGCONF_P_LP_mt_cond = hl.any(lambda x: x.matches('athogenic'), mt.info.CLNSIGCONF)
+clinvar_mt = mt.filter_rows(clinvar_CLNSIG_P_LP_no_conflicting_mt_cond | clinvar_CLNSIGCONF_P_LP_mt_cond)
+
+clinvar_CLNSIG_P_LP_no_conflicting_tm_cond = hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), tm.info.CLNSIG)
+clinvar_CLNSIGCONF_P_LP_tm_cond = hl.any(lambda x: x.matches('athogenic'), tm.info.CLNSIGCONF)
+clinvar_tm = phased_tm.filter_rows(clinvar_CLNSIG_P_LP_no_conflicting_tm_cond | clinvar_CLNSIGCONF_P_LP_tm_cond)
+
 # NEW 1/9/2025: Keep 2*+ ClinVar only
 clnrevstat_one_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided','_multiple_submitters','_no_conflicts'], ['criteria_provided','_single_submitter']]
 clnrevstat_two_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided', '_multiple_submitters', '_no_conflicts']]

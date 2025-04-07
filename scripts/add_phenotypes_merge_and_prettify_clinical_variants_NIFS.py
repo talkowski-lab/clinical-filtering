@@ -192,7 +192,10 @@ merged_df['Fetal_Fraction'] = xgenotyping_nomat_fetal_fraction_estimate
 
 # NEW 4/2/2025: Add sample HPO terms
 hpo_df = pd.read_csv(sample_hpo_uri, sep='\t', dtype='str').set_index('Participant')
-merged_df['Case_Pheno'] = hpo_df.loc[sample_id, hpo_col]
+if sample_id in hpo_df.index:
+    merged_df['Case_Pheno'] = hpo_df.loc[sample_id, hpo_col]
+else:
+    merged_df['Case_Pheno'] = np.nan
 
 # Add 2 empty columns as spacers after priority columns
 merged_df = merged_df[priority_cols + remaining_cols].copy()

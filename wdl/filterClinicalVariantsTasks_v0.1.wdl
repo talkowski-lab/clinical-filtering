@@ -15,7 +15,7 @@ task runClinicalFiltering {
         File ped_uri
         File empty_file
 
-        String? prefix  # optional, for if vcf_file has a very long filename (e.g. NIFS)
+        String prefix='NA'  # optional, for if vcf_file has a very long filename (e.g. NIFS)
         String helper_functions_script
         String filter_clinical_variants_snv_indel_script
         String hail_docker
@@ -58,23 +58,23 @@ task runClinicalFiltering {
     }
 
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = select_first([prefix, basename(vcf_file, file_ext)])
+    String new_prefix = if prefix!='NA' then prefix else basename(vcf_file, file_ext)
 
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py
         curl ~{filter_clinical_variants_snv_indel_script} > filter_vcf.py
-        python3 filter_vcf.py ~{vcf_file} ~{prefix} ~{cpu_cores} ~{memory} \
-            ~{ped_uri} ~{af_threshold} ~{ac_threshold} ~{gnomad_af_threshold} ~{genome_build} ~{pass_filter} \
-            ~{include_all_maternal_carrier_variants}
+        python3 filter_vcf.py --vcf_file ~{vcf_file} --prefix ~{new_prefix} --cores ~{cpu_cores} --mem ~{memory} \
+            --ped_uri ~{ped_uri} --af_threshold ~{af_threshold} --ac_threshold ~{ac_threshold} \
+            --gnomad_af_threshold ~{gnomad_af_threshold} --build ~{genome_build} --pass_filter ~{pass_filter} \
+            --include_all_maternal_carrier_variants ~{include_all_maternal_carrier_variants}
     }
 
     output {
-        File mat_carrier_tsv = if include_all_maternal_carrier_variants then prefix + '_mat_carrier_variants.tsv.gz' else empty_file
-        File inheritance_other_tsv = prefix + '_inheritance_other_variants.tsv.gz'
-        File clinvar_tsv = prefix + '_clinvar_variants.tsv.gz'
-        File clinvar_vcf = prefix + '_clinvar_variants.vcf.bgz'
-        File clinvar_vcf_idx = prefix + '_clinvar_variants.vcf.bgz.tbi'
-        File filtered_vcf = prefix + '_clinical.vcf.bgz'
+        File mat_carrier_tsv = if include_all_maternal_carrier_variants then new_prefix + '_mat_carrier_variants.tsv.gz' else empty_file
+        File clinvar_tsv = new_prefix + '_clinvar_variants.tsv.gz'
+        File clinvar_vcf = new_prefix + '_clinvar_variants.vcf.bgz'
+        File clinvar_vcf_idx = new_prefix + '_clinvar_variants.vcf.bgz.tbi'
+        File filtered_vcf = new_prefix + '_clinical.vcf.bgz'
     }
 }
 
@@ -83,7 +83,7 @@ task runClinicalFilteringInheritance {
         File vcf_file
         File ped_uri
 
-        String? prefix  # optional, for if vcf_file has a very long filename (e.g. NIFS)
+        String prefix='NA'  # optional, for if vcf_file has a very long filename (e.g. NIFS)
         String helper_functions_script
         String filter_clinical_variants_snv_indel_inheritance_script
         String hail_docker
@@ -138,12 +138,12 @@ task runClinicalFilteringInheritance {
     }
 
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = select_first([prefix, basename(vcf_file, file_ext)])
+    String new_prefix = if prefix!='NA' then prefix else basename(vcf_file, file_ext)
 
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py
         curl ~{filter_clinical_variants_snv_indel_inheritance_script} > filter_vcf.py
-        python3 filter_vcf.py --vcf_file ~{vcf_file} --prefix ~{prefix} --cores ~{cpu_cores} --mem ~{memory} --ped_uri ~{ped_uri} \
+        python3 filter_vcf.py --vcf_file ~{vcf_file} --prefix ~{new_prefix} --cores ~{cpu_cores} --mem ~{memory} --ped_uri ~{ped_uri} \
             --ac_rec_threshold ~{ac_rec_threshold} --af_rec_threshold ~{af_rec_threshold} --ac_dom_threshold ~{ac_dom_threshold} --af_dom_threshold ~{af_dom_threshold} \
             --am_rec_threshold ~{am_rec_threshold} --am_dom_threshold ~{am_dom_threshold} --mpc_rec_threshold ~{mpc_rec_threshold} --mpc_dom_threshold ~{mpc_dom_threshold} \
             --gnomad_af_rec_threshold ~{gnomad_af_rec_threshold} --gnomad_af_dom_threshold ~{gnomad_af_dom_threshold} --loeuf_v2_threshold ~{loeuf_v2_threshold} --loeuf_v4_threshold ~{loeuf_v4_threshold} \
@@ -151,10 +151,11 @@ task runClinicalFilteringInheritance {
     }
 
     output {
-        File recessive_vcf = prefix + '_recessive.vcf.bgz'
-        File recessive_vcf_idx = prefix + '_recessive.vcf.bgz.tbi'
-        File dominant_tsv = prefix + '_dominant.tsv.gz'
-        File recessive_tsv = prefix + '_recessive.tsv.gz'  # NEW 1/17/2025
+        File recessive_vcf = new_prefix + '_recessive.vcf.bgz'
+        File recessive_vcf_idx = new_prefix + '_recessive.vcf.bgz.tbi'
+        File dominant_tsv = new_prefix + '_dominant.tsv.gz'
+        File recessive_tsv = new_prefix + '_recessive.tsv.gz'  # NEW 1/17/2025
+        File inheritance_other_tsv = new_prefix + '_inheritance_other_variants.tsv.gz'
     }
 }
 

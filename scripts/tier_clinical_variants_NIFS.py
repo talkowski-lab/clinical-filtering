@@ -84,10 +84,22 @@ high_or_moderate_impact = df['vep.transcript_consequences.IMPACT'].isin(['HIGH',
 
 # GT CRITERIA
 if inheritance_type=='recessive':
-    # Treat XLR like AD (proband has alt allele)
-    xlr_proband_GT = ((df.locus.str.contains('X')) & 
-                      (df['proband_entry.GT'].str.contains('1')))
     ar_proband_GT = df['proband_entry.GT'].isin(['1/1','1|1'])
+    # Males: treat XLR like AD (proband has alt allele) except for PARs (treat like AR)
+    xlr_proband_cond_male_par = ((~df.is_female) & 
+                                (df.locus.str.contains('X')) &
+                                (~df.in_non_par) & 
+                                (ar_proband_GT))
+    xlr_proband_cond_male_non_par = ((~df.is_female) & 
+                                (df.locus.str.contains('X')) &
+                                (df.in_non_par) & 
+                                (df['proband_entry.GT'].str.contains('1')))
+    # Females: treat XLR like AR
+    xlr_proband_cond_female = ((df.is_female) & 
+                               (df.locus.str.contains('X')) &
+                               (ar_proband_GT))
+    xlr_proband_GT = ((xlr_proband_cond_male_par | xlr_proband_cond_male_non_par) |
+                      (xlr_proband_cond_female))
     # Tier 1: Only HomVar (except XLR)
     tier_1_proband_GT = (ar_proband_GT) | (xlr_proband_GT)
     # Tier 2: Same as Tier 1 but allow 0/1 for comphets

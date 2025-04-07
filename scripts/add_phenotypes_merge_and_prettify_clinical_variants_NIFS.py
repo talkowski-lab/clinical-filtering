@@ -192,6 +192,7 @@ merged_df['Fetal_Fraction'] = xgenotyping_nomat_fetal_fraction_estimate
 
 # NEW 4/2/2025: Add sample HPO terms
 hpo_df = pd.read_csv(sample_hpo_uri, sep='\t', dtype='str').set_index('Participant')
+# Check that sample is in HPO file
 if sample_id in hpo_df.index:
     merged_df['Case_Pheno'] = hpo_df.loc[sample_id, hpo_col]
 else:

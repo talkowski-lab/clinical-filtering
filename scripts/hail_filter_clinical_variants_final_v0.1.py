@@ -5,6 +5,8 @@
 
 ## CHANGE LOG:
 '''
+4/7/2025:
+- add in_non_par annotation
 '''
 ###
 
@@ -63,6 +65,9 @@ hl.init(min_block_size=128,
 
 mt = load_split_vep_consequences(vcf_file, build)
 header = hl.get_vcf_metadata(vcf_file)
+
+# NEW 4/7/2025: add in_non_par annotation
+mt = mt.annotate_rows(in_non_par=~(mt.locus.in_autosome_or_par()))
 
 # NEW 1/15/2025: moved all_csqs and gnomad_popmax_af annotations to INFO field
 gnomad_fields = [x for x in list(mt.vep.transcript_consequences[0]) if 'gnomAD' in x]

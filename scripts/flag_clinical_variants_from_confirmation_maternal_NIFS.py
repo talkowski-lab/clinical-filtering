@@ -35,6 +35,8 @@ merged_ht = merged_ht.annotate(hail_locus=hl.parse_locus(merged_ht.locus),
 # confirmation_vcf
 if confirmation_vcf_uri!='NA' and confirmation_sample_id!='NA':
     conf_mt = hl.import_vcf(confirmation_vcf_uri, force_bgz=True, array_elements_required=False)
+    # Split multiallelic sites
+    conf_mt = hl.split_multi_hts(conf_mt)
     # Annotate with temporary confirmation_sample_id
     merged_ht = merged_ht.annotate(confirmation_sample_id=confirmation_sample_id)
     # Annotate GT from confirmation_vcf
@@ -45,6 +47,8 @@ if confirmation_vcf_uri!='NA' and confirmation_sample_id!='NA':
 # maternal_vcf
 if maternal_vcf_uri!='NA' and maternal_sample_id!='NA':
     mat_mt = hl.import_vcf(maternal_vcf_uri, force_bgz=True, array_elements_required=False)
+    # Split multiallelic sites
+    mat_mt = hl.split_multi_hts(mat_mt)
     # Annotate with temporary maternal_sample_id
     merged_ht = merged_ht.annotate(maternal_sample_id=maternal_sample_id)
     # Annotate GT from maternal_vcf

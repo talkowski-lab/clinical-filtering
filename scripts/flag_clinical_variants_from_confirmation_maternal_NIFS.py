@@ -35,24 +35,23 @@ merged_ht = merged_ht.annotate(hail_locus=hl.parse_locus(merged_ht.locus),
 # confirmation_vcf
 if confirmation_vcf_uri!='NA' and confirmation_sample_id!='NA':
     conf_mt = hl.import_vcf(confirmation_vcf_uri, force_bgz=True, array_elements_required=False)
-    # Split multiallelic sites
-    conf_mt = hl.split_multi_hts(conf_mt)
     # Annotate with temporary confirmation_sample_id
     merged_ht = merged_ht.annotate(confirmation_sample_id=confirmation_sample_id)
-    # Annotate GT from confirmation_vcf
-    merged_ht = merged_ht.annotate(confirmation_GT=hl.str(conf_mt[merged_ht.key, merged_ht.confirmation_sample_id].GT))
+    # Annotate GT and filters from confirmation_vcf
+    merged_ht = merged_ht.annotate(confirmation_GT=hl.str(conf_mt[merged_ht.key, merged_ht.confirmation_sample_id].GT),
+                                   confirmation_filter=conf_mt.rows()[merged_ht.key].filters)
     # Flag if GT matches 
     merged_ht = merged_ht.annotate(GT_matches_confirmation_vcf=hl.parse_call(merged_ht.confirmation_GT)==hl.parse_call(merged_ht['proband_entry.GT']))
 
 # maternal_vcf
 if maternal_vcf_uri!='NA' and maternal_sample_id!='NA':
     mat_mt = hl.import_vcf(maternal_vcf_uri, force_bgz=True, array_elements_required=False)
-    # Split multiallelic sites
-    mat_mt = hl.split_multi_hts(mat_mt)
     # Annotate with temporary maternal_sample_id
     merged_ht = merged_ht.annotate(maternal_sample_id=maternal_sample_id)
-    # Annotate GT from maternal_vcf
-    merged_ht = merged_ht.annotate(maternal_GT=hl.str(mat_mt[merged_ht.key, merged_ht.maternal_sample_id].GT))
+    # Annotate GT and filters from maternal_vcf
+    merged_ht = merged_ht.annotate(maternal_GT=hl.str(mat_mt[merged_ht.key, merged_ht.maternal_sample_id].GT),
+                                    maternal_filter=mat_mt.rows()[merged_ht.key].filters
+    )
     # Flag if GT matches 
     merged_ht = merged_ht.annotate(GT_matches_maternal_vcf=hl.parse_call(merged_ht.maternal_GT)==hl.parse_call(merged_ht['mother_entry.GT']))
 

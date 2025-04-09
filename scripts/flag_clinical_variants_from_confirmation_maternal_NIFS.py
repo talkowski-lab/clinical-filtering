@@ -39,7 +39,7 @@ if confirmation_vcf_uri!='NA' and confirmation_sample_id!='NA':
     merged_ht = merged_ht.annotate(confirmation_sample_id=confirmation_sample_id)
     # Annotate GT and filters from confirmation_vcf
     merged_ht = merged_ht.annotate(confirmation_GT=hl.str(conf_mt[merged_ht.key, merged_ht.confirmation_sample_id].GT),
-                                   confirmation_filter=conf_mt.rows()[merged_ht.key].filters)
+                                   confirmation_filter=hl.str(conf_mt.rows()[merged_ht.key].filters))
     # Flag if GT matches 
     merged_ht = merged_ht.annotate(GT_matches_confirmation_vcf=hl.parse_call(merged_ht.confirmation_GT)==hl.parse_call(merged_ht['proband_entry.GT']))
 
@@ -50,8 +50,7 @@ if maternal_vcf_uri!='NA' and maternal_sample_id!='NA':
     merged_ht = merged_ht.annotate(maternal_sample_id=maternal_sample_id)
     # Annotate GT and filters from maternal_vcf
     merged_ht = merged_ht.annotate(maternal_GT=hl.str(mat_mt[merged_ht.key, merged_ht.maternal_sample_id].GT),
-                                    maternal_filter=mat_mt.rows()[merged_ht.key].filters
-    )
+                                    maternal_filter=hl.str(mat_mt.rows()[merged_ht.key].filters))
     # Flag if GT matches 
     merged_ht = merged_ht.annotate(GT_matches_maternal_vcf=hl.parse_call(merged_ht.maternal_GT)==hl.parse_call(merged_ht['mother_entry.GT']))
 

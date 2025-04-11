@@ -48,7 +48,7 @@ workflow filterClinicalVariants {
         Int ac_threshold=10  
         Int ac_rec_threshold=10  
         Int ac_dom_threshold=3  
-        Float af_rec_threshold=0.1  
+        Float af_rec_threshold=0.05  
         Float af_dom_threshold=0.05  
 
         Float gnomad_af_threshold=0.05

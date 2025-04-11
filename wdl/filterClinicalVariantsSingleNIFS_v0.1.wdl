@@ -643,7 +643,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
     python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -p ~{prefix} -g ~{gene_phenotype_map} \
         -s ~{sample_id} --ff-estimate ~{xgenotyping_nomat_fetal_fraction_estimate} \
         --sample-hpo-uri ~{sample_hpo_uri} --gene-hpo-uri ~{gene_hpo_uri} --hpo-id-to-name-uri ~{hpo_id_to_name_uri} \
-        --hpo-id-col ~{hpo_id_col} --phenotype-col "~{phenotype_col}" \
+        --hpo-id-col "~{hpo_id_col}" --phenotype-col "~{phenotype_col}" \
         --exclude-cols "~{sep=',' dup_exclude_cols}" --cols-for-varkey "~{sep=',' cols_for_varkey}" \
         --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=';' priority_cols}" \
         --cols-to-rename ~{write_map(cols_to_rename)}

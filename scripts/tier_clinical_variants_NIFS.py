@@ -74,7 +74,7 @@ df.loc[passes_filters & has_strong_definitive_evidence &
 # NEW 4/11/2025: Tier 3: Only include Conflicting with at least one P/LP in CLNSIGCONF
 conflicting_P_LP = (df['info.CLNSIGCONF'].astype(str).str.contains('athogenic'))
 df.loc[passes_filters & has_strong_definitive_evidence &
-       (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus) & conflicting_P_LP, 'Tier'] = 3
+       ((vus_or_conflicting_in_clinvar & conflicting_P_LP) | is_clinvar_P_LP_one_star_plus), 'Tier'] = 3
 
 # CRITERIA FOR BOTH TIER 1 AND TIER 2
 ncount_over_proband_DP = df['info.NCount'] / df['proband_entry.DP']

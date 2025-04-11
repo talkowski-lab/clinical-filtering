@@ -87,7 +87,7 @@ workflow filterClinicalVariants {
         Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']  # DEPRECATED 4/1/2025, TODO: REMOVE
         Array[String] priority_cols=['id', 'is_female', 'fam_id', 'Fetal_Fraction',
                         'Tier', 'inheritance_mode', 'CLNSIG', 'CLNREVSTAT','locus', 'alleles',  # disease_title_recessive, disease_title_dominant inserted here
-                        'Case_Pheno', 'disease_title_recessive', 'disease_title_dominant',
+                        'Case_Pheno', 'Pheno_Overlapping_HPO_IDs', 'disease_title_recessive', 'disease_title_dominant',
                         'HGVSc_symbol', 'HGVSc', 'HGVSp', 'Consequence', 'filters', 
                         'CANONICAL', 'MANE_PLUS_CLINICAL', 'gene_list', 'maternal_carrier',
                         'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 

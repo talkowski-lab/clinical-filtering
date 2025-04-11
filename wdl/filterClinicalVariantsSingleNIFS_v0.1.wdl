@@ -75,6 +75,7 @@ workflow filterClinicalVariants {
         File carrier_gene_list  # NIFS-specific, TODO: not actually NIFS-specific anymore?
         File sample_hpo_uri  # NIFS-specific
         File gene_hpo_uri  # NIFS-specific
+        File hpo_id_to_name_uri  # NIFS-specific
         String hpo_id_col = 'Anomalies with HPO codes (Screening)'
         String phenotype_col = 'Anomalies on PG03 at Eligibility Screening'
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
@@ -286,6 +287,7 @@ workflow filterClinicalVariants {
             xgenotyping_nomat_fetal_fraction_estimate=xgenotyping_nomat_fetal_fraction_estimate,
             sample_hpo_uri=sample_hpo_uri,
             gene_hpo_uri=gene_hpo_uri,
+            hpo_id_to_name_uri=hpo_id_to_name_uri,
             hpo_id_col=hpo_id_col,
             phenotype_col=phenotype_col,
             hail_docker=hail_docker,
@@ -589,6 +591,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
         File gene_phenotype_map  # From GenCC, expects TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns
         File sample_hpo_uri  # Maps samples to HPO IDs and phenotypes
         File gene_hpo_uri  # Maps genes to HPO IDs
+        File hpo_id_to_name_uri  # Maps HPO IDs to HPO names
 
         Array[String] dup_exclude_cols  # Columns to exclude when calculating duplicate rows to drop
         Array[String] cols_for_varkey  # Columns to use to create unique string for each row
@@ -639,7 +642,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
 
     python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -p ~{prefix} -g ~{gene_phenotype_map} \
         -s ~{sample_id} --ff-estimate ~{xgenotyping_nomat_fetal_fraction_estimate} \
-        --sample-hpo-uri ~{sample_hpo_uri} --gene-hpo-uri ~{gene_hpo_uri} \
+        --sample-hpo-uri ~{sample_hpo_uri} --gene-hpo-uri ~{gene_hpo_uri} --hpo-id-to-name-uri ~{hpo_id_to_name_uri} \
         --hpo-id-col ~{hpo_id_col} --phenotype-col "~{phenotype_col}" \
         --exclude-cols "~{sep=',' dup_exclude_cols}" --cols-for-varkey "~{sep=',' cols_for_varkey}" \
         --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=';' priority_cols}" \

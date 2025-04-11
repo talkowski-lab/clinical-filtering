@@ -85,13 +85,14 @@ workflow filterClinicalVariants {
         Array[String] dup_exclude_cols=['info.CSQ','Tier','variant_source']  # DEPRECATED 4/1/2025, TODO: REMOVE
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
         Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']  # DEPRECATED 4/1/2025, TODO: REMOVE
-        Array[String] priority_cols=['id', 'is_female', 'fam_id', 'Fetal_Fraction',
-                        'Tier', 'inheritance_mode', 'CLNSIG', 'CLNREVSTAT','locus', 'alleles',  # disease_title_recessive, disease_title_dominant inserted here
-                        'Case_Pheno', 'Pheno_Overlapping_HPO_IDs', 'disease_title_recessive', 'disease_title_dominant',
-                        'HGVSc_symbol', 'HGVSc', 'HGVSp', 'Consequence', 'filters', 
-                        'CANONICAL', 'MANE_PLUS_CLINICAL', 'gene_list', 'maternal_carrier',
-                        'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 
-                        'AlphaMissense', 'REVEL', 'spliceAI_score', 'gnomad_popmax_af', 'cohort_AC', 'cohort_AF', 'comphet_ID']
+        Array[String] priority_cols=['fam_id', 'is_female', 'Fetal_Fraction', 'Case_Pheno',
+                        'locus', 'alleles', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
+                        'Pheno_Overlapping_HPO_IDs', 'disease_title_recessive', 'disease_title_dominant',
+                         'CLNSIG', 'CLNREVSTAT', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
+                        'CANONICAL', 'MANE_PLUS_CLINICAL', 'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 
+                        'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 'comphet_ID',
+                        'gene_list', 'cohort_AC', 'cohort_AF', 'cohort_AN', 'gnomad_popmax_af', 'GAF',
+                        'maternal_carrier', 'filters']
         # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
         Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense'}
 

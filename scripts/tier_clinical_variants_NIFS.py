@@ -72,7 +72,8 @@ has_strong_definitive_evidence = (df['vep.transcript_consequences.genCC_classifi
 df.loc[passes_filters & has_strong_definitive_evidence &
        (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 4
 # NEW 4/11/2025: Tier 3: Only include Conflicting with at least one P/LP in CLNSIGCONF
-conflicting_P_LP = (df['info.CLNSIGCONF'].astype(str).str.contains('athogenic'))
+conflicting_P_LP = ((df['info.CLNSIGCONF'].astype(str).str.contains('athogenic')) |
+                    (df['info.CLNSIGCONF'].isna()))
 df.loc[passes_filters & has_strong_definitive_evidence &
        ((vus_or_conflicting_in_clinvar & conflicting_P_LP) | is_clinvar_P_LP_one_star_plus), 'Tier'] = 3
 

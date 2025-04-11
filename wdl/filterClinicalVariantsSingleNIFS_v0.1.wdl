@@ -74,7 +74,9 @@ workflow filterClinicalVariants {
         File gene_phenotype_map  # NIFS-specific for now (2/27/2025)
         File carrier_gene_list  # NIFS-specific, TODO: not actually NIFS-specific anymore?
         File sample_hpo_uri  # NIFS-specific
-        String hpo_col = 'Anomalies on PG03 at Eligibility Screening'
+        File gene_hpo_uri  # NIFS-specific
+        String hpo_id_col = 'Anomalies with HPO codes (Screening)'
+        String phenotype_col = 'Anomalies on PG03 at Eligibility Screening'
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
         String dom_gene_list_tsv='NA'
 
@@ -283,7 +285,9 @@ workflow filterClinicalVariants {
             sample_id=sample_id,
             xgenotyping_nomat_fetal_fraction_estimate=xgenotyping_nomat_fetal_fraction_estimate,
             sample_hpo_uri=sample_hpo_uri,
-            hpo_col=hpo_col,
+            gene_hpo_uri=gene_hpo_uri,
+            hpo_id_col=hpo_id_col,
+            phenotype_col=phenotype_col,
             hail_docker=hail_docker,
             runtime_attr_override=runtime_attr_merge_prettify
     }
@@ -582,8 +586,9 @@ task finalFilteringTiers {
 task addPhenotypesMergeAndPrettifyOutputs {
     input {
         Array[File] input_uris
-        File gene_phenotype_map  # Expects TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns
-        File sample_hpo_uri
+        File gene_phenotype_map  # From GenCC, expects TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns
+        File sample_hpo_uri  # Maps samples to HPO IDs and phenotypes
+        File gene_hpo_uri  # Maps genes to HPO IDs
 
         Array[String] dup_exclude_cols  # Columns to exclude when calculating duplicate rows to drop
         Array[String] cols_for_varkey  # Columns to use to create unique string for each row
@@ -592,7 +597,8 @@ task addPhenotypesMergeAndPrettifyOutputs {
         Map[String, String] cols_to_rename  # Columns to rename after removing 'vep.transcript_consequences.' and 'info.' prefixes
         String prefix
         String sample_id
-        String hpo_col
+        String hpo_id_col
+        String phenotype_col
         Float xgenotyping_nomat_fetal_fraction_estimate
 
         String add_phenotypes_merge_and_prettify_script
@@ -627,15 +633,17 @@ task addPhenotypesMergeAndPrettifyOutputs {
         docker: hail_docker
         bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
     }
-
     command <<<
     set -eou pipefail
     curl ~{add_phenotypes_merge_and_prettify_script} > add_phenotypes_merge_and_prettify.py
 
     python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -p ~{prefix} -g ~{gene_phenotype_map} \
-        -s ~{sample_id} --ff-estimate ~{xgenotyping_nomat_fetal_fraction_estimate} --hpo-uri ~{sample_hpo_uri} --hpo-col "~{hpo_col}" \
+        -s ~{sample_id} --ff-estimate ~{xgenotyping_nomat_fetal_fraction_estimate} \
+        --sample-hpo-uri ~{sample_hpo_uri} --gene-hpo-uri ~{gene_hpo_uri} \
+        --hpo-id-col ~{hpo_id_col} --phenotype-col "~{phenotype_col}" \
         --exclude-cols "~{sep=',' dup_exclude_cols}" --cols-for-varkey "~{sep=',' cols_for_varkey}" \
-        --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=';' priority_cols}" --cols-to-rename ~{write_map(cols_to_rename)}
+        --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=';' priority_cols}" \
+        --cols-to-rename ~{write_map(cols_to_rename)}
     >>>
 
     output {

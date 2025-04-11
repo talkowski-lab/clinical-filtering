@@ -42,9 +42,8 @@ if confirmation_vcf_uri!='NA' and confirmation_sample_id!='NA':
                                    confirmation_filter=conf_mt.rows()[merged_ht.key].filters)
     # Flag if GT matches 
     merged_ht = merged_ht.annotate(
-        GT_matches_confirmation_vcf = hl.parse_call(
-            merged_ht.confirmation_GT.replace('0|1', '0/1').replace('1|0', '0/1')
-        ) == hl.parse_call(merged_ht['proband_entry.GT'])
+        GT_matches_confirmation_vcf = merged_ht.confirmation_GT.replace('0\|1', '0/1').replace('1\|0', '0/1')
+         == merged_ht['proband_entry.GT']
     )
 
 # maternal_vcf
@@ -57,11 +56,11 @@ if maternal_vcf_uri!='NA' and maternal_sample_id!='NA':
                                     maternal_filter=mat_mt.rows()[merged_ht.key].filters)
     # Flag if GT matches 
     merged_ht = merged_ht.annotate(
-        GT_matches_maternal_vcf = hl.parse_call(
-            merged_ht.maternal_GT.replace('0|1', '0/1').replace('1|0', '0/1')
-        ) == hl.parse_call(merged_ht['mother_entry.GT'])
+        GT_matches_maternal_vcf = 
+        merged_ht.maternal_GT.replace('0\|1', '0/1').replace('1\|0', '0/1')
+         == merged_ht['mother_entry.GT']
     )
-
+    
 # Drop temporary fields before export
 tmp_fields = ['confirmation_sample_id','maternal_sample_id','hail_locus','hail_alleles']
 fields_to_drop = np.intersect1d(tmp_fields, list(merged_ht.row)).tolist()

@@ -151,7 +151,7 @@ inheritance_other_tm = filter_mt(inheritance_other_tm)
 clinvar_mt = mt.filter_rows(hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), mt.info.CLNSIG))
 clinvar_tm = phased_tm.filter_rows(hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), phased_tm.info.CLNSIG))
 # NEW 1/9/2025: Keep 2*+ ClinVar only
-clnrevstat_one_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided','_multiple_submitters','_no_conflicts'], ['criteria_provided','_single_submitter']]
+clnrevstat_one_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided','_multiple_submitters','_no_conflicts'], ['criteria_provided','_conflicting_classifications'], ['criteria_provided','_single_submitter']]
 clnrevstat_two_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided', '_multiple_submitters', '_no_conflicts']]
 # NEW 2/27/2025: Revert to all ClinVar P/LP, NOT 2*+ only
 # NEW 3/10/2025: Change to ClinVar 1*+ P/LP

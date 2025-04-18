@@ -88,7 +88,7 @@ workflow filterClinicalVariants {
         Array[String] priority_cols=['fam_id', 'is_female', 'Fetal_Fraction', 'Case_Pheno',
                         'locus', 'alleles', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
                         'Pheno_Overlapping_HPO_IDs', 'disease_title_recessive', 'disease_title_dominant',
-                         'CLNSIG', 'CLNREVSTAT', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
+                        'CLNSIG', 'CLNREVSTAT', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
                         'CANONICAL', 'MANE_PLUS_CLINICAL', 'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 
                         'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 'comphet_ID',
                         'gene_list', 'cohort_AC', 'cohort_AF', 'cohort_AN', 'gnomad_popmax_af', 'GAF',

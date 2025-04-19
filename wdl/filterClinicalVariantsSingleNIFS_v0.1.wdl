@@ -29,6 +29,7 @@ workflow filterClinicalVariants {
         String? maternal_sample_id  # NIFS-specific
 
         String predicted_sex_chrom_ploidy  # XX or XY, NIFS-specific
+        Float xgenotyping_nomat_fetal_fraction_estimate  # NIFS-specific
 
         String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_NIFS_v0.1.py"
         String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_inheritance_NIFS_v0.1.py"
@@ -47,7 +48,7 @@ workflow filterClinicalVariants {
         Int ac_threshold=10  
         Int ac_rec_threshold=10  
         Int ac_dom_threshold=3  
-        Float af_rec_threshold=0.1  
+        Float af_rec_threshold=0.05  
         Float af_dom_threshold=0.05  
 
         Float gnomad_af_threshold=0.05
@@ -72,20 +73,29 @@ workflow filterClinicalVariants {
 
         File gene_phenotype_map  # NIFS-specific for now (2/27/2025)
         File carrier_gene_list  # NIFS-specific, TODO: not actually NIFS-specific anymore?
+        File sample_hpo_uri  # NIFS-specific
+        File gene_hpo_uri  # NIFS-specific
+        File hpo_id_to_name_uri  # NIFS-specific
+        String hpo_id_col = 'Anomalies with HPO codes (Screening)'
+        String phenotype_col = 'Anomalies on PG03 at Eligibility Screening'
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
         String dom_gene_list_tsv='NA'
 
         # ALL NIFS-specific, for addPhenotypesMergeAndPrettifyOutputs task
-        Array[String] dup_exclude_cols=['info.CSQ','Tier','variant_source']
+        Array[String] dup_exclude_cols=['info.CSQ','Tier','variant_source']  # DEPRECATED 4/1/2025, TODO: REMOVE
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
-        Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']
-        Array[String] priority_cols=['id', 'is_female', 'fam_id',
-                        'Tier', 'inheritance_mode', 'CLNSIG', 'CLNREVSTAT','locus', 'alleles',  # disease_title_recessive, disease_title_dominant inserted here
-                        'HGVSc_symbol', 'HGVSc', 'HGVSp', 'Consequence', 'filters', 
-                        'CANONICAL', 'MANE_PLUS_CLINICAL', 'gene_list', 'maternal_carrier',
-                        'proband_entry.GT', 'proband_entry.AD', 'mother_entry.GT', 'mother_entry.AD', 
-                        'am_pathogenicity', 'spliceAI_score', 'gnomad_popmax_af', 'cohort_AC', 'cohort_AF', 'comphet_ID']
-        
+        Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']  # DEPRECATED 4/1/2025, TODO: REMOVE
+        Array[String] priority_cols=['fam_id', 'is_female', 'Fetal_Fraction', 'Case_Pheno',
+                        'locus', 'alleles', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
+                        'Pheno_Overlapping_HPO_IDs', 'disease_title_recessive', 'disease_title_dominant',
+                        'CLNSIG', 'CLNREVSTAT', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
+                        'CANONICAL', 'MANE_PLUS_CLINICAL', 'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 
+                        'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 'comphet_ID',
+                        'gene_list', 'cohort_AC', 'cohort_AF', 'cohort_AN', 'gnomad_popmax_af', 'GAF',
+                        'maternal_carrier', 'filters']
+        # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
+        Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense'}
+
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_inheritance
         RuntimeAttr? runtime_attr_filter_comphets
@@ -271,8 +281,16 @@ workflow filterClinicalVariants {
             cols_for_varkey=cols_for_varkey,
             float_cols=float_cols,
             priority_cols=priority_cols,
+            cols_to_rename=cols_to_rename,
             add_phenotypes_merge_and_prettify_script=add_phenotypes_merge_and_prettify_script,
             prefix=sample_id,
+            sample_id=sample_id,
+            xgenotyping_nomat_fetal_fraction_estimate=xgenotyping_nomat_fetal_fraction_estimate,
+            sample_hpo_uri=sample_hpo_uri,
+            gene_hpo_uri=gene_hpo_uri,
+            hpo_id_to_name_uri=hpo_id_to_name_uri,
+            hpo_id_col=hpo_id_col,
+            phenotype_col=phenotype_col,
             hail_docker=hail_docker,
             runtime_attr_override=runtime_attr_merge_prettify
     }
@@ -484,14 +502,22 @@ task finalFilteringTiers {
 task addPhenotypesMergeAndPrettifyOutputs {
     input {
         Array[File] input_uris
-        File gene_phenotype_map  # Expects TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns
+        File gene_phenotype_map  # From GenCC, expects TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns
+        File sample_hpo_uri  # Maps samples to HPO IDs and phenotypes
+        File gene_hpo_uri  # Maps genes to HPO IDs
+        File hpo_id_to_name_uri  # Maps HPO IDs to HPO names
 
         Array[String] dup_exclude_cols  # Columns to exclude when calculating duplicate rows to drop
         Array[String] cols_for_varkey  # Columns to use to create unique string for each row
         Array[String] float_cols  # Columns to convert from float to int to str for uniform formatting across inputs
         Array[String] priority_cols  # Columns to prioritize/put at front of output
-        
+        Map[String, String] cols_to_rename  # Columns to rename after removing 'vep.transcript_consequences.' and 'info.' prefixes
         String prefix
+        String sample_id
+        String hpo_id_col
+        String phenotype_col
+        Float xgenotyping_nomat_fetal_fraction_estimate
+
         String add_phenotypes_merge_and_prettify_script
         String hail_docker
 
@@ -524,14 +550,17 @@ task addPhenotypesMergeAndPrettifyOutputs {
         docker: hail_docker
         bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
     }
-
     command <<<
     set -eou pipefail
     curl ~{add_phenotypes_merge_and_prettify_script} > add_phenotypes_merge_and_prettify.py
 
     python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -p ~{prefix} -g ~{gene_phenotype_map} \
+        -s ~{sample_id} --ff-estimate ~{xgenotyping_nomat_fetal_fraction_estimate} \
+        --sample-hpo-uri ~{sample_hpo_uri} --gene-hpo-uri ~{gene_hpo_uri} --hpo-id-to-name-uri ~{hpo_id_to_name_uri} \
+        --hpo-id-col "~{hpo_id_col}" --phenotype-col "~{phenotype_col}" \
         --exclude-cols "~{sep=',' dup_exclude_cols}" --cols-for-varkey "~{sep=',' cols_for_varkey}" \
-        --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=',' priority_cols}"
+        --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=';' priority_cols}" \
+        --cols-to-rename ~{write_map(cols_to_rename)}
     >>>
 
     output {

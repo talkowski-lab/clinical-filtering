@@ -212,68 +212,27 @@ if xgenotyping_nomat_fetal_fraction_estimate!=-1:
 # NEW 4/2/2025: Add sample HPO terms
 if (sample_hpo_uri!='NA') and (gene_hpo_uri!='NA') and (hpo_id_to_name_uri!='NA') and (phenotype_col!='NA') and (hpo_id_col!='NA'):
     sample_hpo_df = pd.read_csv(sample_hpo_uri, sep='\t', dtype='str').set_index('Participant')
-    # NEW 4/11/2025: Add overlap between sample HPO terms and Gene HPO terms as Pheno_Overlapping_HPO_IDs column
-    gene_hpo_df = pd.read_csv(gene_hpo_uri, sep='\t')
-    hpo_id_to_name_dict = pd.read_csv(hpo_id_to_name_uri, sep='\t').set_index('hpo_id').hpo_name.to_dict()
-    # Convert hpo_ids column to list
-    gene_hpo_df['hpo_ids'] = gene_hpo_df.hpo_ids.str.split(', ')
-
-    # Single-sample
-    if sample_id!='NA':
-        # Check that sample is in HPO file
-        if sample_id in sample_hpo_df.index:
-            merged_df['Case_Pheno'] = sample_hpo_df.loc[sample_id, phenotype_col]    
-            sample_hpo_ids = sample_hpo_df[hpo_id_col].fillna('').loc[sample_id].split(', ')
-            merged_df['Pheno_Overlapping_HPO_IDs'] = (
-                merged_df['SYMBOL']
-                .map(gene_hpo_df.set_index('gene_symbol').hpo_ids.to_dict())
-                .apply(lambda gene_hpo_ids: np.intersect1d(gene_hpo_ids, sample_hpo_ids))
-                .apply(lambda hpo_id_list: [hpo_id_to_name_dict[hpo_id] for hpo_id in hpo_id_list])
-                .apply(', '.join)
-            )
-        else:
-            merged_df['Case_Pheno'] = np.nan
-            merged_df['Pheno_Overlapping_HPO_IDs'] = np.nan
-
-    # Multiple samples
-    else:
-        merged_df['Case_Pheno'] = merged_df['id'].map(sample_hpo_df[phenotype_col].to_dict())
-        merged_df['Sample_HPO_IDs'] = merged_df['id'].map(sample_hpo_df[hpo_id_col].fillna('').str.split(', ').to_dict())
+    # Check that sample is in HPO file
+    if sample_id in sample_hpo_df.index:
+        merged_df['Case_Pheno'] = sample_hpo_df.loc[sample_id, phenotype_col]    
+        # NEW 4/11/2025: Add overlap between sample HPO terms and Gene HPO terms as Pheno_Overlapping_HPO_IDs column
+        gene_hpo_df = pd.read_csv(gene_hpo_uri, sep='\t')
+        hpo_id_to_name_dict = pd.read_csv(hpo_id_to_name_uri, sep='\t').set_index('hpo_id').hpo_name.to_dict()
+        # Convert hpo_ids column to list
+        gene_hpo_df['hpo_ids'] = gene_hpo_df.hpo_ids.str.split(', ')
+        sample_hpo_ids = sample_hpo_df.loc[sample_id, hpo_id_col].split(', ')
         merged_df['Pheno_Overlapping_HPO_IDs'] = (
-            merged_df.apply(
-                lambda x: ', '.join(
-                    [hpo_id_to_name_dict[hpo_id] for hpo_id in np.intersect1d(
-                        x['Sample_HPO_IDs'],
-                        gene_hpo_df.loc[
-                            gene_hpo_df['gene_symbol'] == x['SYMBOL'], 'hpo_ids'
-                        ].values[0] if x['SYMBOL'] in gene_hpo_df['gene_symbol'].values else []
-                    )]
-                ),
-                axis=1
-            )
+            merged_df['SYMBOL']
+            .map(gene_hpo_df.set_index('gene_symbol').hpo_ids.to_dict())
+            .apply(lambda gene_hpo_ids: np.intersect1d(gene_hpo_ids, sample_hpo_ids))
+            .apply(lambda hpo_id_list: [hpo_id_to_name_dict[hpo_id] for hpo_id in hpo_id_list])
+            .apply(', '.join)
         )
-
-# NEW 4/29/2025: Add pLI scores (optional)
-if pli_uri!='':
-    pli_df = pd.read_csv(pli_uri, sep='\t')
-    merged_df['lof.pLI'] = merged_df.Gene.map(pli_df.set_index('gene_id')['lof.pLI'].to_dict())
-
-# NEW 6/19/2025: Make combined CANONICAL_OR_MANE_PLUS_CLINICAL column and drop duplicate rows
-# Combine CANONICAL and MANE_PLUS_CLINICAL columns
-merged_df['CANONICAL_OR_MANE_PLUS_CLINICAL'] = merged_df['CANONICAL'].replace({'': np.nan}).fillna(merged_df['MANE_PLUS_CLINICAL'])
-# Remove MANE_PLUS_CLINICAL only rows because now redundant
-merged_df = merged_df[merged_df['MANE_PLUS_CLINICAL'].isna()]
-
-# NEW 7/11/2025: Flag genes in OMIM
-omim_all_genes_list = pd.read_csv(omim_uri, sep='\t', header=None)[0].tolist()
-merged_df['OMIM_Gene'] = merged_df['SYMBOL'].isin(omim_all_genes_list)
-
-# NEW 7/28/2025: Change locus/alleles column to ID (CHR#-POS-REF-ALT), no 'chr' prefix
-merged_df['ID'] = merged_df['locus'].str.split('chr').str[1].str.split(':').apply('-'.join) + '-' + \
-    merged_df['alleles'].str.split(',').apply('-'.join)
+    else:
+        merged_df['Case_Pheno'] = np.nan
+        merged_df['Pheno_Overlapping_HPO_IDs'] = np.nan
 
 # Add 2 empty columns as spacers after priority columns (for exporting as Excel later)
-remaining_cols = list(np.setdiff1d(merged_df.columns, priority_cols))
 merged_df = merged_df[priority_cols + remaining_cols].copy()
 for i in range(2):
     merged_df.insert(len(priority_cols)+i, f"SPACE_{i}", np.nan)

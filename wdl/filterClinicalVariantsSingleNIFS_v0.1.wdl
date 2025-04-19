@@ -50,7 +50,7 @@ workflow filterClinicalVariants {
         Int ac_rec_threshold=10  
         Int ac_dom_threshold=3  
         Float af_rec_threshold=0.05  
-        Float af_dom_threshold=0.01  
+        Float af_dom_threshold=0.05  
 
         Float gnomad_af_threshold=0.05
         Float am_threshold=0.56
@@ -77,29 +77,25 @@ workflow filterClinicalVariants {
         File sample_hpo_uri  # NIFS-specific
         File gene_hpo_uri  # NIFS-specific
         File hpo_id_to_name_uri  # NIFS-specific
-        File pli_uri
         String hpo_id_col = 'Anomalies with HPO codes (Screening)'
         String phenotype_col = 'Anomalies on PG03 at Eligibility Screening'
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
         String dom_gene_list_tsv='NA'
 
         # ALL NIFS-specific, for addPhenotypesMergeAndPrettifyOutputs task
+        Array[String] dup_exclude_cols=['info.CSQ','Tier','variant_source']  # DEPRECATED 4/1/2025, TODO: REMOVE
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
-        Array[String] priority_cols=['fam_id', 'sex', 'Fetal_Fraction', 'Case_Pheno',
-                        'ID', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
-                        'Pheno_Overlapping_HPO_IDs', 
-                        'disease_title_dominant', 'disease_title_recessive','classification_title',
-                        'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE', 'OMIM_Gene', 'gene_list_status',
-                        'SYMBOL', 'HGVSc', 'HGVSp', 
-                        'IMPACT', 'Consequence', 'EXON', 'INTRON', 'CANONICAL_OR_MANE_PLUS_CLINICAL', 
-                        'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 'comphet_ID',
-                        'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'lof.pLI', 
+        Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']  # DEPRECATED 4/1/2025, TODO: REMOVE
+        Array[String] priority_cols=['fam_id', 'is_female', 'Fetal_Fraction', 'Case_Pheno',
+                        'locus', 'alleles', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
+                        'Pheno_Overlapping_HPO_IDs', 'disease_title_recessive', 'disease_title_dominant',
+                        'CLNSIG', 'CLNREVSTAT', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
+                        'CANONICAL', 'MANE_PLUS_CLINICAL', 'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 
+                        'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 'comphet_ID',
                         'gene_list', 'cohort_AC', 'cohort_AF', 'cohort_AN', 'gnomad_popmax_af', 'GAF',
                         'maternal_carrier', 'filters']
         # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
-        Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense', 'GENEINFO': 'CLNGENE'}
-        Array[String] static_cols = ['fam_id','id','Fetal_Fraction','sex','Case_Pheno']
-        Array[String] static_cols_to_combine = ['fam_id', 'sex', 'Fetal_Fraction']  # will be '/'-separated in output
+        Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense'}
 
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_inheritance
@@ -291,8 +287,6 @@ workflow filterClinicalVariants {
             xgenotyping_nomat_fetal_fraction_estimate=xgenotyping_nomat_fetal_fraction_estimate,
             sample_hpo_uri=sample_hpo_uri,
             gene_hpo_uri=gene_hpo_uri,
-            pli_uri=pli_uri,
-            omim_uri=omim_uri,
             hpo_id_to_name_uri=hpo_id_to_name_uri,
             hpo_id_col=hpo_id_col,
             phenotype_col=phenotype_col,
@@ -503,7 +497,76 @@ task finalFilteringTiers {
     >>>
 
     output {
-        File filtered_tsv = prefix + '_tiers.tsv.gz'
+        File filtered_tsv = prefix + '_tiers.tsv'
+    }
+}
+
+task addPhenotypesMergeAndPrettifyOutputs {
+    input {
+        Array[File] input_uris
+        File gene_phenotype_map  # From GenCC, expects TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns
+        File sample_hpo_uri  # Maps samples to HPO IDs and phenotypes
+        File gene_hpo_uri  # Maps genes to HPO IDs
+        File hpo_id_to_name_uri  # Maps HPO IDs to HPO names
+
+        Array[String] dup_exclude_cols  # Columns to exclude when calculating duplicate rows to drop
+        Array[String] cols_for_varkey  # Columns to use to create unique string for each row
+        Array[String] float_cols  # Columns to convert from float to int to str for uniform formatting across inputs
+        Array[String] priority_cols  # Columns to prioritize/put at front of output
+        Map[String, String] cols_to_rename  # Columns to rename after removing 'vep.transcript_consequences.' and 'info.' prefixes
+        String prefix
+        String sample_id
+        String hpo_id_col
+        String phenotype_col
+        Float xgenotyping_nomat_fetal_fraction_estimate
+
+        String add_phenotypes_merge_and_prettify_script
+        String hail_docker
+
+        RuntimeAttr? runtime_attr_override
+    }
+    Float input_size = size(input_uris, 'GB')
+    Float base_disk_gb = 10.0
+    Float input_disk_scale = 5.0
+
+    RuntimeAttr runtime_default = object {
+        mem_gb: 4,
+        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
+        cpu_cores: 1,
+        preemptible_tries: 3,
+        max_retries: 1,
+        boot_disk_gb: 10
+    }
+
+    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
+
+    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
+    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
+    
+    runtime {
+        memory: "~{memory} GB"
+        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
+        cpu: cpu_cores
+        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
+        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
+        docker: hail_docker
+        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
+    }
+    command <<<
+    set -eou pipefail
+    curl ~{add_phenotypes_merge_and_prettify_script} > add_phenotypes_merge_and_prettify.py
+
+    python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -p ~{prefix} -g ~{gene_phenotype_map} \
+        -s ~{sample_id} --ff-estimate ~{xgenotyping_nomat_fetal_fraction_estimate} \
+        --sample-hpo-uri ~{sample_hpo_uri} --gene-hpo-uri ~{gene_hpo_uri} --hpo-id-to-name-uri ~{hpo_id_to_name_uri} \
+        --hpo-id-col "~{hpo_id_col}" --phenotype-col "~{phenotype_col}" \
+        --exclude-cols "~{sep=',' dup_exclude_cols}" --cols-for-varkey "~{sep=',' cols_for_varkey}" \
+        --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=';' priority_cols}" \
+        --cols-to-rename ~{write_map(cols_to_rename)}
+    >>>
+
+    output {
+        File merged_output = prefix + '.merged.clinical.variants.tsv'
     }
 }
 

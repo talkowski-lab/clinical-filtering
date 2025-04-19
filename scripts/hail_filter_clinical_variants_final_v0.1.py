@@ -7,9 +7,6 @@
 '''
 4/7/2025:
 - add in_non_par annotation
-4/19/2025:
-- annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
-- filter_by_in_gene_list=False for ClinVar output
 '''
 ###
 

@@ -8,6 +8,7 @@
 4/18/2025:
 - set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True
 4/19/2025:
+- add in_non_par annotation
 - annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
 '''
 ###
@@ -91,6 +92,9 @@ hl.init(min_block_size=128,
 
 mt = load_split_vep_consequences(vcf_file, build)
 header = hl.get_vcf_metadata(vcf_file)
+
+# NEW 4/19/2025: add in_non_par annotation
+mt = mt.annotate_rows(in_non_par=~(mt.locus.in_autosome_or_par()))
 
 # Phasing
 tmp_ped = pd.read_csv(ped_uri, sep='\t').iloc[:,:6]

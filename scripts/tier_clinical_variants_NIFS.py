@@ -10,8 +10,6 @@
 - add Tier 6, shift other Tiers
 4/11/2025:
 - add Tier 7, shift other Tiers (for Conflicting CLNSIGCONF P/LP status)
-6/19/2025:
-- require ClinVar gene match for Tiers 1-3
 '''
 ###
 
@@ -85,19 +83,16 @@ df.loc[passes_filters &
         (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 5
 
 # CRITERIA FOR TIERS 1-4: STRONG/DEFINITIVE
-has_strong_definitive_evidence = (df['vep.transcript_consequences.genCC_classification'].astype(str).str.match('Strong|Definitive'))
+has_strong_definitive_evidence = (df['vep.transcript_consequences.genCC_classification']=='Strong/Definitive')
 
 # Tier 4: Include VUS or Conflicting in ClinVar AND Strong/Definitive
 df.loc[passes_filters & has_strong_definitive_evidence &
        (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 4
-
 # NEW 4/11/2025: Tier 3: Only include Conflicting with at least one P/LP in CLNSIGCONF
-# NEW 8/26/2025: CLNSIGCONF as empty string, instead of nan
 conflicting_P_LP = ((df['info.CLNSIGCONF'].astype(str).str.contains('athogenic')) |  # if Conflicting, must have at least one P/LP
-                    (df['info.CLNSIGCONF']==''))  # if not Conflicting, CLNSIGCONF is empty
-df.loc[passes_filters & has_strong_definitive_evidence & 
-        (((vus_or_conflicting_in_clinvar & conflicting_P_LP) | is_clinvar_P_LP_one_star_plus) & 
-                clinvar_gene_matches), 'Tier'] = 3
+                    (df['info.CLNSIGCONF'].isna()))  # if not Conflicting, CLNSIGCONF is empty
+df.loc[passes_filters & has_strong_definitive_evidence &
+       ((vus_or_conflicting_in_clinvar & conflicting_P_LP) | is_clinvar_P_LP_one_star_plus), 'Tier'] = 3
 
 # CRITERIA FOR BOTH TIER 1 AND TIER 2
 # NEW 8/11/2025: no IMPACT=MODIFIER until Tier 3

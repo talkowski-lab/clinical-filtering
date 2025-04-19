@@ -7,11 +7,13 @@
 '''
 4/7/2025:
 - add in_non_par annotation
+4/19/2025:
+- Mendel errors and transmission after phasing TM
 '''
 ###
 
 from pyspark.sql import SparkSession
-from clinical_helper_functions import filter_mt, remove_parent_probands_trio_matrix, load_split_vep_consequences
+from clinical_helper_functions import filter_mt, remove_parent_probands_trio_matrix, load_split_vep_consequences, get_mendel_errors, get_transmission
 import hail as hl
 import numpy as np
 import pandas as pd
@@ -90,6 +92,9 @@ pedigree = hl.Pedigree.read(f"{prefix}.ped", delimiter='\t')
 tm = hl.trio_matrix(mt, pedigree, complete_trios=False)
 tm = remove_parent_probands_trio_matrix(tm)  # NEW 1/31/2025: Removes redundant "trios"  
 phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
+# NEW 4/19/2025: Mendel errors and transmission after phasing TM
+phased_tm = get_mendel_errors(mt, phased_tm, pedigree)
+phased_tm = get_transmission(phased_tm)
 
 # NEW 1/21/2025: NIFS-specific
 # make new row-level annotation, similar to CA, but purely based on GT

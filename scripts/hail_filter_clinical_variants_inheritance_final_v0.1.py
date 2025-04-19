@@ -7,11 +7,13 @@
 '''
 4/18/2025:
 - set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True
+4/19/2025:
+- Mendel errors and transmission after phasing TM
 '''
 ###
 
 from pyspark.sql import SparkSession
-from clinical_helper_functions import filter_mt, remove_parent_probands_trio_matrix, load_split_vep_consequences
+from clinical_helper_functions import filter_mt, remove_parent_probands_trio_matrix, load_split_vep_consequences, get_mendel_errors, get_transmission
 import hail as hl
 import numpy as np
 import pandas as pd
@@ -104,6 +106,9 @@ phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT
 all_errors, per_fam, per_sample, per_variant = hl.mendel_errors(mt['GT'], pedigree)
 all_errors_mt = all_errors.key_by().to_matrix_table(row_key=['locus','alleles'], col_key=['s'], row_fields=['fam_id'])
 phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_key, phased_tm.col_key].mendel_code)
+# NEW 4/19/2025: Mendel errors and transmission after phasing TM
+phased_tm = get_mendel_errors(mt, phased_tm, pedigree)
+phased_tm = get_transmission(phased_tm)
 
 gene_phased_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
 # NEW 4/18/2025: Set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True

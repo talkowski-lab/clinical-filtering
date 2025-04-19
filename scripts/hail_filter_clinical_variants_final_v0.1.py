@@ -9,6 +9,7 @@
 - add in_non_par annotation
 4/19/2025:
 - Mendel errors and transmission after phasing TM
+- filter_by_in_gene_list=False for ClinVar output
 '''
 ###
 
@@ -156,7 +157,7 @@ clinvar_tm = clinvar_tm.filter_entries((clinvar_tm.proband_entry.GT.is_non_ref()
                                    (clinvar_tm.father_entry.GT.is_non_ref()))
 clinvar_tm = clinvar_tm.annotate_rows(variant_category='ClinVar_P/LP')
 clinvar_tm = clinvar_tm.explode_rows(clinvar_tm.vep.transcript_consequences)
-clinvar_tm = filter_mt(clinvar_tm, filter_csq=False, filter_impact=False)  # filter to CANONICAL and/or MANE_PLUS_CLINICAL
+clinvar_tm = filter_mt(clinvar_tm, filter_csq=False, filter_impact=False, filter_by_in_gene_list=False)  # filter to CANONICAL and/or MANE_PLUS_CLINICAL
 
 # NEW 1/15/2025: liberal set of maternal carrier variants
 # Output 2: grab all GenCC_OMIM variants

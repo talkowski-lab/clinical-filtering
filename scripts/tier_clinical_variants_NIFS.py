@@ -8,6 +8,8 @@
 - add 'other' inheritance_type
 3/31/2025:
 - add Tier 6, shift other Tiers
+4/11/2025:
+- add Tier 7, shift other Tiers (for Conflicting CLNSIGCONF P/LP status)
 '''
 ###
 
@@ -34,7 +36,7 @@ ncount_over_proband_DP_threshold = float(args.ncount_over_proband_DP_threshold)
 GQ_threshold = int(args.GQ_threshold)
 inheritance_type = args.type
 
-clnrevstat_one_star_plus = ["criteria_provided,_multiple_submitters,_no_conflicts", "criteria_provided,_single_submitter", "practice_guideline", "reviewed_by_expert_panel"]
+clnrevstat_one_star_plus = ['practice_guideline', 'reviewed_by_expert_panel', 'criteria_provided,_multiple_submitters,_no_conflicts', 'criteria_provided,_conflicting_classifications', 'criteria_provided,_single_submitter']
 
 df = pd.read_csv(uri, sep='\t')
 # Strip quotes etc. from every column
@@ -42,12 +44,12 @@ for col in df.columns:
     if df[col].dtype=='object':
         df[col] = df[col].str.strip('\n').str.replace('\"','').str.replace('[','').str.replace(']','')
 
-# Tier 6: default/lowest tier
-df['Tier'] = 6
+# Tier 7: default/lowest tier
+df['Tier'] = 7
 
-# Tier 5: Only native NIFS filters
+# Tier 6: Only native NIFS filters
 passes_filters = (df.filters=='')
-df.loc[passes_filters, 'Tier'] = 5
+df.loc[passes_filters, 'Tier'] = 6
 
 # ClinVar criteria
 is_clinvar_P_LP = ((df['info.CLNSIG'].astype(str).str.contains('athogenic')) 
@@ -56,19 +58,24 @@ is_clnrevstat_one_star_plus = (df['info.CLNREVSTAT'].isin(clnrevstat_one_star_pl
 is_clinvar_P_LP_one_star_plus = is_clinvar_P_LP & is_clnrevstat_one_star_plus
 is_not_clinvar_B_LB = (~df['info.CLNSIG'].astype(str).str.contains('enign'))
 
-# CRITERIA FOR BOTH TIER 3 AND TIER 4
+# CRITERIA FOR TIERS 3-5
 vus_or_conflicting_in_clinvar = (df['info.CLNSIG'].str.contains('Uncertain') | df['info.CLNSIG'].str.contains('Conflicting'))
 
-# Tier 4: Include VUS or Conflicting in ClinVar
+# Tier 5: Include VUS or Conflicting in ClinVar
 df.loc[passes_filters &
-        (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 4
+        (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 5
 
-# CRITERIA FOR TIERS 1-3: STRONG/DEFINITIVE
+# CRITERIA FOR TIERS 1-4: STRONG/DEFINITIVE
 has_strong_definitive_evidence = (df['vep.transcript_consequences.genCC_classification']=='Strong/Definitive')
 
-# Tier 3: Include VUS or Conflicting in ClinVar AND Strong/Definitive
+# Tier 4: Include VUS or Conflicting in ClinVar AND Strong/Definitive
 df.loc[passes_filters & has_strong_definitive_evidence &
-       (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 3
+       (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 4
+# NEW 4/11/2025: Tier 3: Only include Conflicting with at least one P/LP in CLNSIGCONF
+conflicting_P_LP = ((df['info.CLNSIGCONF'].astype(str).str.contains('athogenic')) |  # if Conflicting, must have at least one P/LP
+                    (df['info.CLNSIGCONF'].isna()))  # if not Conflicting, CLNSIGCONF is empty
+df.loc[passes_filters & has_strong_definitive_evidence &
+       ((vus_or_conflicting_in_clinvar & conflicting_P_LP) | is_clinvar_P_LP_one_star_plus), 'Tier'] = 3
 
 # CRITERIA FOR BOTH TIER 1 AND TIER 2
 ncount_over_proband_DP = df['info.NCount'] / df['proband_entry.DP']
@@ -84,10 +91,22 @@ high_or_moderate_impact = df['vep.transcript_consequences.IMPACT'].isin(['HIGH',
 
 # GT CRITERIA
 if inheritance_type=='recessive':
-    # Treat XLR like AD (proband has alt allele)
-    xlr_proband_GT = ((df.locus.str.contains('X')) & 
-                      (df['proband_entry.GT'].str.contains('1')))
     ar_proband_GT = df['proband_entry.GT'].isin(['1/1','1|1'])
+    # Males: treat XLR like AD (proband has alt allele) except for PARs (treat like AR)
+    xlr_proband_cond_male_par = ((~df.is_female) & 
+                                (df.locus.str.contains('X')) &
+                                (~df.in_non_par) & 
+                                (ar_proband_GT))
+    xlr_proband_cond_male_non_par = ((~df.is_female) & 
+                                (df.locus.str.contains('X')) &
+                                (df.in_non_par) & 
+                                (df['proband_entry.GT'].str.contains('1')))
+    # Females: treat XLR like AR
+    xlr_proband_cond_female = ((df.is_female) & 
+                               (df.locus.str.contains('X')) &
+                               (ar_proband_GT))
+    xlr_proband_GT = ((xlr_proband_cond_male_par | xlr_proband_cond_male_non_par) |
+                      (xlr_proband_cond_female))
     # Tier 1: Only HomVar (except XLR)
     tier_1_proband_GT = (ar_proband_GT) | (xlr_proband_GT)
     # Tier 2: Same as Tier 1 but allow 0/1 for comphets

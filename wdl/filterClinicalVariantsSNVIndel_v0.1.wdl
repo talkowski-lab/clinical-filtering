@@ -63,31 +63,6 @@ workflow filterClinicalVariants {
         Boolean sort_after_merge=false
         Boolean merge_first_pass_filtered_vcfs=false
 
-        File omim_uri  # All OMIM genes
-        File gene_phenotype_map
-        File carrier_gene_list  
-        String sample_hpo_uri='NA'
-        String gene_hpo_uri='NA'
-        String hpo_id_to_name_uri='NA'
-        File pli_uri
-        String hpo_id_col = 'Anomalies with HPO codes (Screening)'
-        String phenotype_col = 'Anomalies on PG03 at Eligibility Screening'
-        File carrier_gene_list  
-        Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
-        Array[String] priority_cols=['fam_id', 'id', 'sex', 'trio_status', 'Case_Pheno', 
-                        'ID', 'Tier', 'inheritance_mode',
-                        'Pheno_Overlapping_HPO_IDs',
-                        'disease_title_dominant', 'disease_title_recessive', 'classification_title',
-                        'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE', 'OMIM_Gene', 'gene_list_status', 
-                        'SYMBOL', 'HGVSc', 'HGVSp', 
-                        'IMPACT', 'Consequence', 'EXON', 'INTRON', 'CANONICAL_OR_MANE_PLUS_CLINICAL',
-                        'AD_ref,AD_alt', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT', 'comphet_ID', 
-                        'transmission', 'mendel_code', 'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'lof.pLI',
-                        'gene_list', 'cohort_AC', 'cohort_AF', 'gnomad_popmax_af', 'maternal_carrier', 'filters']
-
-        # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
-        Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense', 'GENEINFO': 'CLNGENE'}
-
         # merge TSVs
         RuntimeAttr? runtime_attr_merge_clinvar
         RuntimeAttr? runtime_attr_merge_inheritance_dom
@@ -206,13 +181,15 @@ workflow filterClinicalVariants {
     }
 
     # Merge VCFs
-    call mergeVCFs.mergeVCFs as mergePassFirstFilteredVCFs {
-        input:
-            vcf_files=runClinicalFiltering.filtered_vcf,
-            sv_base_mini_docker=sv_base_mini_docker,
-            cohort_prefix=cohort_prefix + '_first_pass_filtered',
-            sort_after_merge=sort_after_merge,
-            runtime_attr_override=runtime_attr_merge_filtered_vcfs
+    if (merge_first_pass_filtered_vcfs) {
+        call mergeVCFs.mergeVCFs as mergeFirstPassFilteredVCFs {
+            input:
+                vcf_files=runClinicalFiltering.filtered_vcf,
+                sv_base_mini_docker=sv_base_mini_docker,
+                cohort_prefix=cohort_prefix + '_first_pass_filtered',
+                sort_after_merge=sort_after_merge,
+                runtime_attr_override=runtime_attr_merge_filtered_vcfs
+        }     
     }
 
     call mergeVCFs.mergeVCFs as mergeInheritanceRecessiveVCFs {
@@ -361,8 +338,8 @@ workflow filterClinicalVariants {
         File clinvar_tsv = mergeClinVar.merged_tsv
         File clinvar_vcf = mergeClinVarVCFs.merged_vcf_file
         File clinvar_vcf_idx = mergeClinVarVCFs.merged_vcf_idx
-        File first_pass_filtered_vcf = mergePassFirstFilteredVCFs.merged_vcf_file
-        File first_pass_filtered_vcf_idx = mergePassFirstFilteredVCFs.merged_vcf_idx
+        File first_pass_filtered_vcf = select_first([mergeFirstPassFilteredVCFs.merged_vcf_file, empty_file])
+        File first_pass_filtered_vcf_idx = select_first([mergeFirstPassFilteredVCFs.merged_vcf_idx, empty_file])
         File recessive_vcf = mergeInheritanceRecessiveVCFs.merged_vcf_file
         File recessive_vcf_idx = mergeInheritanceRecessiveVCFs.merged_vcf_idx
         File recessive_tsv = mergeInheritanceRecessive.merged_tsv

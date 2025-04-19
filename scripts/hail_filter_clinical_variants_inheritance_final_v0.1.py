@@ -9,6 +9,7 @@
 - set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True
 4/19/2025:
 - annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
+- include all de novos in dominant output if include_not_genCC_OMIM=True
 '''
 ###
 
@@ -267,6 +268,8 @@ passes_loeuf_v2 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v
 
 passes_loeuf_v4 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v4=='', 0, 
                         hl.float(gene_phased_tm.vep.transcript_consequences.LOEUF_v4))<=loeuf_v4_threshold)
+# NEW 4/19/2025: include all de novos in dominant output if include_not_genCC_OMIM=True
+is_de_novo = (gene_phased_tm.mendel_code==2)
 
 if include_not_genCC_OMIM:
     dom_mt = gene_phased_tm.filter_rows(
@@ -279,8 +282,10 @@ if include_not_genCC_OMIM:
             in_dom_gene_list |
             (
                 no_inheritance_code &
-                passes_mpc_dom &
-                (passes_loeuf_v2 | passes_loeuf_v4)
+                (
+                    (passes_mpc_dom & (passes_loeuf_v2 | passes_loeuf_v4)) |
+                    is_de_novo
+                )
             )
         )
     )

@@ -24,6 +24,7 @@ workflow filterClinicalVariants {
         String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_clinical_helper_functions.py"       
         String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_v0.1.py"
         String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_inheritance_v0.1.py"
+        String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_CLNSIGCONF/scripts/tier_clinical_variants_SNV_Indel.py"
 
         String hail_docker
         String sv_base_mini_docker
@@ -72,6 +73,7 @@ workflow filterClinicalVariants {
         # filtering steps
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_inheritance
+        RuntimeAttr? runtime_attr_filter_tiers
     }
 
     scatter (vcf_file in annot_vcf_files) {
@@ -199,6 +201,68 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_merge_clinvar_vcfs
     }
 
+    call filterClinicalVariants.splitByInheritance as splitClinVarByInheritance {
+        input:
+            input_tsv=mergeClinVar.merged_tsv,
+            hail_docker=hail_docker,
+            inheritance_code_col='vep.transcript_consequences.inheritance_code',
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
+    call finalFilteringTiers as finalFilteringTiersInheritanceOther {
+        input:
+            input_tsv=mergeInheritanceOther.merged_tsv,
+            inheritance_type='other',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
+    call finalFilteringTiers as finalFilteringTiersClinVarDominant {
+        input:
+            input_tsv=splitClinVarByInheritance.dominant_tsv,
+            inheritance_type='dominant',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
+    call finalFilteringTiers as finalFilteringTiersClinVarRecessive {
+        input:
+            input_tsv=splitClinVarByInheritance.recessive_tsv,
+            inheritance_type='recessive',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
+    call finalFilteringTiers as finalFilteringTiersClinVarOther {
+        input:
+            input_tsv=splitClinVarByInheritance.other_tsv,
+            inheritance_type='other',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
+    call finalFilteringTiers as finalFilteringTiersDominant {
+        input:
+            input_tsv=mergeInheritanceDominant.merged_tsv,
+            inheritance_type='dominant',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
+    call finalFilteringTiers as finalFilteringTiersRecessive {
+        input:
+            input_tsv=mergeInheritanceRecessive.merged_tsv,
+            inheritance_type='recessive',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
     output {
         File mat_carrier_tsv = select_first([mergeMaternalCarriers.merged_tsv, empty_file])
         File clinvar_tsv = mergeClinVar.merged_tsv
@@ -211,5 +275,63 @@ workflow filterClinicalVariants {
         File recessive_tsv = mergeInheritanceRecessive.merged_tsv
         File dominant_tsv = mergeInheritanceDominant.merged_tsv
         File inheritance_other_tsv = mergeInheritanceOther.merged_tsv
+    
+        # After tiering (does not include ClinVar separate output for now)
+        File final_recessive_tsv = finalFilteringTiersRecessive.filtered_tsv
+        File final_dominant_tsv = finalFilteringTiersDominant.filtered_tsv
+        File final_inheritance_other_tsv = finalFilteringTiersInheritanceOther.filtered_tsv
+    }
+}
+
+task finalFilteringTiers {
+    input {
+        File input_tsv
+
+        String inheritance_type
+        String hail_docker
+        String filter_final_tiers_script
+        
+        RuntimeAttr? runtime_attr_override
+    }
+
+    Float input_size = size(input_tsv, 'GB')
+    Float base_disk_gb = 10.0
+    Float input_disk_scale = 5.0
+
+    RuntimeAttr runtime_default = object {
+        mem_gb: 4,
+        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
+        cpu_cores: 1,
+        preemptible_tries: 3,
+        max_retries: 1,
+        boot_disk_gb: 10
+    }
+
+    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
+
+    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
+    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
+    
+    runtime {
+        memory: "~{memory} GB"
+        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
+        cpu: cpu_cores
+        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
+        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
+        docker: hail_docker
+        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
+    }
+
+    String file_ext = if sub(basename(input_tsv), '.tsv.gz', '')!=basename(input_tsv) then '.tsv.gz' else '.tsv'
+    String prefix = basename(input_tsv, file_ext)
+
+    command <<<
+    set -eou pipefail
+    curl ~{filter_final_tiers_script} > tier.py
+    python3 tier.py -i ~{input_tsv} -p ~{prefix} -t ~{inheritance_type}
+    >>>
+
+    output {
+        File filtered_tsv = prefix + '_tiers.tsv'
     }
 }

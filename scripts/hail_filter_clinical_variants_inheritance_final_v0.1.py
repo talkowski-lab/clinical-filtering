@@ -8,12 +8,12 @@
 4/18/2025:
 - set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True
 4/19/2025:
-- Mendel errors and transmission after phasing TM
+- annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
 '''
 ###
 
 from pyspark.sql import SparkSession
-from clinical_helper_functions import filter_mt, remove_parent_probands_trio_matrix, load_split_vep_consequences, get_mendel_errors, get_transmission
+from clinical_helper_functions import filter_mt, remove_parent_probands_trio_matrix, load_split_vep_consequences, annotate_trio_matrix
 import hail as hl
 import numpy as np
 import pandas as pd
@@ -102,13 +102,10 @@ tm = hl.trio_matrix(mt, pedigree, complete_trios=False)
 tm = remove_parent_probands_trio_matrix(tm)  # NEW 1/31/2025: Removes redundant "trios"
 phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
 
-# Mendel errors
-all_errors, per_fam, per_sample, per_variant = hl.mendel_errors(mt['GT'], pedigree)
-all_errors_mt = all_errors.key_by().to_matrix_table(row_key=['locus','alleles'], col_key=['s'], row_fields=['fam_id'])
-phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_key, phased_tm.col_key].mendel_code)
-# NEW 4/19/2025: Mendel errors and transmission after phasing TM
-phased_tm = get_mendel_errors(mt, phased_tm, pedigree)
-phased_tm = get_transmission(phased_tm)
+# Load pedigree as HT for sample annotations
+ped_ht = hl.import_table(ped_uri, delimiter='\t').key_by('sample_id')
+# NEW 4/19/2025: annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
+phased_tm = annotate_trio_matrix(phased_tm, mt, pedigree, ped_ht)
 
 gene_phased_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
 # NEW 4/18/2025: Set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True

@@ -8,6 +8,7 @@
 4/18/2025:
 - set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True
 4/19/2025:
+- add in_non_par annotation
 - annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
 '''
 ###

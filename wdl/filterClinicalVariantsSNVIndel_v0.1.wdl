@@ -25,6 +25,7 @@ workflow filterClinicalVariants {
         String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_variants_final_v0.1.py"
         String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_variants_inheritance_final_v0.1.py"
         String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/tier_clinical_variants_SNV_Indel.py"
+        String add_phenotypes_merge_and_prettify_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/add_phenotypes_merge_and_prettify_clinical_variants_NIFS.py"
 
         String hail_docker
         String sv_base_mini_docker
@@ -60,6 +61,17 @@ workflow filterClinicalVariants {
         Boolean sort_after_merge=false
         Boolean merge_first_pass_filtered_vcfs=false
 
+        File gene_phenotype_map
+        Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
+        Array[String] priority_cols=['fam_id', 'id', 'sex', 'locus', 'alleles', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
+                        'disease_title_recessive', 'disease_title_dominant', 'CLNSIG', 'CLNREVSTAT', 
+                        'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'CANONICAL', 'MANE_PLUS_CLINICAL',
+                        'AD_ref,AD_alt', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT',
+                        'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 'comphet_ID',
+                        'gene_list', 'cohort_AC', 'cohort_AF', 'gnomad_popmax_af', 'maternal_carrier', 'filters']
+        # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
+        Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense'}
+
         # merge TSVs
         RuntimeAttr? runtime_attr_merge_clinvar
         RuntimeAttr? runtime_attr_merge_inheritance_dom
@@ -74,6 +86,8 @@ workflow filterClinicalVariants {
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_inheritance
         RuntimeAttr? runtime_attr_filter_tiers
+        # merge and prettify TSVs
+        RuntimeAttr? runtime_attr_merge_prettify
     }
 
     scatter (vcf_file in annot_vcf_files) {
@@ -263,6 +277,26 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_tiers
     }
 
+    call filterClinicalVariants.addPhenotypesMergeAndPrettifyOutputs as addPhenotypesMergeAndPrettifyOutputs {
+        input:
+            input_uris=[
+                # finalFilteringTiersCompHet.filtered_tsv,  # ORDER MATTERS (CompHet output first)
+                finalFilteringTiersRecessive.filtered_tsv,
+                finalFilteringTiersDominant.filtered_tsv,
+                finalFilteringTiersClinVarRecessive.filtered_tsv,
+                finalFilteringTiersClinVarDominant.filtered_tsv,
+                finalFilteringTiersClinVarOther.filtered_tsv,
+                finalFilteringTiersInheritanceOther.filtered_tsv],
+            gene_phenotype_map=gene_phenotype_map,
+            cols_for_varkey=cols_for_varkey,
+            priority_cols=priority_cols,
+            cols_to_rename=cols_to_rename,
+            add_phenotypes_merge_and_prettify_script=add_phenotypes_merge_and_prettify_script,
+            prefix=cohort_prefix,
+            hail_docker=hail_docker,
+            runtime_attr_override=runtime_attr_merge_prettify
+    }
+
     output {
         File mat_carrier_tsv = select_first([mergeMaternalCarriers.merged_tsv, empty_file])
         File clinvar_tsv = mergeClinVar.merged_tsv
@@ -280,6 +314,9 @@ workflow filterClinicalVariants {
         File final_recessive_tsv = finalFilteringTiersRecessive.filtered_tsv
         File final_dominant_tsv = finalFilteringTiersDominant.filtered_tsv
         File final_inheritance_other_tsv = finalFilteringTiersInheritanceOther.filtered_tsv
+
+        # Merged and prettified
+        File final_merged_clinical_tsv = addPhenotypesMergeAndPrettifyOutputs.merged_output
     }
 }
 

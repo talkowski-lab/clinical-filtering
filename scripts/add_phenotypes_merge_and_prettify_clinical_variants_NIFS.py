@@ -11,9 +11,7 @@ parser.add_argument('-i', dest='input_uris', help='Comma-separated list of all i
 parser.add_argument('-p', dest='prefix', help='Prefix for output filename')
 parser.add_argument('-g', dest='gene_phenotype_map', help='TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns')
 parser.add_argument('-s', dest='sample_id', help='Sample ID')
-parser.add_argument('--exclude-cols', dest='exclude_cols', help='[DEPRECATED AS OF 4/1/2025, TODO: REMOVE] Columns to exclude when calculating duplicate rows to drop')
 parser.add_argument('--cols-for-varkey', dest='cols_for_varkey', help='Columns to use to create unique string for each row')
-parser.add_argument('--float-cols', dest='float_cols', help='[DEPRECATED AS OF 4/1/2025, TODO: REMOVE] Columns to convert from float to int to str for uniform formatting across inputs')
 parser.add_argument('--priority-cols', dest='priority_cols', help='Columns to prioritize/put at front of output')
 parser.add_argument('--cols-to-rename', dest='cols_to_rename', help='TSV with columns to rename after removing vep.transcript_consequences. and info. prefixes')
 parser.add_argument('--ff-estimate', dest='xgenotyping_nomat_fetal_fraction_estimate', help='Fetal fraction estimate')
@@ -25,9 +23,7 @@ parser.add_argument('--phenotype-col', dest='phenotype_col', help='Column in sam
 
 args = parser.parse_args()
 input_uris = args.input_uris.split(',')
-exclude_cols = args.exclude_cols.split(',')    
 cols_for_varkey = args.cols_for_varkey.split(',')
-float_cols = args.float_cols.split(',')
 priority_cols = args.priority_cols.split(';')
 prefix = args.prefix
 pheno_uri = args.gene_phenotype_map
@@ -143,10 +139,6 @@ merged_df[['inheritance_mode', 'Tier']] = merged_df.apply(condense_output_catego
 merged_df = merged_df.drop(['output_category','output_category_list', 'Tier_List'], axis=1).copy()
 
 # Prioritize CompHet/XLR/hom_var/mat_carrier output because extra columns
-# NEW 3/28/2025: Use n_inputs_to_merge to account for empty inputs
-col_counts = pd.Series(all_cols).value_counts()
-extra_cols = col_counts[col_counts<n_inputs_to_merge].index.tolist()
-cols_for_duplicate = list(np.setdiff1d(merged_df.columns, extra_cols+exclude_cols))
 # NEW 4/1/2025: Simplify dropping duplicates by just using select columns
 cols_for_duplicate = ['Tier', 'inheritance_mode', 'VarKey']
 merged_df = merged_df.drop_duplicates(cols_for_duplicate)
@@ -194,34 +186,36 @@ merged_df['disease_title_recessive'] = merged_df.SYMBOL.map(pheno_df.set_index('
 merged_df['disease_title_dominant'] = merged_df.SYMBOL.map(pheno_df.set_index('gene_symbol').disease_title_dominant.to_dict())
 
 # NEW 4/2/2025: Add sample fetal fraction
-merged_df['Fetal_Fraction'] = xgenotyping_nomat_fetal_fraction_estimate
+if xgenotyping_nomat_fetal_fraction_estimate!=-1:
+    merged_df['Fetal_Fraction'] = xgenotyping_nomat_fetal_fraction_estimate
 
 # NEW 4/2/2025: Add sample HPO terms
-sample_hpo_df = pd.read_csv(sample_hpo_uri, sep='\t', dtype='str').set_index('Participant')
-# Check that sample is in HPO file
-if sample_id in sample_hpo_df.index:
-    merged_df['Case_Pheno'] = sample_hpo_df.loc[sample_id, phenotype_col]    
-    # NEW 4/11/2025: Add overlap between sample HPO terms and Gene HPO terms as Pheno_Overlapping_HPO_IDs column
-    gene_hpo_df = pd.read_csv(gene_hpo_uri, sep='\t')
-    hpo_id_to_name_dict = pd.read_csv(hpo_id_to_name_uri, sep='\t').set_index('hpo_id').hpo_name.to_dict()
-    # Convert hpo_ids column to list
-    gene_hpo_df['hpo_ids'] = gene_hpo_df.hpo_ids.str.split(', ')
-    sample_hpo_ids = sample_hpo_df.loc[sample_id, hpo_id_col].split(', ')
-    merged_df['Pheno_Overlapping_HPO_IDs'] = (
-        merged_df['SYMBOL']
-        .map(gene_hpo_df.set_index('gene_symbol').hpo_ids.to_dict())
-        .apply(lambda gene_hpo_ids: np.intersect1d(gene_hpo_ids, sample_hpo_ids))
-        .apply(lambda hpo_id_list: [hpo_id_to_name_dict[hpo_id] for hpo_id in hpo_id_list])
-        .apply(', '.join)
-    )
-else:
-    merged_df['Case_Pheno'] = np.nan
-    merged_df['Pheno_Overlapping_HPO_IDs'] = np.nan
+if (sample_hpo_uri!='NA') and (gene_hpo_uri!='NA') and (hpo_id_to_name_uri!='NA') and (phenotype_col!='NA') and (hpo_id_col!='NA'):
+    sample_hpo_df = pd.read_csv(sample_hpo_uri, sep='\t', dtype='str').set_index('Participant')
+    # Check that sample is in HPO file
+    if sample_id in sample_hpo_df.index:
+        merged_df['Case_Pheno'] = sample_hpo_df.loc[sample_id, phenotype_col]    
+        # NEW 4/11/2025: Add overlap between sample HPO terms and Gene HPO terms as Pheno_Overlapping_HPO_IDs column
+        gene_hpo_df = pd.read_csv(gene_hpo_uri, sep='\t')
+        hpo_id_to_name_dict = pd.read_csv(hpo_id_to_name_uri, sep='\t').set_index('hpo_id').hpo_name.to_dict()
+        # Convert hpo_ids column to list
+        gene_hpo_df['hpo_ids'] = gene_hpo_df.hpo_ids.str.split(', ')
+        sample_hpo_ids = sample_hpo_df.loc[sample_id, hpo_id_col].split(', ')
+        merged_df['Pheno_Overlapping_HPO_IDs'] = (
+            merged_df['SYMBOL']
+            .map(gene_hpo_df.set_index('gene_symbol').hpo_ids.to_dict())
+            .apply(lambda gene_hpo_ids: np.intersect1d(gene_hpo_ids, sample_hpo_ids))
+            .apply(lambda hpo_id_list: [hpo_id_to_name_dict[hpo_id] for hpo_id in hpo_id_list])
+            .apply(', '.join)
+        )
+    else:
+        merged_df['Case_Pheno'] = np.nan
+        merged_df['Pheno_Overlapping_HPO_IDs'] = np.nan
 
-# Add 2 empty columns as spacers after priority columns
+# Add 2 empty columns as spacers after priority columns (for exporting as Excel later)
 merged_df = merged_df[priority_cols + remaining_cols].copy()
 for i in range(2):
     merged_df.insert(len(priority_cols)+i, f"SPACE_{i}", np.nan)
 
-output_filename = f"{prefix}.merged.clinical.variants.tsv"
+output_filename = f"{prefix}.merged.clinical.variants.tsv.gz"
 merged_df.to_csv(output_filename, sep='\t', index=False)

@@ -313,3 +313,71 @@ task splitByInheritance {
         File other_tsv = basename(input_tsv, file_ext) + '.other.tsv'
     }
 }
+
+task addPhenotypesMergeAndPrettifyOutputs {
+    input {
+        Array[File] input_uris
+        File gene_phenotype_map  # From GenCC, expects TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns
+
+        Array[String] cols_for_varkey  # Columns to use to create unique string for each row
+        Array[String] priority_cols  # Columns to prioritize/put at front of output
+        Map[String, String] cols_to_rename  # Columns to rename after removing 'vep.transcript_consequences.' and 'info.' prefixes
+        String prefix
+
+        # ALL OPTIONAL INPUTS FOR NIFS ONLY
+        String sample_hpo_uri='NA'  # Maps samples to HPO IDs and phenotypes
+        String gene_hpo_uri='NA'  # Maps genes to HPO IDs
+        String hpo_id_to_name_uri='NA'  # Maps HPO IDs to HPO names
+        String sample_id='NA'
+        String hpo_id_col='NA'
+        String phenotype_col='NA'
+        Float xgenotyping_nomat_fetal_fraction_estimate=-1
+
+        String add_phenotypes_merge_and_prettify_script
+        String hail_docker
+
+        RuntimeAttr? runtime_attr_override
+    }
+    Float input_size = size(input_uris, 'GB')
+    Float base_disk_gb = 10.0
+    Float input_disk_scale = 5.0
+
+    RuntimeAttr runtime_default = object {
+        mem_gb: 4,
+        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
+        cpu_cores: 1,
+        preemptible_tries: 3,
+        max_retries: 1,
+        boot_disk_gb: 10
+    }
+
+    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
+
+    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
+    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
+    
+    runtime {
+        memory: "~{memory} GB"
+        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
+        cpu: cpu_cores
+        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
+        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
+        docker: hail_docker
+        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
+    }
+    command <<<
+    set -eou pipefail
+    curl ~{add_phenotypes_merge_and_prettify_script} > add_phenotypes_merge_and_prettify.py
+
+    python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -p ~{prefix} -g ~{gene_phenotype_map} \
+        -s ~{sample_id} --ff-estimate ~{xgenotyping_nomat_fetal_fraction_estimate} \
+        --sample-hpo-uri ~{sample_hpo_uri} --gene-hpo-uri ~{gene_hpo_uri} --hpo-id-to-name-uri ~{hpo_id_to_name_uri} \
+        --hpo-id-col "~{hpo_id_col}" --phenotype-col "~{phenotype_col}" \
+        --cols-for-varkey "~{sep=',' cols_for_varkey}" --priority-cols "~{sep=';' priority_cols}" \
+        --cols-to-rename ~{write_map(cols_to_rename)}
+    >>>
+
+    output {
+        File merged_output = prefix + '.merged.clinical.variants.tsv'
+    }
+}

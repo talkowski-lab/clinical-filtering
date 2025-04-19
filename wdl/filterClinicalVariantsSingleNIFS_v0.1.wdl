@@ -31,13 +31,13 @@ workflow filterClinicalVariants {
         String predicted_sex_chrom_ploidy  # XX or XY, NIFS-specific
         Float xgenotyping_nomat_fetal_fraction_estimate  # NIFS-specific
 
-        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_NIFS_v0.1.py"
-        String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_inheritance_NIFS_v0.1.py"
-        String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py"
-        String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/tier_clinical_variants_NIFS.py"
-        String add_phenotypes_merge_and_prettify_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/add_phenotypes_merge_and_prettify_clinical_variants_NIFS.py"
-        String flag_from_confirmation_maternal_vcf_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/flag_clinical_variants_from_confirmation_maternal_NIFS.py"
-        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_clinical_helper_functions.py"
+        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_variants_final_v0.1.py"
+        String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_variants_inheritance_final_v0.1.py"
+        String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py"
+        String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/tier_clinical_variants_NIFS.py"
+        String add_phenotypes_merge_and_prettify_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/add_phenotypes_merge_and_prettify_clinical_variants_NIFS.py"
+        String flag_from_confirmation_maternal_vcf_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/flag_clinical_variants_from_confirmation_maternal_NIFS.py"
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_clinical_helper_functions.py"
 
         String hail_docker
         String sv_base_mini_docker
@@ -71,7 +71,7 @@ workflow filterClinicalVariants {
         Boolean include_not_genCC_OMIM=false  # NIFS-specific
         Boolean include_all_maternal_carrier_variants=false
 
-        File gene_phenotype_map  # NIFS-specific for now (2/27/2025)
+        File gene_phenotype_map
         File carrier_gene_list  # NIFS-specific, TODO: not actually NIFS-specific anymore?
         File sample_hpo_uri  # NIFS-specific
         File gene_hpo_uri  # NIFS-specific
@@ -82,10 +82,8 @@ workflow filterClinicalVariants {
         String dom_gene_list_tsv='NA'
 
         # ALL NIFS-specific, for addPhenotypesMergeAndPrettifyOutputs task
-        Array[String] dup_exclude_cols=['info.CSQ','Tier','variant_source']  # DEPRECATED 4/1/2025, TODO: REMOVE
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
-        Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']  # DEPRECATED 4/1/2025, TODO: REMOVE
-        Array[String] priority_cols=['fam_id', 'is_female', 'Fetal_Fraction', 'Case_Pheno',
+        Array[String] priority_cols=['fam_id', 'sex', 'Fetal_Fraction', 'Case_Pheno',
                         'locus', 'alleles', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
                         'Pheno_Overlapping_HPO_IDs', 'disease_title_recessive', 'disease_title_dominant',
                         'CLNSIG', 'CLNREVSTAT', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
@@ -267,7 +265,7 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_tiers
     }
 
-    call addPhenotypesMergeAndPrettifyOutputs {
+    call filterClinicalVariants.addPhenotypesMergeAndPrettifyOutputs as addPhenotypesMergeAndPrettifyOutputs {
         input:
             input_uris=[finalFilteringTiersCompHet.filtered_tsv,  # ORDER MATTERS (CompHet output first)
                 finalFilteringTiersRecessive.filtered_tsv,
@@ -277,9 +275,7 @@ workflow filterClinicalVariants {
                 finalFilteringTiersClinVarOther.filtered_tsv,
                 finalFilteringTiersInheritanceOther.filtered_tsv],
             gene_phenotype_map=gene_phenotype_map,
-            dup_exclude_cols=dup_exclude_cols,
             cols_for_varkey=cols_for_varkey,
-            float_cols=float_cols,
             priority_cols=priority_cols,
             cols_to_rename=cols_to_rename,
             add_phenotypes_merge_and_prettify_script=add_phenotypes_merge_and_prettify_script,
@@ -496,75 +492,6 @@ task finalFilteringTiers {
 
     output {
         File filtered_tsv = prefix + '_tiers.tsv'
-    }
-}
-
-task addPhenotypesMergeAndPrettifyOutputs {
-    input {
-        Array[File] input_uris
-        File gene_phenotype_map  # From GenCC, expects TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns
-        File sample_hpo_uri  # Maps samples to HPO IDs and phenotypes
-        File gene_hpo_uri  # Maps genes to HPO IDs
-        File hpo_id_to_name_uri  # Maps HPO IDs to HPO names
-
-        Array[String] dup_exclude_cols  # Columns to exclude when calculating duplicate rows to drop
-        Array[String] cols_for_varkey  # Columns to use to create unique string for each row
-        Array[String] float_cols  # Columns to convert from float to int to str for uniform formatting across inputs
-        Array[String] priority_cols  # Columns to prioritize/put at front of output
-        Map[String, String] cols_to_rename  # Columns to rename after removing 'vep.transcript_consequences.' and 'info.' prefixes
-        String prefix
-        String sample_id
-        String hpo_id_col
-        String phenotype_col
-        Float xgenotyping_nomat_fetal_fraction_estimate
-
-        String add_phenotypes_merge_and_prettify_script
-        String hail_docker
-
-        RuntimeAttr? runtime_attr_override
-    }
-    Float input_size = size(input_uris, 'GB')
-    Float base_disk_gb = 10.0
-    Float input_disk_scale = 5.0
-
-    RuntimeAttr runtime_default = object {
-        mem_gb: 4,
-        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
-        cpu_cores: 1,
-        preemptible_tries: 3,
-        max_retries: 1,
-        boot_disk_gb: 10
-    }
-
-    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
-
-    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
-    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
-    
-    runtime {
-        memory: "~{memory} GB"
-        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
-        cpu: cpu_cores
-        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
-        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
-        docker: hail_docker
-        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
-    }
-    command <<<
-    set -eou pipefail
-    curl ~{add_phenotypes_merge_and_prettify_script} > add_phenotypes_merge_and_prettify.py
-
-    python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -p ~{prefix} -g ~{gene_phenotype_map} \
-        -s ~{sample_id} --ff-estimate ~{xgenotyping_nomat_fetal_fraction_estimate} \
-        --sample-hpo-uri ~{sample_hpo_uri} --gene-hpo-uri ~{gene_hpo_uri} --hpo-id-to-name-uri ~{hpo_id_to_name_uri} \
-        --hpo-id-col "~{hpo_id_col}" --phenotype-col "~{phenotype_col}" \
-        --exclude-cols "~{sep=',' dup_exclude_cols}" --cols-for-varkey "~{sep=',' cols_for_varkey}" \
-        --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=';' priority_cols}" \
-        --cols-to-rename ~{write_map(cols_to_rename)}
-    >>>
-
-    output {
-        File merged_output = prefix + '.merged.clinical.variants.tsv'
     }
 }
 

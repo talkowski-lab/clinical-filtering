@@ -17,7 +17,7 @@ from hail.table import Table
 from hail.typecheck import numeric, typecheck
 from hail.utils.java import Env
 
-def filter_mt(mt, filter_csq=True, filter_impact=True):
+def filter_mt(mt, filter_csq=True, filter_impact=True, filter_by_in_gene_list=True):
     '''
     mt: can be trio matrix (tm) or matrix table (mt) but must be transcript-level, not variant-level
     '''
@@ -33,7 +33,9 @@ def filter_mt(mt, filter_csq=True, filter_impact=True):
                         (mt.vep.transcript_consequences.MANE_PLUS_CLINICAL!=''))
     
     # NEW 3/10/2025: Filter by in gene list
-    mt = mt.filter_rows(mt.vep.transcript_consequences.gene_list!='')
+    # NEW 4/18/2025: Make filter_by_in_gene_list optional (default True)
+    if filter_by_in_gene_list:
+        mt = mt.filter_rows(mt.vep.transcript_consequences.gene_list!='')
 
     # filter by Impact and splice/noncoding consequence
     if filter_impact:

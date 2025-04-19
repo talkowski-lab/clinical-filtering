@@ -5,6 +5,8 @@
 
 ## CHANGE LOG:
 '''
+4/18/2025:
+- set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True
 '''
 ###
 
@@ -104,7 +106,8 @@ all_errors_mt = all_errors.key_by().to_matrix_table(row_key=['locus','alleles'],
 phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_key, phased_tm.col_key].mendel_code)
 
 gene_phased_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
-gene_phased_tm = filter_mt(gene_phased_tm)
+# NEW 4/18/2025: Set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True
+gene_phased_tm = filter_mt(gene_phased_tm, filter_by_in_gene_list=not include_not_genCC_OMIM)
 
 # annotate spliceAI score if missing
 if 'spliceAI_score' not in list(gene_phased_tm.vep.transcript_consequences):

@@ -9,6 +9,7 @@
 - add in_non_par annotation
 4/19/2025:
 - Mendel errors and transmission after phasing TM
+- filter_by_in_gene_list=False for ClinVar output
 '''
 ###
 

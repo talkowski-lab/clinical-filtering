@@ -22,12 +22,10 @@ workflow filterClinicalVariants {
 
         String cohort_prefix
 
-        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_clinical_helper_functions.py"       
-        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_variants_final_v0.1.py"
-        String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_variants_inheritance_final_v0.1.py"
-        String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_comphets_xlr_hom_var_v0.1.py"
-        String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/tier_clinical_variants_SNV_Indel.py"
-        String add_phenotypes_merge_and_prettify_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/add_phenotypes_merge_and_prettify_clinical_variants.py"
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_clinical_helper_functions.py"       
+        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_v0.1.py"
+        String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_inheritance_v0.1.py"
+        String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_CLNSIGCONF/scripts/tier_clinical_variants_SNV_Indel.py"
 
         String hail_docker
         String sv_base_mini_docker
@@ -77,10 +75,6 @@ workflow filterClinicalVariants {
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_inheritance
         RuntimeAttr? runtime_attr_filter_tiers
-        # merge and prettify TSVs
-        RuntimeAttr? runtime_attr_merge_prettify
-        # split by sample
-        RuntimeAttr? runtime_attr_split_output_by_sample
     }
 
     scatter (vcf_file in annot_vcf_files) {
@@ -210,21 +204,6 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_merge_clinvar_vcfs
     }
 
-    # CompHets
-    call filterClinicalCompHets.filterClinicalCompHets as filterCompHetsXLRHomVar {
-        input:
-            recessive_vcf=select_first([mergeInheritanceRecessiveVCFs.merged_vcf_file, 'NA']),
-            clinvar_vcf=select_first([mergeClinVarVCFs.merged_vcf_file, 'NA']),
-            cohort_prefix=cohort_prefix,
-            sv_base_mini_docker=sv_base_mini_docker,
-            ped_uri=ped_uri,
-            genome_build=genome_build,
-            hail_docker=hail_docker,
-            carrier_gene_list=carrier_gene_list,
-            ad_alt_threshold=ad_alt_threshold,
-            filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script
-    }
-
     call filterClinicalVariants.splitByInheritance as splitClinVarByInheritance {
         input:
             input_tsv=mergeClinVar.merged_tsv,
@@ -287,52 +266,6 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_tiers
     }
 
-    call finalFilteringTiers as finalFilteringTiersCompHet {
-        input:
-            input_tsv=filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv,
-            inheritance_type='recessive',
-            hail_docker=hail_docker,
-            filter_final_tiers_script=filter_final_tiers_script,
-            runtime_attr_override=runtime_attr_filter_tiers
-    }
-
-    call filterClinicalVariants.addPhenotypesMergeAndPrettifyOutputs as addPhenotypesMergeAndPrettifyOutputs {
-        input:
-            input_uris=[
-                finalFilteringTiersCompHet.filtered_tsv,  # ORDER MATTERS (CompHet output first)
-                finalFilteringTiersRecessive.filtered_tsv,
-                finalFilteringTiersDominant.filtered_tsv,
-                finalFilteringTiersClinVarRecessive.filtered_tsv,
-                finalFilteringTiersClinVarDominant.filtered_tsv,
-                finalFilteringTiersClinVarOther.filtered_tsv,
-                finalFilteringTiersInheritanceOther.filtered_tsv],
-            gene_phenotype_map=gene_phenotype_map,
-            cols_for_varkey=cols_for_varkey,
-            priority_cols=priority_cols,
-            cols_to_rename=cols_to_rename,
-            omim_uri=omim_uri,
-            add_phenotypes_merge_and_prettify_script=add_phenotypes_merge_and_prettify_script,
-            prefix=cohort_prefix,
-            sample_hpo_uri=sample_hpo_uri,
-            gene_hpo_uri=gene_hpo_uri,
-            pli_uri=pli_uri,
-            omim_uri=omim_uri,
-            hpo_id_to_name_uri=hpo_id_to_name_uri,
-            hpo_id_col=hpo_id_col,
-            phenotype_col=phenotype_col,
-            sample_id='NA',
-            hail_docker=hail_docker,
-            runtime_attr_override=runtime_attr_merge_prettify
-    }
-
-    call splitMergedOutputBySample {
-        input:
-            input_tsv=addPhenotypesMergeAndPrettifyOutputs.merged_output,
-            hail_docker=hail_docker,
-            helper_functions_script=helper_functions_script,
-            runtime_attr_override=runtime_attr_split_output_by_sample
-    }
-
     output {
         File mat_carrier_tsv = select_first([mergeMaternalCarriers.merged_tsv, empty_file])
         File clinvar_tsv = mergeClinVar.merged_tsv
@@ -345,20 +278,11 @@ workflow filterClinicalVariants {
         File recessive_tsv = mergeInheritanceRecessive.merged_tsv
         File dominant_tsv = mergeInheritanceDominant.merged_tsv
         File inheritance_other_tsv = mergeInheritanceOther.merged_tsv
-        File comphet_xlr_hom_var_mat_carrier_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv
-
+    
         # After tiering (does not include ClinVar separate output for now)
         File final_recessive_tsv = finalFilteringTiersRecessive.filtered_tsv
         File final_dominant_tsv = finalFilteringTiersDominant.filtered_tsv
         File final_inheritance_other_tsv = finalFilteringTiersInheritanceOther.filtered_tsv
-        File final_comphet_xlr_hom_var_mat_carrier_tsv = finalFilteringTiersCompHet.filtered_tsv
-
-        # Merged and prettified
-        File final_merged_clinical_tsv = splitMergedOutputBySample.final_merged_clinical_tsv
-        File final_merged_clinical_excel = splitMergedOutputBySample.final_merged_clinical_excel
-
-        # Separate excel for each sample 
-        Array[File] final_clinical_sample_excels = splitMergedOutputBySample.sample_excels
     }
 }
 
@@ -411,95 +335,6 @@ task finalFilteringTiers {
     >>>
 
     output {
-        File filtered_tsv = prefix + '_tiers.tsv.gz'
-    }
-}
-
-task splitMergedOutputBySample {
-    input {
-        File input_tsv
-        String hail_docker
-        String helper_functions_script
-
-        RuntimeAttr? runtime_attr_override
-    }
-    Float input_size = size(input_tsv, 'GB')
-    Float base_disk_gb = 10.0
-    Float input_disk_scale = 5.0
-
-    RuntimeAttr runtime_default = object {
-        mem_gb: 4,
-        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
-        cpu_cores: 1,
-        preemptible_tries: 3,
-        max_retries: 1,
-        boot_disk_gb: 10
-    }
-
-    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
-
-    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
-    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
-    
-    runtime {
-        memory: "~{memory} GB"
-        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
-        cpu: cpu_cores
-        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
-        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
-        docker: hail_docker
-        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
-    }
-    String file_ext = if sub(basename(input_tsv), '.tsv.gz', '')!=basename(input_tsv) then '.tsv.gz' else '.tsv'
-    
-    command <<<
-    set -eou pipefail
-    curl ~{helper_functions_script} > clinical_helper_functions.py
-    cat <<EOF > split_by_sample.py
-    import pandas as pd
-    import numpy as np
-    import os
-    import argparse
-    from clinical_helper_functions import sort_final_merged_output_by_tiers
-
-    parser = argparse.ArgumentParser(description='Parse arguments')
-    parser.add_argument('-i', dest='input_tsv', help='Input TSV to annotate with phenotypes')
-
-    args = parser.parse_args()
-    input_uri = args.input_tsv
-
-    merged_df = pd.concat(pd.read_csv(input_uri, sep='\t', chunksize=100_000))
-    # Sort by tier (in helper functions script)
-    merged_df = sort_final_merged_output_by_tiers(merged_df)
-    # Replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
-    space_cols = merged_df.columns[merged_df.columns.str.contains('SPACE_')].tolist()
-    merged_df = merged_df.rename({col: '' for col in space_cols}, axis=1)
-
-    # Save merged after sort_final_merged_output_by_tiers
-    merged_df.to_csv(os.path.basename(input_uri).split('.tsv')[0] + '.final.tsv.gz', sep='\t', index=False)
-    # Also export full Excel
-    try:
-        merged_df.to_excel(os.path.basename(input_uri).split('.tsv')[0] + '.final.xlsx', index=False)
-    except Exception as e:
-        print(str(e))
-        # Empty Excel output if too large
-        pd.DataFrame().to_excel(os.path.basename(input_uri).split('.tsv')[0] + '.final.xlsx', index=False)
-
-    # Save each sample to separate Excel output
-    all_samples = merged_df.id.unique()
-    tot_n_samples = all_samples.size
-
-    for i, sample_id in enumerate(all_samples):
-        output_filename = f"{sample_id}.final.merged.clinical.variants.xlsx"
-        print(f"Exporting Excel for sample {i+1}/{tot_n_samples}...")
-        merged_df[merged_df.id==sample_id].to_excel(output_filename, index=False)
-    EOF
-    python3 split_by_sample.py -i ~{input_tsv}
-    >>>
-
-    output {
-        File final_merged_clinical_tsv = basename(input_tsv, file_ext) + '.final.tsv.gz'
-        File final_merged_clinical_excel = basename(input_tsv, file_ext) + '.final.xlsx'
-        Array[File] sample_excels = glob('*final.merged.clinical.variants.xlsx')
+        File filtered_tsv = prefix + '_tiers.tsv'
     }
 }

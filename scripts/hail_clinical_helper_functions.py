@@ -58,6 +58,71 @@ def remove_parent_probands_trio_matrix(tm):
     mothers = tm.mother.s.collect()
     return tm.filter_cols(hl.array(fathers + mothers).contains(tm.proband.s), keep=False)
 
+def annotate_trio_matrix(phased_tm, mt, pedigree, ped_ht):
+    # Annotate trio_status
+    complete_trio_probands = [trio.s for trio in pedigree.complete_trios()]
+    if len(complete_trio_probands)==0:
+        complete_trio_probands = ['']
+    phased_tm = phased_tm.annotate_cols(trio_status=hl.if_else(phased_tm.fam_id=='-9', 'not_in_pedigree', 
+                                                       hl.if_else(hl.array(complete_trio_probands).contains(phased_tm.id), 'trio', 'non_trio')))
+    # Annotate phenotype in MT
+    mt = mt.annotate_cols(phenotype=ped_ht[mt.s].phenotype)
+
+    # Get cohort unaffected/affected het and homvar counts
+    mt = mt.annotate_rows(**{
+        "n_het_unaffected": hl.agg.filter(mt.phenotype=='1', hl.agg.sum(mt.GT.is_het())),
+        "n_hom_var_unaffected": hl.agg.filter(mt.phenotype=='1', hl.agg.sum(mt.GT.is_hom_var())),
+        "n_het_affected": hl.agg.filter(mt.phenotype=='2', hl.agg.sum(mt.GT.is_het())),
+        "n_hom_var_affected": hl.agg.filter(mt.phenotype=='2', hl.agg.sum(mt.GT.is_hom_var()))
+    })
+
+    # Get Mendel code/errors, get transmission
+    phased_tm = get_mendel_errors(mt, phased_tm, pedigree)
+    phased_tm = get_transmission(phased_tm)
+    
+    # Annotate sex in TM
+    phased_tm = phased_tm.annotate_cols(sex=ped_ht[phased_tm.id].sex)
+    
+    # Annotate affected status/phenotype from pedigree
+    phased_tm = phased_tm.annotate_cols(
+        proband=phased_tm.proband.annotate(
+            phenotype=ped_ht[phased_tm.proband.s].phenotype),
+    mother=phased_tm.mother.annotate(
+            phenotype=ped_ht[phased_tm.mother.s].phenotype),
+    father=phased_tm.father.annotate(
+            phenotype=ped_ht[phased_tm.father.s].phenotype))
+
+    affected_cols = ['n_het_unaffected', 'n_hom_var_unaffected', 'n_het_affected', 'n_hom_var_affected']
+    phased_tm = phased_tm.annotate_rows(**{col: mt.rows()[phased_tm.row_key][col] 
+                                                 for col in affected_cols})
+
+    ## Annotate dominant_gt and recessive_gt
+    # denovo
+    dom_trio_criteria = ((phased_tm.trio_status=='trio') &  
+                         (phased_tm.mendel_code==2))
+    # het absent in unaff
+    dom_non_trio_criteria = ((phased_tm.trio_status!='trio') & 
+                            (phased_tm.n_hom_var_unaffected==0) &
+                            (phased_tm.n_het_unaffected==0) & 
+                            (phased_tm.proband_entry.GT.is_het())
+                            )
+
+    # homozygous and het parents
+    rec_trio_criteria = ((phased_tm.trio_status=='trio') &  
+                         (phased_tm.proband_entry.GT.is_hom_var()) &
+                         (phased_tm.mother_entry.GT.is_het()) &
+                         (phased_tm.father_entry.GT.is_het())
+                        )  
+    # hom and unaff are not hom
+    rec_non_trio_criteria = ((phased_tm.trio_status!='trio') &  
+                            (phased_tm.n_hom_var_unaffected==0) &
+                            (phased_tm.proband_entry.GT.is_hom_var())
+                            )
+
+    phased_tm = phased_tm.annotate_entries(dominant_gt=((dom_trio_criteria) | (dom_non_trio_criteria)),
+                            recessive_gt=((rec_trio_criteria) | (rec_non_trio_criteria)))
+    return phased_tm    
+
 def load_split_vep_consequences(vcf_uri, build):
     mt = hl.import_vcf(vcf_uri, reference_genome=build, find_replace=('null', ''), force_bgz=True, call_fields=[], array_elements_required=False)
     csq_columns = hl.get_vcf_metadata(vcf_uri)['info']['CSQ']['Description'].split('Format: ')[1].split('|')

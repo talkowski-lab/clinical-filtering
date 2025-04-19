@@ -3,6 +3,8 @@
 
 ## CHANGE LOG:
 '''
+4/19/2025:
+- change is_female field to sex to account for missing sex information
 '''
 ###
 
@@ -73,16 +75,16 @@ high_or_moderate_impact = df['vep.transcript_consequences.IMPACT'].isin(['HIGH',
 if inheritance_type=='recessive':
     ar_proband_GT = df['proband_entry.GT'].isin(['1/1','1|1'])
     # Males: treat XLR like AD (proband has alt allele) except for PARs (treat like AR)
-    xlr_proband_cond_male_par = ((~df.is_female) & 
+    xlr_proband_cond_male_par = ((df.sex=='1') & 
                                 (df.locus.str.contains('X')) &
                                 (~df.in_non_par) & 
                                 (ar_proband_GT))
-    xlr_proband_cond_male_non_par = ((~df.is_female) & 
+    xlr_proband_cond_male_non_par = ((df.sex=='1') & 
                                 (df.locus.str.contains('X')) &
                                 (df.in_non_par) & 
                                 (df['proband_entry.GT'].str.contains('1')))
     # Females: treat XLR like AR
-    xlr_proband_cond_female = ((df.is_female) & 
+    xlr_proband_cond_female = ((df.sex=='2') & 
                                (df.locus.str.contains('X')) &
                                (ar_proband_GT))    
     xlr_proband_GT = ((xlr_proband_cond_male_par | xlr_proband_cond_male_non_par) |

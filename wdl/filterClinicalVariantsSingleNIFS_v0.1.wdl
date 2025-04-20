@@ -300,6 +300,7 @@ workflow filterClinicalVariants {
             maternal_sample_id=select_first([maternal_sample_id, 'NA']),
             hail_docker=hail_docker,
             genome_build=genome_build,
+            helper_functions_script=helper_functions_script,
             flag_from_confirmation_maternal_vcf_script=flag_from_confirmation_maternal_vcf_script,
             runtime_attr_override=runtime_attr_flag_conf_mat_gt
     }
@@ -504,6 +505,7 @@ task flagFromConfirmationMaternalVCF {
         String confirmation_sample_id
         String maternal_sample_id
         String hail_docker
+        String helper_functions_script
         String flag_from_confirmation_maternal_vcf_script
         String genome_build
 
@@ -537,9 +539,11 @@ task flagFromConfirmationMaternalVCF {
         bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
     }
 
-    String prefix = basename(input_tsv, '.tsv')
+    String file_ext = if sub(basename(input_tsv), '.tsv.gz', '')!=basename(input_tsv) then '.tsv.gz' else '.tsv'
+    String prefix = basename(input_tsv, file_ext)
     command <<<
     set -eou pipefail
+    curl ~{helper_functions_script} > clinical_helper_functions.py
     curl ~{flag_from_confirmation_maternal_vcf_script} > add_GT_flags.py
     
     python3 add_GT_flags.py -i ~{input_tsv} -c ~{confirmation_vcf} -m ~{maternal_vcf} -p ~{prefix} \

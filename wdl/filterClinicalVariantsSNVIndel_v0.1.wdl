@@ -88,6 +88,8 @@ workflow filterClinicalVariants {
         RuntimeAttr? runtime_attr_filter_tiers
         # merge and prettify TSVs
         RuntimeAttr? runtime_attr_merge_prettify
+        # split by sample
+        RuntimeAttr? runtime_attr_split_output_by_sample
     }
 
     scatter (vcf_file in annot_vcf_files) {
@@ -297,6 +299,14 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_merge_prettify
     }
 
+    call splitMergedOutputBySample {
+        input:
+            input_tsv=addPhenotypesMergeAndPrettifyOutputs.merged_output,
+            hail_docker=hail_docker,
+            helper_functions_script=helper_functions_script,
+            runtime_attr_override=runtime_attr_split_output_by_sample
+    }
+
     output {
         File mat_carrier_tsv = select_first([mergeMaternalCarriers.merged_tsv, empty_file])
         File clinvar_tsv = mergeClinVar.merged_tsv
@@ -317,6 +327,9 @@ workflow filterClinicalVariants {
 
         # Merged and prettified
         File final_merged_clinical_tsv = addPhenotypesMergeAndPrettifyOutputs.merged_output
+
+        # Separate excel for each sample 
+        Array[File] final_clinical_sample_excels = splitMergedOutputBySample.sample_excels
     }
 }
 
@@ -370,5 +383,81 @@ task finalFilteringTiers {
 
     output {
         File filtered_tsv = prefix + '_tiers.tsv'
+    }
+}
+
+task splitMergedOutputBySample {
+    input {
+        File input_tsv
+        String hail_docker
+        String helper_functions_script
+
+        RuntimeAttr? runtime_attr_override
+    }
+    Float input_size = size(input_tsv, 'GB')
+    Float base_disk_gb = 10.0
+    Float input_disk_scale = 5.0
+
+    RuntimeAttr runtime_default = object {
+        mem_gb: 4,
+        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
+        cpu_cores: 1,
+        preemptible_tries: 3,
+        max_retries: 1,
+        boot_disk_gb: 10
+    }
+
+    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
+
+    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
+    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
+    
+    runtime {
+        memory: "~{memory} GB"
+        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
+        cpu: cpu_cores
+        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
+        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
+        docker: hail_docker
+        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
+    }
+
+    command <<<
+    set -eou pipefail
+    curl ~{helper_functions_script} > clinical_helper_functions.py
+    cat <<EOF > split_by_sample.py
+    import pandas as pd
+    import numpy as np
+    import os
+    import argparse
+    from clinical_helper_functions import sort_final_merged_output_by_tiers
+
+    parser = argparse.ArgumentParser(description='Parse arguments')
+    parser.add_argument('-i', dest='input_tsv', help='Input TSV to annotate with phenotypes')
+
+    args = parser.parse_args()
+    input_uri = args.input_tsv
+
+    merged_df = pd.concat(pd.read_csv(input_uri, sep='\t', chunksize=100_000))
+    # Sort by tier (in helper functions script)
+    merged_df = sort_final_merged_output_by_tiers(merged_df)
+    # Replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
+    space_cols = merged_df.columns[merged_df.columns.str.contains('SPACE_')].tolist()
+    merged_df = merged_df.rename({col: '' for col in space_cols}, axis=1)
+
+    # Save each sample to separate Excel output
+    all_samples = merged_df.id.unique()
+    tot_n_samples = all_samples.size
+
+    for i, sample_id in enumerate(all_samples):
+        output_filename = f"{sample_id}.final.merged.clinical.variants.xlsx"
+        print(f"Exporting Excel for sample {i+1}/{tot_n_samples}...")
+        merged_df[merged_df.id==sample_id].to_excel(output_filename, index=False)
+    EOF    
+    python3 split_by_sample.py -i ~{input_tsv}
+    >>>
+
+    output {
+        Array[File] sample_excels = glob('*final.merged.clinical.variants.xlsx')
     }
 }

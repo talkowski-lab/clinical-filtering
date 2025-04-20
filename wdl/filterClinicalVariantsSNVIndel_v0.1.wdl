@@ -63,7 +63,7 @@ workflow filterClinicalVariants {
 
         File gene_phenotype_map
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
-        Array[String] priority_cols=['fam_id', 'id', 'sex', 'locus', 'alleles', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
+        Array[String] priority_cols=['fam_id', 'id', 'sex', 'locus', 'alleles', 'Tier', 'inheritance_mode',
                         'disease_title_recessive', 'disease_title_dominant', 'CLNSIG', 'CLNREVSTAT', 
                         'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'CANONICAL', 'MANE_PLUS_CLINICAL',
                         'AD_ref,AD_alt', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT',

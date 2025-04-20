@@ -28,6 +28,8 @@
 3/4/2025:
 - change OMIM_recessive/OMIM_dominant to just recessive/dominant
 - remove redundant gene field from output
+4/20/2025:
+- annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
 TODO: remove SV/trio_status/etc. irrelevant code
 '''
 ###
@@ -391,7 +393,10 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     # tm = tm.filter_entries(tm.proband_entry.GT.is_non_ref())
 
     phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
-    phased_tm = get_mendel_errors(mt, phased_tm, pedigree)
+    # Load pedigree as HT for sample annotations
+    ped_ht = hl.import_table(ped_uri, delimiter='\t').key_by('sample_id')
+    # NEW 4/19/2025: annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
+    phased_tm = annotate_trio_matrix(phased_tm, mt, pedigree, ped_ht)
     phased_tm = phased_tm.key_rows_by(locus_expr,'alleles','gene')
 
     # NEW 1/14/2025: filter_entries before aggregation

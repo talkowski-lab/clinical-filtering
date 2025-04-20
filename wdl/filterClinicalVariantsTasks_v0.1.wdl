@@ -380,6 +380,6 @@ task addPhenotypesMergeAndPrettifyOutputs {
     >>>
 
     output {
-        File merged_output = prefix + '.merged.clinical.variants.tsv'
+        File merged_output = prefix + '.merged.clinical.variants.tsv.gz'
     }
 }

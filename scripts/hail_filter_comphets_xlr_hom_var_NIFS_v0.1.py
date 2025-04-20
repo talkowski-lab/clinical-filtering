@@ -35,7 +35,7 @@ TODO: remove SV/trio_status/etc. irrelevant code
 ###
 
 from pyspark.sql import SparkSession
-from clinical_helper_functions import filter_mt, load_split_vep_consequences
+from clinical_helper_functions import filter_mt, load_split_vep_consequences, annotate_trio_matrix
 import hail as hl
 import numpy as np
 import pandas as pd

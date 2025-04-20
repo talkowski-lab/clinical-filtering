@@ -553,5 +553,4 @@ task flagFromConfirmationMaternalVCF {
     output {
         File flagged_excel = prefix + '.conf.mat.flag.xlsx'
     }
-
 }

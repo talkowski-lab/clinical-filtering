@@ -453,7 +453,7 @@ task splitMergedOutputBySample {
         output_filename = f"{sample_id}.final.merged.clinical.variants.xlsx"
         print(f"Exporting Excel for sample {i+1}/{tot_n_samples}...")
         merged_df[merged_df.id==sample_id].to_excel(output_filename, index=False)
-    EOF    
+    EOF
     python3 split_by_sample.py -i ~{input_tsv}
     >>>
 

@@ -74,19 +74,7 @@ merged_df = merged_ht.key_by().drop(*fields_to_drop).to_pandas()
 # Sort by tier (in helper functions script)
 merged_df = sort_final_merged_output_by_tiers(merged_df)
 
-# Convert sex from numeric code for readability
-merged_df['sex'] = merged_df['sex'].map({'1': 'male', '2':'female'})
-
-static_df = merged_df[static_cols].drop_duplicates()
-variant_df = merged_df.drop(static_cols, axis=1)  # remaining cols
-# Add combined static col to variant_df
-variant_df.insert(0, '/'.join(static_cols_to_combine),
-                              merged_df[static_cols_to_combine].apply('/'.join, axis=1))
-# Replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
-space_cols = variant_df.columns[variant_df.columns.str.contains('SPACE_')].tolist()
-variant_df = variant_df.rename({col: '' for col in space_cols}, axis=1)
-
-# Export to Excel
+# Export to Excel, replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
 output_filename = f"{prefix}.conf.mat.flag.xlsx"
 writer = pd.ExcelWriter(output_filename, engine = 'xlsxwriter')
 static_df.to_excel(writer, index=False, sheet_name = 'static_info')

@@ -431,9 +431,7 @@ def sort_final_merged_output_by_tiers(merged_df):
         numeric_tiers = row.numeric_tiers_list
         top_tier = row.tiers_list[numeric_tiers.index(top_numeric_tier)]
         return len(top_tier)
-    
-    # Convert Tier column to string
-    merged_df['Tier'] = merged_df.Tier.astype(str)
+
     merged_df['tiers_list'] = merged_df.Tier.str.split(',')  # with * and flags
     merged_df['numeric_tiers_list'] = merged_df.tiers_list.apply(lambda lst: [int(x[0])  if x!='' else 6 for x in lst])  # Assign missing tier to tier 6 for sorting
     merged_df['top_numeric_tier'] = merged_df.numeric_tiers_list.apply(min)

@@ -27,7 +27,7 @@ maternal_sample_id = args.maternal_sample_id
 
 hl.init(default_reference=build)
 
-merged_ht = hl.import_table(input_uri)
+merged_ht = hl.import_table(input_uri, force=input_uri.split('.')[-1] in ['gz', 'bgz'])
 # Annotate with temporary Hail-friendly locus/alleles fields
 merged_ht = merged_ht.annotate(hail_locus=hl.parse_locus(merged_ht.locus),
                 hail_alleles=hl.array(merged_ht.alleles.split(','))).key_by('hail_locus','hail_alleles')

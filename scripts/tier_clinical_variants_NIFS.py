@@ -14,6 +14,7 @@
 ###
 
 import pandas as pd
+import numpy as np
 import argparse
 import os
 
@@ -42,7 +43,7 @@ df = pd.read_csv(uri, sep='\t')
 # Strip quotes etc. from every column
 for col in df.columns:
     if df[col].dtype=='object':
-        df[col] = df[col].str.strip('\n').str.replace('\"','').str.replace('[','').str.replace(']','')
+        df[col] = df[col].replace({np.nan: ''}).astype(str).str.strip('\n').str.replace('\"','').str.replace('[','').str.replace(']','')
 
 # Tier 7: default/lowest tier
 df['Tier'] = 7

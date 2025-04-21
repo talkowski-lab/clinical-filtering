@@ -492,7 +492,7 @@ task finalFilteringTiers {
     >>>
 
     output {
-        File filtered_tsv = prefix + '_tiers.tsv'
+        File filtered_tsv = prefix + '_tiers.tsv.gz'
     }
 }
 

@@ -173,10 +173,5 @@ df['maternal_carrier'] = ((is_clinvar_P_LP_one_star_plus | high_or_moderate_impa
         not_in_segdup &
         is_maternal_variant)
 
-# NEW 10/26/2025: Add gene_list_status column
-df['gene_list_status'] = 'Not in gene lists, high impact'
-df.loc[(df['vep.transcript_consequences.gene_list']!=''), 'gene_list_status'] = 'In GenCC/OMIM with inheritance code'
-df.loc[(df['variant_category']=='inheritance_other'), 'gene_list_status'] = 'In gene lists, no inheritance code'
-
 output_filename = f"{prefix}_tiers.tsv.gz"
 df.to_csv(output_filename, sep='\t', index=False)

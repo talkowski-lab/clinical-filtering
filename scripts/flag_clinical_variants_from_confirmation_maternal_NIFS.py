@@ -32,7 +32,7 @@ static_cols_to_combine = args.static_cols_to_combine.split(',')
 
 hl.init(default_reference=build)
 
-merged_ht = hl.import_table(input_uri, force=input_uri.split('.')[-1] in ['gz', 'bgz'])
+merged_ht = hl.import_table(input_uri)
 # Annotate with temporary Hail-friendly locus/alleles fields
 merged_ht = merged_ht.annotate(hail_locus=hl.parse_locus(merged_ht.locus),
                 hail_alleles=hl.array(merged_ht.alleles.split(','))).key_by('hail_locus','hail_alleles')

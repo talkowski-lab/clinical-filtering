@@ -299,18 +299,18 @@ task splitByInheritance {
     dom_df.loc[:, 'variant_category'] = dom_df['variant_category'] + '_dominant'
     other_df.loc[:, 'variant_category'] = other_df['variant_category'] + '_other'
 
-    rec_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.recessive.tsv', sep='\t', index=False)
-    dom_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.dominant.tsv', sep='\t', index=False)
-    other_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.other.tsv', sep='\t', index=False)
+    rec_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.recessive.tsv.gz', sep='\t', index=False)
+    dom_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.dominant.tsv.gz', sep='\t', index=False)
+    other_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.other.tsv.gz', sep='\t', index=False)
     EOF
     
     python3 split_by_inheritance.py -i ~{input_tsv} -c ~{inheritance_code_col} --file-ext ~{file_ext}
     >>>
 
     output {
-        File recessive_tsv = basename(input_tsv, file_ext) + '.recessive.tsv'
-        File dominant_tsv = basename(input_tsv, file_ext) + '.dominant.tsv'
-        File other_tsv = basename(input_tsv, file_ext) + '.other.tsv'
+        File recessive_tsv = basename(input_tsv, file_ext) + '.recessive.tsv.gz'
+        File dominant_tsv = basename(input_tsv, file_ext) + '.dominant.tsv.gz'
+        File other_tsv = basename(input_tsv, file_ext) + '.other.tsv.gz'
     }
 }
 

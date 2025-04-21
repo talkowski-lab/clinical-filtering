@@ -326,7 +326,7 @@ workflow filterClinicalVariants {
         File final_inheritance_other_tsv = finalFilteringTiersInheritanceOther.filtered_tsv
 
         # Merged and prettified
-        File final_merged_clinical_tsv = addPhenotypesMergeAndPrettifyOutputs.merged_output
+        File final_merged_clinical_tsv = splitMergedOutputBySample.final_merged_clinical_tsv
 
         # Separate excel for each sample 
         Array[File] final_clinical_sample_excels = splitMergedOutputBySample.sample_excels
@@ -382,7 +382,7 @@ task finalFilteringTiers {
     >>>
 
     output {
-        File filtered_tsv = prefix + '_tiers.tsv'
+        File filtered_tsv = prefix + '_tiers.tsv.gz'
     }
 }
 
@@ -421,7 +421,8 @@ task splitMergedOutputBySample {
         docker: hail_docker
         bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
     }
-
+    String file_ext = if sub(basename(input_tsv), '.tsv.gz', '')!=basename(input_tsv) then '.tsv.gz' else '.tsv'
+    
     command <<<
     set -eou pipefail
     curl ~{helper_functions_script} > clinical_helper_functions.py
@@ -445,6 +446,9 @@ task splitMergedOutputBySample {
     space_cols = merged_df.columns[merged_df.columns.str.contains('SPACE_')].tolist()
     merged_df = merged_df.rename({col: '' for col in space_cols}, axis=1)
 
+    # Save merged after sort_final_merged_output_by_tiers
+    merged_df.to_csv(os.path.basename(input_uri).split('.tsv')[0] + '.final.tsv.gz', sep='\t', index=False)
+
     # Save each sample to separate Excel output
     all_samples = merged_df.id.unique()
     tot_n_samples = all_samples.size
@@ -458,6 +462,7 @@ task splitMergedOutputBySample {
     >>>
 
     output {
+        File final_merged_clinical_tsv = basename(input_tsv, file_ext) + '.final.tsv.gz'
         Array[File] sample_excels = glob('*final.merged.clinical.variants.xlsx')
     }
 }

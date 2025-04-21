@@ -131,5 +131,5 @@ df['maternal_carrier'] = ((is_clinvar_P_LP_one_star_plus | high_or_moderate_impa
         passes_tier_1_and_2 & 
         is_maternal_variant)
 
-output_filename = f"{prefix}_tiers.tsv"
+output_filename = f"{prefix}_tiers.tsv.gz"
 df.to_csv(output_filename, sep='\t', index=False)

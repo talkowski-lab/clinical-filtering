@@ -76,6 +76,7 @@ workflow filterClinicalVariants {
         File sample_hpo_uri  # NIFS-specific
         File gene_hpo_uri  # NIFS-specific
         File hpo_id_to_name_uri  # NIFS-specific
+        File pli_uri
         String hpo_id_col = 'Anomalies with HPO codes (Screening)'
         String phenotype_col = 'Anomalies on PG03 at Eligibility Screening'
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
@@ -88,7 +89,7 @@ workflow filterClinicalVariants {
                         'Pheno_Overlapping_HPO_IDs', 'disease_title_recessive', 'disease_title_dominant',
                         'CLNSIG', 'CLNREVSTAT', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
                         'CANONICAL', 'MANE_PLUS_CLINICAL', 'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 
-                        'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 'comphet_ID',
+                        'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'lof.pLI', 'INTRON', 'comphet_ID',
                         'gene_list', 'cohort_AC', 'cohort_AF', 'cohort_AN', 'gnomad_popmax_af', 'GAF',
                         'maternal_carrier', 'filters']
         # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
@@ -286,6 +287,7 @@ workflow filterClinicalVariants {
             xgenotyping_nomat_fetal_fraction_estimate=xgenotyping_nomat_fetal_fraction_estimate,
             sample_hpo_uri=sample_hpo_uri,
             gene_hpo_uri=gene_hpo_uri,
+            pli_uri=pli_uri,
             hpo_id_to_name_uri=hpo_id_to_name_uri,
             hpo_id_col=hpo_id_col,
             phenotype_col=phenotype_col,

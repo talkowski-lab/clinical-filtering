@@ -557,7 +557,7 @@ task flagFromConfirmationMaternalVCF {
     
     python3 add_GT_flags.py -i ~{input_tsv} -c ~{confirmation_vcf} -m ~{maternal_vcf} -p ~{prefix} \
         --build ~{genome_build} --conf-id ~{confirmation_sample_id} --mat-id ~{maternal_sample_id} \
-        --static-cols ~{static_cols} --static-cols-to-combine ~{static_cols_to_combine}
+        --static-cols ~{sep=',' static_cols} --static-cols-to-combine ~{sep=',' static_cols_to_combine}
     >>>
 
     output {

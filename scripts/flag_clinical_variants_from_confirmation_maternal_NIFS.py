@@ -16,8 +16,8 @@ parser.add_argument('-p', dest='prefix', help='Prefix for output filename')
 parser.add_argument('--build', dest='build', help='Genome build')
 parser.add_argument('--conf-id', dest='confirmation_sample_id', help='confirmation_sample_id')
 parser.add_argument('--mat-id', dest='maternal_sample_id', help='maternal_sample_id')
-parser.add_argument('--static-cols', dest='static_cols', help='static_cols for first tab of Excel output')
-parser.add_argument('--static-cols-to-combine', dest='static_cols_to_combine', help='static_cols_to_combine for second tab of Excel output')
+parser.add_argumentt('--static-cols', dest='static_cols', help='static_cols for first tab of Excel output')
+parser.add_argumentt('--static-cols-to-combine', dest='static_cols_to_combine', help='static_cols_to_combine for second tab of Excel output')
 
 args = parser.parse_args()
 input_uri = args.input_tsv
@@ -27,8 +27,8 @@ prefix = args.prefix
 build = args.build
 confirmation_sample_id = args.confirmation_sample_id
 maternal_sample_id = args.maternal_sample_id
-static_cols = args.static_cols.split(',')
-static_cols_to_combine = args.static_cols_to_combine.split(',')
+static_cols = args.static_cols
+static_cols_to_combine = args.static_cols_to_combine
 
 hl.init(default_reference=build)
 
@@ -74,7 +74,19 @@ merged_df = merged_ht.key_by().drop(*fields_to_drop).to_pandas()
 # Sort by tier (in helper functions script)
 merged_df = sort_final_merged_output_by_tiers(merged_df)
 
-# Export to Excel, replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
+# Convert sex from numeric code for readability
+merged_df['sex'] = merged_df['sex'].map({'1': 'male', '2':'female'})
+
+static_df = merged_df[static_cols].drop_duplicates()
+variant_df = merged_df.drop(static_cols, axis=1)  # remaining cols
+# Add combined static col to variant_df
+variant_df.insert(0, '/'.join(static_cols_to_combine),
+                              merged_df[static_cols_to_combine].apply('/'.join, axis=1))
+# Replace SPACE_{i} columns with empty column names (added in addPhenotypesMergeAndPrettifyOutputs task)
+space_cols = variant_df.columns[variant_df.columns.str.contains('SPACE_')].tolist()
+variant_df = variant_df.rename({col: '' for col in space_cols}, axis=1)
+
+# Export to Excel
 output_filename = f"{prefix}.conf.mat.flag.xlsx"
 writer = pd.ExcelWriter(output_filename, engine = 'xlsxwriter')
 static_df.to_excel(writer, index=False, sheet_name = 'static_info')

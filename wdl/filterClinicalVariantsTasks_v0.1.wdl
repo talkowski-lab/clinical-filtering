@@ -318,6 +318,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
     input {
         Array[File] input_uris
         File gene_phenotype_map  # From GenCC, expects TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns
+        File? pli_uri 
 
         Array[String] cols_for_varkey  # Columns to use to create unique string for each row
         Array[String] priority_cols  # Columns to prioritize/put at front of output
@@ -365,6 +366,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
         docker: hail_docker
         bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
     }
+    String pli_input_str = if defined(pli_uri) then "--pli-uri ~{pli_uri}" else ''
     command <<<
     set -eou pipefail
     curl ~{add_phenotypes_merge_and_prettify_script} > add_phenotypes_merge_and_prettify.py
@@ -374,7 +376,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
         --sample-hpo-uri ~{sample_hpo_uri} --gene-hpo-uri ~{gene_hpo_uri} --hpo-id-to-name-uri ~{hpo_id_to_name_uri} \
         --hpo-id-col "~{hpo_id_col}" --phenotype-col "~{phenotype_col}" \
         --cols-for-varkey "~{sep=',' cols_for_varkey}" --priority-cols "~{sep=';' priority_cols}" \
-        --cols-to-rename ~{write_map(cols_to_rename)}
+        --cols-to-rename ~{write_map(cols_to_rename)} ~{pli_input_str}
     >>>
 
     output {

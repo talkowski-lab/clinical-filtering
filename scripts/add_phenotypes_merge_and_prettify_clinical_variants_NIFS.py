@@ -20,6 +20,7 @@ parser.add_argument('--gene-hpo-uri', dest='gene_hpo_uri', help='Path to file ma
 parser.add_argument('--hpo-id-to-name-uri', dest='hpo_id_to_name_uri', help='Path to file mapping HPO IDs to HPO names')
 parser.add_argument('--hpo-id-col', dest='hpo_id_col', help='Column in sample HPO file with HPO IDs to intersect with gene HPO IDs')
 parser.add_argument('--phenotype-col', dest='phenotype_col', help='Column in sample HPO file to annotate with for Dx at screening')
+parser.add_argument('--pli-uri', dest='pli_uri', nargs='?', default='', help='TSV with lof.pLI column')
 
 args = parser.parse_args()
 input_uris = args.input_uris.split(',')
@@ -36,6 +37,8 @@ gene_hpo_uri = args.gene_hpo_uri
 hpo_id_to_name_uri = args.hpo_id_to_name_uri
 hpo_id_col = args.hpo_id_col
 phenotype_col = args.phenotype_col
+# NEW 4/29/2025: Add pLI scores
+pli_uri = args.pli_uri
 
 # Fix float formatting before merging variant_category column
 def convert_to_uniform_format(num):
@@ -211,6 +214,11 @@ if (sample_hpo_uri!='NA') and (gene_hpo_uri!='NA') and (hpo_id_to_name_uri!='NA'
     else:
         merged_df['Case_Pheno'] = np.nan
         merged_df['Pheno_Overlapping_HPO_IDs'] = np.nan
+
+# NEW 4/29/2025: Add pLI scores (optional)
+if pli_uri!='':
+    pli_df = pd.read_csv(pli_uri, sep='\t')
+    merged_df['lof.pLI'] = merged_df.Gene.map(pli_df.set_index('gene_id')['lof.pLI'].to_dict())
 
 # Add 2 empty columns as spacers after priority columns (for exporting as Excel later)
 merged_df = merged_df[priority_cols + remaining_cols].copy()

@@ -27,8 +27,8 @@ prefix = args.prefix
 build = args.build
 confirmation_sample_id = args.confirmation_sample_id
 maternal_sample_id = args.maternal_sample_id
-static_cols = args.static_cols
-static_cols_to_combine = args.static_cols_to_combine
+static_cols = args.static_cols.split(',')
+static_cols_to_combine = args.static_cols_to_combine.split(',')
 
 hl.init(default_reference=build)
 

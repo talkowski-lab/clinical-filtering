@@ -93,6 +93,8 @@ workflow filterClinicalVariants {
                         'maternal_carrier', 'filters']
         # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
         Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense'}
+        Array[String] static_cols = ['fam_id','id','Fetal_Fraction','sex','Case_Pheno']
+        Array[String] static_cols_to_combine = ['fam_id', 'sex', 'Fetal_Fraction']  # will be '/'-separated in output
 
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_inheritance
@@ -302,6 +304,8 @@ workflow filterClinicalVariants {
             genome_build=genome_build,
             helper_functions_script=helper_functions_script,
             flag_from_confirmation_maternal_vcf_script=flag_from_confirmation_maternal_vcf_script,
+            static_cols=static_cols,
+            static_cols_to_combine=static_cols_to_combine,
             runtime_attr_override=runtime_attr_flag_conf_mat_gt
     }
 
@@ -509,6 +513,9 @@ task flagFromConfirmationMaternalVCF {
         String flag_from_confirmation_maternal_vcf_script
         String genome_build
 
+        Array[String] static_cols
+        Array[String] static_cols_to_combine
+
         RuntimeAttr? runtime_attr_override
     }
     Float input_size = size(input_tsv, 'GB')
@@ -547,7 +554,8 @@ task flagFromConfirmationMaternalVCF {
     curl ~{flag_from_confirmation_maternal_vcf_script} > add_GT_flags.py
     
     python3 add_GT_flags.py -i ~{input_tsv} -c ~{confirmation_vcf} -m ~{maternal_vcf} -p ~{prefix} \
-        --build ~{genome_build} --conf-id ~{confirmation_sample_id} --mat-id ~{maternal_sample_id}
+        --build ~{genome_build} --conf-id ~{confirmation_sample_id} --mat-id ~{maternal_sample_id} \
+        --static-cols ~{static_cols} --static-cols-to-combine ~{static_cols_to_combine}
     >>>
 
     output {

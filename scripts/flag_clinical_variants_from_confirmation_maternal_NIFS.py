@@ -16,8 +16,8 @@ parser.add_argument('-p', dest='prefix', help='Prefix for output filename')
 parser.add_argument('--build', dest='build', help='Genome build')
 parser.add_argument('--conf-id', dest='confirmation_sample_id', help='confirmation_sample_id')
 parser.add_argument('--mat-id', dest='maternal_sample_id', help='maternal_sample_id')
-parser.add_argumentt('--static-cols', dest='static_cols', help='static_cols for first tab of Excel output')
-parser.add_argumentt('--static-cols-to-combine', dest='static_cols_to_combine', help='static_cols_to_combine for second tab of Excel output')
+parser.add_argument('--static-cols', dest='static_cols', help='static_cols for first tab of Excel output')
+parser.add_argument('--static-cols-to-combine', dest='static_cols_to_combine', help='static_cols_to_combine for second tab of Excel output')
 
 args = parser.parse_args()
 input_uri = args.input_tsv

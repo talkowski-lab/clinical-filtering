@@ -178,7 +178,9 @@ task mergeExcelsPython {
         for i, uri in enumerate(excel_files):
             if (i+1)%100==0:
                 print(f"Loading excel {i+1}/{tot}...")
-            df = pd.read_excel(uri)
+            df = pd.read_excel(uri, sheet_name=None)
+            if type(df)==dict:
+                df = df[1]  # 2nd sheet contains variants
             merged_df = pd.concat([merged_df, df])
         merged_df.to_csv(merged_filename, sep='\t', index=False)
         EOF

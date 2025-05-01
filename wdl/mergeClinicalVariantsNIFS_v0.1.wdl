@@ -180,7 +180,7 @@ task mergeExcelsPython {
                 print(f"Loading excel {i+1}/{tot}...")
             df = pd.read_excel(uri, sheet_name=None)
             if type(df)==dict:
-                df = df[1]  # 2nd sheet contains variants
+                df = df['variant_info']  # 2nd sheet contains variants
             merged_df = pd.concat([merged_df, df])
         merged_df.to_csv(merged_filename, sep='\t', index=False)
         EOF

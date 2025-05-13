@@ -3,6 +3,7 @@ version 1.0
 import "mergeVCFs.wdl" as mergeVCFs
 import "helpers.wdl" as helpers
 import "filterClinicalVariantsTasks_v0.1.wdl" as filterClinicalVariants
+import "filterClinicalCompHets_v0.1.wdl" as filterClinicalCompHets
 
 struct RuntimeAttr {
     Float? mem_gb
@@ -24,6 +25,7 @@ workflow filterClinicalVariants {
         String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_clinical_helper_functions.py"       
         String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_variants_final_v0.1.py"
         String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_variants_inheritance_final_v0.1.py"
+        String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_comphets_xlr_hom_var_v0.1.py"
         String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/tier_clinical_variants_SNV_Indel.py"
         String add_phenotypes_merge_and_prettify_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/add_phenotypes_merge_and_prettify_clinical_variants_NIFS.py"
 
@@ -62,11 +64,12 @@ workflow filterClinicalVariants {
         Boolean merge_first_pass_filtered_vcfs=false
 
         File gene_phenotype_map
+        File carrier_gene_list  
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
-        Array[String] priority_cols=['fam_id', 'id', 'sex', 'locus', 'alleles', 'Tier', 'inheritance_mode',
+        Array[String] priority_cols=['fam_id', 'id', 'sex', 'trio_status', 'locus', 'alleles', 'Tier', 'inheritance_mode',
                         'disease_title_recessive', 'disease_title_dominant', 'CLNSIG', 'CLNREVSTAT', 
                         'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'CANONICAL', 'MANE_PLUS_CLINICAL',
-                        'AD_ref,AD_alt', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT',
+                        'AD_ref,AD_alt', 'transmission', 'mendel_code', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT',
                         'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 'comphet_ID',
                         'gene_list', 'cohort_AC', 'cohort_AF', 'gnomad_popmax_af', 'maternal_carrier', 'filters']
         # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
@@ -217,6 +220,19 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_merge_clinvar_vcfs
     }
 
+    # CompHets
+    call filterClinicalCompHets.filterClinicalCompHets as filterCompHetsXLRHomVar {
+        input:
+            recessive_vcf=select_first([mergeInheritanceRecessiveVCFs.merged_vcf_file, 'NA']),
+            clinvar_vcf=select_first([mergeClinVarVCFs.merged_vcf_file, 'NA']),
+            ped_uri=ped_uri,
+            genome_build=genome_build,
+            hail_docker=hail_docker,
+            carrier_gene_list=carrier_gene_list,
+            ad_alt_threshold=ad_alt_threshold,
+            filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script
+    }
+
     call filterClinicalVariants.splitByInheritance as splitClinVarByInheritance {
         input:
             input_tsv=mergeClinVar.merged_tsv,
@@ -279,10 +295,19 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_tiers
     }
 
+    call finalFilteringTiers as finalFilteringTiersCompHet {
+        input:
+            input_tsv=filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv,
+            inheritance_type='recessive',
+            hail_docker=hail_docker,
+            filter_final_tiers_script=filter_final_tiers_script,
+            runtime_attr_override=runtime_attr_filter_tiers
+    }
+
     call filterClinicalVariants.addPhenotypesMergeAndPrettifyOutputs as addPhenotypesMergeAndPrettifyOutputs {
         input:
             input_uris=[
-                # finalFilteringTiersCompHet.filtered_tsv,  # ORDER MATTERS (CompHet output first)
+                finalFilteringTiersCompHet.filtered_tsv,  # ORDER MATTERS (CompHet output first)
                 finalFilteringTiersRecessive.filtered_tsv,
                 finalFilteringTiersDominant.filtered_tsv,
                 finalFilteringTiersClinVarRecessive.filtered_tsv,
@@ -319,11 +344,13 @@ workflow filterClinicalVariants {
         File recessive_tsv = mergeInheritanceRecessive.merged_tsv
         File dominant_tsv = mergeInheritanceDominant.merged_tsv
         File inheritance_other_tsv = mergeInheritanceOther.merged_tsv
-    
+        File comphet_xlr_hom_var_mat_carrier_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv
+
         # After tiering (does not include ClinVar separate output for now)
         File final_recessive_tsv = finalFilteringTiersRecessive.filtered_tsv
         File final_dominant_tsv = finalFilteringTiersDominant.filtered_tsv
         File final_inheritance_other_tsv = finalFilteringTiersInheritanceOther.filtered_tsv
+        File final_comphet_xlr_hom_var_mat_carrier_tsv = finalFilteringTiersCompHet.filtered_tsv
 
         # Merged and prettified
         File final_merged_clinical_tsv = splitMergedOutputBySample.final_merged_clinical_tsv

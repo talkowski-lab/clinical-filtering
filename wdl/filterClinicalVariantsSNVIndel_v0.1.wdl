@@ -225,6 +225,8 @@ workflow filterClinicalVariants {
         input:
             recessive_vcf=select_first([mergeInheritanceRecessiveVCFs.merged_vcf_file, 'NA']),
             clinvar_vcf=select_first([mergeClinVarVCFs.merged_vcf_file, 'NA']),
+            cohort_prefix=cohort_prefix,
+            sv_base_mini_docker=sv_base_mini_docker,
             ped_uri=ped_uri,
             genome_build=genome_build,
             hail_docker=hail_docker,

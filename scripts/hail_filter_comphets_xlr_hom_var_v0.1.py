@@ -34,20 +34,6 @@
 5/14/2025: 
 - don't drop original info/vep fields
 - drop renamed INFO and VEP fields and retain originals (flattened later) to match other outputs
-- add sex annotation to annotate_and_filter_trio_matrix
-6/2/2025:
-- use restrictive CSQ fields for SV gene fields
-6/3/2025:
-- rename all INFO struct fields to "info.{field}" and VEP struct fields to "vep.transcript_consequences.{field}"
-- annotate inheritance_code field from vep.transcript_consequences
-- use restrictive_csq_genes as "gene" field for comphets, restrictive_inheritance_code as "inheritance_code" field
-- don't drop renamed INFO and VEP fields because already renamed above
-- keep 'gene' column
-- don't filter out BNDs
-- keep XLR for all samples, not just male
-6/4/2025:
-- only include AR/XLR that pass recessive_freq filter
-- use variant_id as row key for when running on both SVs and SNV/Indels
 '''
 ###
 
@@ -142,8 +128,20 @@ if snv_indel_vcf!='NA':
     new_info_field_map = {og_field: f"info.{og_field}" for og_field in snv_info_fields}
     new_vep_field_map = {og_field: f"vep.transcript_consequences.{og_field}" for og_field in vep_fields}
 
+    # Check for conflicting INFO fields with FORMAT fields (e.g. DP)
+    conflicting_snv_info_fields = list(np.intersect1d(snv_info_fields, list(snv_mt.entry)))
+    # Check for conflicting INFO and VEP fields (e.g. AF)
+    conflicting_vep_fields = list(np.intersect1d(snv_info_fields, vep_fields))
+    # Retain original field order
+    new_info_field_map = {og_field: f"info.{og_field}" if og_field in conflicting_snv_info_fields 
+                          else og_field for og_field in snv_info_fields}
+    new_vep_field_map = {og_field: f"vep.{og_field}" if og_field in conflicting_vep_fields 
+                          else og_field for og_field in vep_fields}
+    
+    # NEW 5/14/2025: don't drop original info/vep fields
     snv_mt = snv_mt.annotate_rows(**{new_field: snv_mt.info[og_field] for og_field, new_field in new_info_field_map.items()} | 
-                    {new_field: snv_mt.vep.transcript_consequences[og_field] for og_field, new_field in new_vep_field_map.items()})
+                    {new_field: snv_mt.vep.transcript_consequences[og_field] for og_field, new_field in new_vep_field_map.items()})#\
+            # .drop('vep', 'info')
     
     snv_mt = snv_mt.drop('info','vep')
     
@@ -164,10 +162,14 @@ if sv_vcf!='NA':
     # NEW 1/30/2025: flatten INFO fields
     sv_info_fields = list(sv_mt.info)
 
-    # NEW 6/3/2025: rename all INFO struct fields to "info.{field}"
-    new_info_field_map = {og_field: f"info.{og_field}" for og_field in sv_info_fields}
-
-    sv_mt = sv_mt.annotate_rows(**{new_field: sv_mt.info[og_field] for og_field, new_field in new_info_field_map.items()})    
+    # Check for conflicting INFO fields with FORMAT fields (e.g. DP)
+    conflicting_sv_info_fields = list(np.intersect1d(sv_info_fields, list(sv_mt.entry)))
+    # Retain original field order
+    new_info_field_map = {og_field: f"info.{og_field}" if og_field in conflicting_sv_info_fields 
+                          else og_field for og_field in sv_info_fields}
+    # NEW 5/14/2025: don't drop original info/vep fields
+    sv_mt = sv_mt.annotate_rows(**{new_field: sv_mt.info[og_field] for og_field, new_field in new_info_field_map.items()})#\
+            # .drop('info')
     
     # NEW 1/30/2025: combine gene-level annotations in INFO where there is a value for each gene
     # Annotate gene to match SNV/Indels (to explode on and keep original genes annotation)
@@ -464,6 +466,9 @@ merged_tm = hl.trio_matrix(merged_mt, pedigree, complete_trios=False)
 merged_tm = remove_parent_probands_trio_matrix(merged_tm)  # NEW 1/31/2025: Removes redundant "trios"  
 
 gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(merged_tm, merged_mt, pedigree)
+
+# NEW 5/14/2025: drop renamed INFO and VEP fields and retain originals (flattened later) to match other outputs
+gene_phased_tm = gene_phased_tm.drop(*(list(new_vep_field_map.keys()) + list(new_info_field_map.keys())))
 
 # NEW 1/13/2025: maternal carrier variants
 # NEW 1/30/2025: edited gene_phased_tm.vep.transcript_consequences.SYMBOL --> gene_phased_tm.gene,

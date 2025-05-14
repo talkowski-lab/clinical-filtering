@@ -212,12 +212,12 @@ task filterCompHetsXLRHomVar {
 
     String vcf_file = if (variant_types=='SV') then sv_vcf else snv_indel_vcf
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = if prefix!='NA' then prefix else basename(vcf_file, file_ext)
+    String new_prefix = if prefix!='NA' then prefix else basename(vcf_file, file_ext)
 
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py
         curl ~{filter_comphets_xlr_hom_var_script} > filter_vcf.py
-        python3 filter_vcf.py ~{snv_indel_vcf} ~{clinvar_vcf} ~{sv_vcf} ~{ped_uri} ~{prefix} ~{genome_build} \
+        python3 filter_vcf.py ~{snv_indel_vcf} ~{clinvar_vcf} ~{sv_vcf} ~{ped_uri} ~{new_prefix} ~{genome_build} \
         ~{cpu_cores} ~{memory} ~{ad_alt_threshold} ~{carrier_gene_list}
     }
 

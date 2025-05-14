@@ -769,7 +769,7 @@ merged_tm = remove_parent_probands_trio_matrix(merged_tm)  # NEW 1/31/2025: Remo
 gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(merged_tm, merged_mt, pedigree)
 
 # NEW 5/14/2025: drop renamed INFO and VEP fields and retain originals (flattened later) to match other outputs
-gene_phased_tm = gene_phased_tm.drop(*(list(new_vep_field_map.keys()) + list(new_info_field_map.keys())))
+gene_phased_tm = gene_phased_tm.drop(*(list(new_vep_field_map.values()) + list(new_info_field_map.values())))
 
 # NEW 1/13/2025: maternal carrier variants
 # NEW 1/30/2025: edited gene_phased_tm.vep.transcript_consequences.SYMBOL --> gene_phased_tm.gene,

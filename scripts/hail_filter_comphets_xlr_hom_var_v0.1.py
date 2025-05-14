@@ -31,6 +31,9 @@
 3/4/2025:
 - change OMIM_recessive/OMIM_dominant to just recessive/dominant
 - remove redundant gene field from output
+5/14/2025: 
+- don't drop original info/vep fields
+- drop renamed INFO and VEP fields and retain originals (flattened later) to match other outputs
 '''
 ###
 
@@ -128,9 +131,10 @@ if snv_indel_vcf!='NA':
     new_vep_field_map = {og_field: f"vep.{og_field}" if og_field in conflicting_vep_fields 
                           else og_field for og_field in vep_fields}
     
+    # NEW 5/14/2025: don't drop original info/vep fields
     snv_mt = snv_mt.annotate_rows(**{new_field: snv_mt.info[og_field] for og_field, new_field in new_info_field_map.items()} | 
-                    {new_field: snv_mt.vep.transcript_consequences[og_field] for og_field, new_field in new_vep_field_map.items()})\
-            .drop('vep', 'info')
+                    {new_field: snv_mt.vep.transcript_consequences[og_field] for og_field, new_field in new_vep_field_map.items()})#\
+            # .drop('vep', 'info')
     
 # Load SV VCF
 if sv_vcf!='NA':
@@ -152,8 +156,9 @@ if sv_vcf!='NA':
     # Retain original field order
     new_info_field_map = {og_field: f"info.{og_field}" if og_field in conflicting_sv_info_fields 
                           else og_field for og_field in sv_info_fields}
-    sv_mt = sv_mt.annotate_rows(**{new_field: sv_mt.info[og_field] for og_field, new_field in new_info_field_map.items()})\
-            .drop('info')
+    # NEW 5/14/2025: don't drop original info/vep fields
+    sv_mt = sv_mt.annotate_rows(**{new_field: sv_mt.info[og_field] for og_field, new_field in new_info_field_map.items()})#\
+            # .drop('info')
     
     # NEW 1/30/2025: combine gene-level annotations in INFO where there is a value for each gene
     # Annotate gene to match SNV/Indels (to explode on and keep original genes annotation)
@@ -762,6 +767,9 @@ merged_tm = hl.trio_matrix(merged_mt, pedigree, complete_trios=False)
 merged_tm = remove_parent_probands_trio_matrix(merged_tm)  # NEW 1/31/2025: Removes redundant "trios"  
 
 gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(merged_tm, merged_mt, pedigree)
+
+# NEW 5/14/2025: drop renamed INFO and VEP fields and retain originals (flattened later) to match other outputs
+gene_phased_tm = gene_phased_tm.drop(*(list(new_vep_field_map.keys()) + list(new_info_field_map.keys())))
 
 # NEW 1/13/2025: maternal carrier variants
 # NEW 1/30/2025: edited gene_phased_tm.vep.transcript_consequences.SYMBOL --> gene_phased_tm.gene,

@@ -169,7 +169,7 @@ task filterCompHetsXLRHomVar {
 
         Int ad_alt_threshold
 
-        String? prefix  # optional, for if vcf_file has a very long filename (e.g. NIFS)
+        String prefix='NA'  # optional, for if vcf_file has a very long filename (e.g. NIFS)
         String genome_build
 
         String helper_functions_script
@@ -212,7 +212,7 @@ task filterCompHetsXLRHomVar {
 
     String vcf_file = if (variant_types=='SV') then sv_vcf else snv_indel_vcf
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String prefix = select_first([prefix, basename(vcf_file, file_ext)])
+    String prefix = if prefix!='NA' then prefix else basename(vcf_file, file_ext)
 
     command {
         curl ~{helper_functions_script} > clinical_helper_functions.py

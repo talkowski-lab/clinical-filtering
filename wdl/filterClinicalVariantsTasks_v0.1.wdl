@@ -213,7 +213,7 @@ task filterCompHetsXLRHomVar {
 
     String vcf_file = if (variant_types=='SV') then sv_vcf else snv_indel_vcf
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
-    String new_prefix = if prefix!='NA' then prefix else basename(vcf_file, file_ext)
+    String prefix = if prefix!='NA' then prefix else basename(vcf_file, file_ext)
 
     command <<<
     set -eou pipefail

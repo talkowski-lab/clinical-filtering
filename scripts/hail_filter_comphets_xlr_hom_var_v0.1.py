@@ -34,6 +34,7 @@
 5/14/2025: 
 - don't drop original info/vep fields
 - drop renamed INFO and VEP fields and retain originals (flattened later) to match other outputs
+- add sex annotation to annotate_and_filter_trio_matrix
 '''
 ###
 
@@ -255,14 +256,6 @@ merged_mt = merged_mt.annotate_rows(in_non_par=~(merged_mt.locus.in_autosome_or_
 # Annotate affected status/phenotype from pedigree
 ped_ht = hl.import_table(ped_uri, delimiter='\t').key_by('sample_id')
 merged_mt = merged_mt.annotate_cols(phenotype=ped_ht[merged_mt.s].phenotype)
-
-# Get cohort unaffected/affected het and homvar counts
-merged_mt = merged_mt.annotate_rows(**{
-    "n_het_unaffected": hl.agg.filter(merged_mt.phenotype=='1', hl.agg.sum(merged_mt.GT.is_het())),
-    "n_hom_var_unaffected": hl.agg.filter(merged_mt.phenotype=='1', hl.agg.sum(merged_mt.GT.is_hom_var())),
-    "n_het_affected": hl.agg.filter(merged_mt.phenotype=='2', hl.agg.sum(merged_mt.GT.is_het())),
-    "n_hom_var_affected": hl.agg.filter(merged_mt.phenotype=='2', hl.agg.sum(merged_mt.GT.is_hom_var()))
-})
 
 ## EDITED HAIL FUNCTIONS
 # EDITED: don't check locus struct
@@ -551,8 +544,8 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
     
     # NEW 2/3/2025: Run annotate_and_filter_trio_matrix after phasing in phase_by_transmission_aggregate_by_gene
-    phased_tm = annotate_and_filter_trio_matrix(phased_tm, mt, pedigree) 
-
+    phased_tm = annotate_and_filter_trio_matrix(phased_tm, mt, pedigree, ped_ht) 
+    
     phased_tm = phased_tm.key_rows_by(locus_expr,'alleles','gene')
 
     # NEW 2/3/2025: get_transmission in phase_by_transmission_aggregate_by_gene
@@ -574,12 +567,15 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     
     return phased_tm, gene_agg_phased_tm
 
-def annotate_and_filter_trio_matrix(tm, mt, pedigree):
+def annotate_and_filter_trio_matrix(tm, mt, pedigree, ped_ht):
     complete_trio_probands = [trio.s for trio in pedigree.complete_trios()]
     if len(complete_trio_probands)==0:
         complete_trio_probands = ['']
     tm = tm.annotate_cols(trio_status=hl.if_else(tm.fam_id=='-9', 'not_in_pedigree', 
                                                        hl.if_else(hl.array(complete_trio_probands).contains(tm.id), 'trio', 'non_trio')))
+
+    # NEW 5/14/2025: add sex annotation to annotate_and_filter_trio_matrix
+    tm = tm.annotate_cols(sex=ped_ht[tm.id].sex)
 
     # NEW 2/3/2025: get_mendel_errors in annotate_and_filter_trio_matrix
     tm = get_mendel_errors(mt, tm, pedigree)

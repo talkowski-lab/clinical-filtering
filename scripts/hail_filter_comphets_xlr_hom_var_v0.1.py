@@ -257,6 +257,14 @@ merged_mt = merged_mt.annotate_rows(in_non_par=~(merged_mt.locus.in_autosome_or_
 ped_ht = hl.import_table(ped_uri, delimiter='\t').key_by('sample_id')
 merged_mt = merged_mt.annotate_cols(phenotype=ped_ht[merged_mt.s].phenotype)
 
+# Get cohort unaffected/affected het and homvar counts
+merged_mt = merged_mt.annotate_rows(**{
+    "n_het_unaffected": hl.agg.filter(merged_mt.phenotype=='1', hl.agg.sum(merged_mt.GT.is_het())),
+    "n_hom_var_unaffected": hl.agg.filter(merged_mt.phenotype=='1', hl.agg.sum(merged_mt.GT.is_hom_var())),
+    "n_het_affected": hl.agg.filter(merged_mt.phenotype=='2', hl.agg.sum(merged_mt.GT.is_het())),
+    "n_hom_var_affected": hl.agg.filter(merged_mt.phenotype=='2', hl.agg.sum(merged_mt.GT.is_hom_var()))
+})
+
 ## EDITED HAIL FUNCTIONS
 # EDITED: don't check locus struct
 @typecheck(dataset=MatrixTable, method=str, tolerate_generic_locus=bool)

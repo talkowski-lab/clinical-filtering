@@ -101,6 +101,7 @@ workflow filterClinicalCompHets {
                 clinvar_vcf=select_first([subsetVCFSamplesSNVIndelsClinVar.vcf_subset, 'NA']),
                 sv_vcf=select_first([subsetVCFSamplesSVs.vcf_subset, 'NA']),
                 ped_uri=select_first([addSVSamplesToPed.output_ped, ped_uri]),
+                prefix=cohort_prefix,
                 helper_functions_script=helper_functions_script,
                 filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
                 genome_build=genome_build,

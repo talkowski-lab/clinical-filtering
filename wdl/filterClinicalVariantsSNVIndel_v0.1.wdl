@@ -100,6 +100,7 @@ workflow filterClinicalVariants {
             input:
             vcf_file=vcf_file,
             ped_uri=ped_uri,
+            prefix=cohort_prefix,
             helper_functions_script=helper_functions_script,
             filter_clinical_variants_snv_indel_script=filter_clinical_variants_snv_indel_script,
             hail_docker=hail_docker,
@@ -117,6 +118,7 @@ workflow filterClinicalVariants {
             input:
             vcf_file=runClinicalFiltering.filtered_vcf,
             ped_uri=ped_uri,
+            prefix=cohort_prefix,
             helper_functions_script=helper_functions_script,
             filter_clinical_variants_snv_indel_inheritance_script=filter_clinical_variants_snv_indel_inheritance_script,
             hail_docker=hail_docker,

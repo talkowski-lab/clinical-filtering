@@ -140,7 +140,7 @@ phased_sv_tm = phased_sv_tm.annotate_cols(
 
 # NEW 5/29/2025: Move affected/unaffected fields out of INFO
 cohort_affected_cols = [field for field in list(sv_mt.info) if '_affected' in field or '_unaffected' in field]
-sv_mt = sv_mt.annotate_rows(**{field: sv_mt[field] for field in cohort_affected_cols} | 
+sv_mt = sv_mt.annotate_rows(**{field: sv_mt.info[field] for field in cohort_affected_cols} | 
     {'info': sv_mt.info.drop(*cohort_affected_cols)})
 
 phased_sv_tm = phased_sv_tm.annotate_rows(**{col: sv_mt.rows()[phased_sv_tm.row_key][col] 

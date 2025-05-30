@@ -19,6 +19,9 @@
 - get affected/unaffected counts at family-level
 2/20/2025:
 - rewrote variant_category annotation because using append was messing things up in Hail
+5/29/2025:
+- annotate family unaffected/affected AC
+- move affected/unaffected fields out of INFO
 '''
 ###
 
@@ -45,6 +48,15 @@ ped_uri = args.ped_uri
 cores = args.cores  # string
 mem = int(np.floor(float(args.mem)))
 genome_build = args.build
+
+hl.init(min_block_size=128, 
+        local=f"local[*]", 
+        spark_conf={
+                    "spark.driver.memory": f"{int(np.floor(mem*0.8))}g",
+                    "spark.speculation": 'true'
+                    }, 
+        tmp_dir="tmp", local_tmpdir="tmp",
+                    )
 
 def get_transmission(phased_tm):
     phased_tm = phased_tm.annotate_entries(transmission=hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|0'), 'uninherited',
@@ -83,14 +95,6 @@ tmp_ped.to_csv(cropped_ped_uri, sep='\t', index=False)
 ped_ht = hl.import_table(cropped_ped_uri, delimiter='\t').key_by('sample_id')
 sv_mt = sv_mt.annotate_cols(phenotype=ped_ht[sv_mt.s].phenotype)
 
-# Get cohort unaffected/affected het and homvar counts
-sv_mt = sv_mt.annotate_rows(**{
-    "n_cohort_het_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_het())),
-    "n_cohort_hom_var_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_hom_var())),
-    "n_cohort_het_affected": hl.agg.filter(sv_mt.phenotype=='2', hl.agg.sum(sv_mt.GT.is_het())),
-    "n_cohort_hom_var_affected": hl.agg.filter(sv_mt.phenotype=='2', hl.agg.sum(sv_mt.GT.is_hom_var()))
-})
-
 # Phasing
 pedigree = hl.Pedigree.read(cropped_ped_uri, delimiter='\t')
 
@@ -101,6 +105,12 @@ grouped_fam_sv_mt = fam_sv_mt.group_cols_by(fam_sv_mt.family_id).aggregate(**{
     "n_family_hom_var_unaffected": hl.agg.filter(fam_sv_mt.phenotype=='1', hl.agg.sum(fam_sv_mt.GT.is_hom_var())),
     "n_family_het_affected": hl.agg.filter(fam_sv_mt.phenotype=='2', hl.agg.sum(fam_sv_mt.GT.is_het())),
     "n_family_hom_var_affected": hl.agg.filter(fam_sv_mt.phenotype=='2', hl.agg.sum(fam_sv_mt.GT.is_hom_var()))
+})
+
+# NEW 5/29/2025: Annotate family unaffected/affected AC  
+grouped_fam_sv_mt = grouped_fam_sv_mt.annotate_entries(**{
+    "family_AC_unaffected": grouped_fam_sv_mt.n_family_het_unaffected + 2*grouped_fam_sv_mt.n_family_hom_var_unaffected,
+    "family_AC_affected": grouped_fam_sv_mt.n_family_het_affected + 2*grouped_fam_sv_mt.n_family_hom_var_affected
 })
 
 sv_tm = hl.trio_matrix(sv_mt, pedigree, complete_trios=False)
@@ -128,11 +138,14 @@ phased_sv_tm = phased_sv_tm.annotate_cols(
     father=phased_sv_tm.father.annotate(
             phenotype=ped_ht[phased_sv_tm.father.s].phenotype))
 
-cohort_affected_cols = ["n_cohort_het_unaffected", "n_cohort_hom_var_unaffected", "n_cohort_het_affected", "n_cohort_hom_var_affected"]
+# NEW 5/29/2025: Move affected/unaffected fields out of INFO
+cohort_affected_cols = [field for field in list(sv_mt.info) if '_affected' in field or '_unaffected' in field]
+sv_mt = sv_mt.annotate_rows(**{field: sv_mt.info[field] for field in cohort_affected_cols})
+
 phased_sv_tm = phased_sv_tm.annotate_rows(**{col: sv_mt.rows()[phased_sv_tm.row_key][col] 
                                              for col in cohort_affected_cols})
 
-family_affected_cols = ["n_family_het_unaffected", "n_family_hom_var_unaffected", "n_family_het_affected", "n_family_hom_var_affected"]
+family_affected_cols = [field for field in list(grouped_fam_sv_mt.row) if '_affected' in field or '_unaffected' in field]
 phased_sv_tm = phased_sv_tm.annotate_entries(**{col: grouped_fam_sv_mt[phased_sv_tm.row_key, phased_sv_tm.fam_id][col]
                                              for col in family_affected_cols})
 
@@ -164,13 +177,15 @@ phased_sv_tm = phased_sv_tm.annotate_entries(dominant_gt=((dom_trio_criteria) | 
 
 # NEW 2/19/2025: Annotate categories for merged output, instead of filtering
 # NEW 2/20/2025: Rewrote variant_category annotation because using append was messing things up in Hail?
+# NEW 5/29/2025: Added PREDICTED_LOF only criterion for P/LP output
 size_field = [x for x in list(sv_mt.info) if 'passes_SVLEN_filter_' in x][0]
 phased_sv_tm = phased_sv_tm.annotate_rows(
     variant_category = hl.array([
         # Category 1: Pathogenic only (P/LP)
         hl.if_else(
-            (hl.any(lambda x: x.matches('athogenic'), phased_sv_tm.info.clinical_interpretation)) |  # ClinVar P/LP
-            (hl.is_defined(phased_sv_tm.info.dbvar_pathogenic)),  # dbVar Pathogenic 
+            ((hl.any(lambda x: x.matches('athogenic'), phased_sv_tm.info.clinical_interpretation)) |  # ClinVar P/LP
+            (hl.is_defined(phased_sv_tm.info.dbvar_pathogenic))) &  # dbVar Pathogenic 
+            (phased_sv_tm.info.PREDICTED_LOF.size()!=0),  # PREDICTED_LOF only
             'P/LP', 
             hl.missing(hl.tstr)
         ),

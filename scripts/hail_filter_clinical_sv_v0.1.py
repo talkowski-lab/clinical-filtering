@@ -22,17 +22,6 @@
 5/29/2025:
 - annotate family unaffected/affected AC
 - move affected/unaffected fields out of INFO
-6/2/2025:
-- only consider restrictive genes for dominant and recessive inheritance_code filtering
-7/14/2025:
-- restrict large regions to not BND or CPX, impacts a gene from restrictive fields
-- restrict large_region only outputs to private to a family
-- new 'genic' category for any restrictive fields' genes that are in a gene list
-9/2/2025:
-- use dominant_freq filter for 'genic' category
-9/3/2025:
-- use dominant_freq filter for 'P/LP' and 'large_region' categories
-- require 1/1 for recessives
 '''
 ###
 
@@ -68,6 +57,14 @@ hl.init(min_block_size=128,
                     }, 
         tmp_dir="tmp", local_tmpdir="tmp",
                     )
+
+def get_transmission(phased_tm):
+    phased_tm = phased_tm.annotate_entries(transmission=hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|0'), 'uninherited',
+            hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|1'), 'inherited_from_mother',
+                        hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|0'), 'inherited_from_father',
+                                hl.or_missing(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|1'), 'inherited_from_both'))))
+    )
+    return phased_tm
 
 def filter_and_annotate_tm(tm, variant_category=None, filter_type='trio'):
     '''
@@ -146,9 +143,9 @@ cohort_affected_cols = [field for field in list(sv_mt.info) if '_affected' in fi
 sv_mt = sv_mt.annotate_rows(**{field: sv_mt.info[field] for field in cohort_affected_cols})
 
 phased_sv_tm = phased_sv_tm.annotate_rows(**{col: sv_mt.rows()[phased_sv_tm.row_key][col] 
-                                             for col in cohort_affected_cols}  | 
-                                            {'info': phased_sv_tm.info.drop(*cohort_affected_cols)})
-family_affected_cols = [field for field in list(grouped_fam_sv_mt.entry) if '_affected' in field or '_unaffected' in field]
+                                             for col in cohort_affected_cols})
+
+family_affected_cols = [field for field in list(grouped_fam_sv_mt.row) if '_affected' in field or '_unaffected' in field]
 phased_sv_tm = phased_sv_tm.annotate_entries(**{col: grouped_fam_sv_mt[phased_sv_tm.row_key, phased_sv_tm.fam_id][col]
                                              for col in family_affected_cols})
 
@@ -181,8 +178,6 @@ phased_sv_tm = phased_sv_tm.annotate_entries(dominant_gt=((dom_trio_criteria) | 
 # NEW 2/19/2025: Annotate categories for merged output, instead of filtering
 # NEW 2/20/2025: Rewrote variant_category annotation because using append was messing things up in Hail?
 # NEW 5/29/2025: Added PREDICTED_LOF only criterion for P/LP output
-# NEW 9/2/2025: use dominant_freq filter for 'genic' category
-# NEW 9/3/2025: use dominant_freq filter for 'P/LP' and 'large_region' categories
 size_field = [x for x in list(sv_mt.info) if 'passes_SVLEN_filter_' in x][0]
 phased_sv_tm = phased_sv_tm.annotate_rows(
     variant_category = hl.array([
@@ -190,8 +185,7 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
         hl.if_else(
             ((hl.any(lambda x: x.matches('athogenic'), phased_sv_tm.info.clinical_interpretation)) |  # ClinVar P/LP
             (hl.is_defined(phased_sv_tm.info.dbvar_pathogenic))) &  # dbVar Pathogenic 
-            (phased_sv_tm.info.PREDICTED_LOF.size()!=0) &  # PREDICTED_LOF only
-            (phased_sv_tm.info.dominant_freq),
+            (phased_sv_tm.info.PREDICTED_LOF.size()!=0),  # PREDICTED_LOF only
             'P/LP', 
             hl.missing(hl.tstr)
         ),

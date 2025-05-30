@@ -15,9 +15,6 @@
 5/29/2025:
 - more AC and AF cutoffs, PED inputs
 - annotate cohort unaffected/affected counts and AC (moved from hail_filter_clinical_sv_v0.1.py to hail_annotate_sv_gene_level_v0.1.py)
-6/2/2025:
-- rename permissive_csq, restrictive_csq to permissive_csq_fields, restrictive_csq_fields
-- add permissive_gene_source, restrictive_gene_source, permissive_inheritance_code, restrictive_inheritance_code
 '''
 ###
 
@@ -79,9 +76,9 @@ gnomad_af_rec_threshold = float(args.gnomad_af_rec_threshold)
 gnomad_af_field = args.gnomad_af_field
 gnomad_popmax_af_threshold = float(args.gnomad_popmax_af_threshold)
 # NEW 5/29/2025: More AC and AF cutoffs, PED inputs
-rec_n_cohort_hom_var_threshold = int(args.rec_n_cohort_hom_var_threshold)
-dom_ac_threshold = int(args.dom_ac_threshold)
-dom_ac_unaffected_threshold =int(args.dom_ac_unaffected_threshold)
+rec_n_cohort_hom_var_threshold = args.rec_n_cohort_hom_var_threshold
+dom_ac_threshold = args.dom_ac_threshold
+dom_ac_unaffected_threshold = args.dom_ac_unaffected_threshold
 
 # NEW 2/19/2025: Remove sv_gene_fields input and change Python variable to be a union of restrictive_csq_fields and permissive_csq_fields
 sv_gene_fields = list(np.union1d(permissive_csq_fields, restrictive_csq_fields))
@@ -107,6 +104,69 @@ tmp_ped = pd.read_csv(ped_uri, sep='\t').iloc[:,:6]
 tmp_ped.columns = ['family_id', 'sample_id', 'paternal_id', 'maternal_id', 'sex', 'phenotype']
 cropped_ped_uri = f"{os.path.basename(ped_uri).split('.ped')[0]}_crop.ped"
 tmp_ped.to_csv(cropped_ped_uri, sep='\t', index=False)
+
+ped_ht = hl.import_table(cropped_ped_uri, delimiter='\t').key_by('sample_id')
+sv_mt = sv_mt.annotate_cols(phenotype=ped_ht[sv_mt.s].phenotype)
+
+# Get cohort unaffected/affected het and homvar counts
+sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(**{
+    "n_cohort_het_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_het())),
+    "n_cohort_hom_var_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_hom_var())),
+    "n_cohort_het_affected": hl.agg.filter(sv_mt.phenotype=='2', hl.agg.sum(sv_mt.GT.is_het())),
+    "n_cohort_hom_var_affected": hl.agg.filter(sv_mt.phenotype=='2', hl.agg.sum(sv_mt.GT.is_hom_var()))
+    })
+)
+
+# NEW 5/29/2025: Annotate cohort unaffected/affected AC  
+sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(**{
+    "cohort_AC_unaffected": sv_mt.info.n_cohort_het_unaffected + 2*sv_mt.info.n_cohort_hom_var_unaffected,
+    "cohort_AC_affected": sv_mt.info.n_cohort_het_affected + 2*sv_mt.info.n_cohort_hom_var_affected
+    })
+)
+
+# Frequency flags
+# Use "max" AC and AF because Hail parses as array with 1 element
+# NEW 2/20/2025: Allow for missing gnomAD AFs
+# NEW 5/29/2025: Incorporate cohort unaffected/affected counts and AC
+sv_mt = sv_mt.annotate_rows(
+    info=sv_mt.info.annotate(
+        dominant_freq=(
+            (
+                (hl.max(sv_mt.info.AC) <= dom_ac_threshold) |
+                (hl.max(sv_mt.info.AF) <= dom_af_threshold)
+            ) &
+            (
+                (sv_mt.info[gnomad_af_field] <= gnomad_af_dom_threshold) |
+                hl.is_missing(sv_mt.info[gnomad_af_field])
+            ) &
+            (sv_mt.info.cohort_AC_unaffected <= dom_ac_unaffected_threshold)
+        ),
+        recessive_freq=(
+            (
+                (
+                    (sv_mt.info.n_cohort_hom_var_unaffected + sv_mt.info.n_cohort_hom_var_affected)
+                    <= rec_n_cohort_hom_var_threshold
+                ) |
+                (hl.max(sv_mt.info.AF) <= rec_af_threshold)
+            ) &
+            (
+                (sv_mt.info[gnomad_af_field] <= gnomad_af_rec_threshold) |
+                hl.is_missing(sv_mt.info[gnomad_af_field])
+            )
+        )
+    )
+)
+
+n_tot_samples = sv_mt.count_cols()
+
+## ANNOTATIONS
+# Annotate genes in INFO
+sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(
+    genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in sv_gene_fields]))),
+    restrictive_csq=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in restrictive_csq_fields]))),
+    permissive_csq=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in permissive_csq_fields])))))
+# Explode rows by gene for gene-level annotation
+sv_gene_mt = sv_mt.explode_rows(sv_mt.info.genes)
 
 ped_ht = hl.import_table(cropped_ped_uri, delimiter='\t').key_by('sample_id')
 sv_mt = sv_mt.annotate_cols(phenotype=ped_ht[sv_mt.s].phenotype)
@@ -231,12 +291,8 @@ def get_gene_level_annotations(mt, gene_field, gene_field_list, inheritance_ht, 
 # Load gene list file(s) if available
 if gene_list_tsv != 'NA':
     gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
-    gene_list_dict = {
-        name: hl.literal(set(pd.read_csv(uri, header=None)[0].str.replace('\t', '').tolist()))
-        for name, uri in gene_list_uris.items()
-    }
-else:
-    gene_list_dict = None
+    gene_list = {gene_list_name: pd.read_csv(uri, header=None)[0].tolist() 
+                for gene_list_name, uri in gene_list_uris.items()}
 
 # Load inheritance table
 inheritance_ht = hl.import_table(inheritance_uri).key_by('approvedGeneSymbol')

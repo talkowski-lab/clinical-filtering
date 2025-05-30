@@ -76,9 +76,9 @@ gnomad_af_rec_threshold = float(args.gnomad_af_rec_threshold)
 gnomad_af_field = args.gnomad_af_field
 gnomad_popmax_af_threshold = float(args.gnomad_popmax_af_threshold)
 # NEW 5/29/2025: More AC and AF cutoffs, PED inputs
-rec_n_cohort_hom_var_threshold = args.rec_n_cohort_hom_var_threshold
-dom_ac_threshold = args.dom_ac_threshold
-dom_ac_unaffected_threshold = args.dom_ac_unaffected_threshold
+rec_n_cohort_hom_var_threshold = int(args.rec_n_cohort_hom_var_threshold)
+dom_ac_threshold = int(args.dom_ac_threshold)
+dom_ac_unaffected_threshold =int(args.dom_ac_unaffected_threshold)
 
 # NEW 2/19/2025: Remove sv_gene_fields input and change Python variable to be a union of restrictive_csq_fields and permissive_csq_fields
 sv_gene_fields = list(np.union1d(permissive_csq_fields, restrictive_csq_fields))

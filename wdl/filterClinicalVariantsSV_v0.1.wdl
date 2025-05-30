@@ -32,10 +32,10 @@ workflow filterClinicalVariantsSV {
         String hail_docker
         String variant_interpretation_docker
 
-        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_clinical_helper_functions.py"
-        String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
-        String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_annotate_sv_gene_level_v0.1.py"
-        String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_sv_v0.1.py"
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_clinical_helper_functions.py"
+        String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
+        String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_annotate_sv_gene_level_v0.1.py"
+        String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_sv_v0.1.py"
 
         Array[String] permissive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN",
                          "PREDICTED_PARTIAL_EXON_DUP", "PREDICTED_DUP_PARTIAL", "PREDICTED_INTRONIC",

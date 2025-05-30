@@ -40,7 +40,7 @@ workflow filterClinicalVariantsSV {
         Array[String] permissive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN",
                          "PREDICTED_PARTIAL_EXON_DUP", "PREDICTED_DUP_PARTIAL", "PREDICTED_INTRONIC",
                          "PREDICTED_INV_SPAN", "PREDICTED_UTR", "PREDICTED_PROMOTER", "PREDICTED_BREAKEND_EXONIC"]
-        Array[String] restrictive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN"]
+        Array[String] restrictive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN", "PREDICTED_INTRONIC"]
 
         Float bed_overlap_threshold=0.5
         Int size_threshold=500000  # in BP
@@ -48,7 +48,10 @@ workflow filterClinicalVariantsSV {
         Float rec_af_threshold=0.01
         Float gnomad_af_dom_threshold=0.01
         Float gnomad_af_rec_threshold=0.01
-        Float gnomad_popmax_af_threshold=0.05
+        Float gnomad_popmax_af_threshold=0.01
+        Int rec_n_cohort_hom_var_threshold=10
+        Int dom_ac_threshold=10
+        Int dom_ac_unaffected_threshold=5
         String gnomad_af_field='gnomad_v4.1_sv_AF'
 
         RuntimeAttr? runtime_attr_bcftools
@@ -119,6 +122,7 @@ workflow filterClinicalVariantsSV {
         prec_uri=prec_uri,
         hi_uri=hi_uri,
         ts_uri=ts_uri,
+        ped_uri=ped_uri,
         permissive_csq_fields=permissive_csq_fields,
         restrictive_csq_fields=restrictive_csq_fields,
         size_threshold=size_threshold,
@@ -128,6 +132,9 @@ workflow filterClinicalVariantsSV {
         gnomad_af_rec_threshold=gnomad_af_rec_threshold,
         gnomad_popmax_af_threshold=gnomad_popmax_af_threshold,
         gnomad_af_field=gnomad_af_field,
+        rec_n_cohort_hom_var_threshold=rec_n_cohort_hom_var_threshold,
+        dom_ac_threshold=dom_ac_threshold,
+        dom_ac_unaffected_threshold=dom_ac_unaffected_threshold,
         genome_build=genome_build,
         hail_docker=hail_docker,
         annotate_sv_gene_level_script=annotate_sv_gene_level_script,
@@ -383,6 +390,7 @@ task annotateGeneLevelVCF {
         File prec_uri
         File hi_uri
         File ts_uri
+        File ped_uri
 
         Array[String] permissive_csq_fields
         Array[String] restrictive_csq_fields
@@ -393,6 +401,9 @@ task annotateGeneLevelVCF {
         Float gnomad_af_dom_threshold
         Float gnomad_af_rec_threshold
         Float gnomad_popmax_af_threshold
+        Int rec_n_cohort_hom_var_threshold
+        Int dom_ac_threshold
+        Int dom_ac_unaffected_threshold
 
         String gnomad_af_field
         String genome_build
@@ -438,10 +449,11 @@ task annotateGeneLevelVCF {
     python3 annotate_vcf.py -i ~{vcf_file} -o ~{output_filename} -l ~{gene_list_tsv} -s ~{size_threshold} \
         --inheritance ~{inheritance_uri} --cores ~{cpu_cores} --mem ~{memory} --build ~{genome_build} \
         --permissive-csq-fields ~{sep=',' permissive_csq_fields} --restrictive-csq-fields ~{sep=',' restrictive_csq_fields} \
-        --constrained-uri ~{constrained_uri} --prec-uri ~{prec_uri} --hi-uri ~{hi_uri} --ts-uri ~{ts_uri} \
+        --constrained-uri ~{constrained_uri} --prec-uri ~{prec_uri} --hi-uri ~{hi_uri} --ts-uri ~{ts_uri} --ped ~{ped_uri} \
         --dom-af ~{dom_af_threshold} --rec-af ~{rec_af_threshold} \
         --gnomad-dom-af ~{gnomad_af_dom_threshold} --gnomad-rec-af ~{gnomad_af_rec_threshold} \
-        --gnomad-af-field ~{gnomad_af_field} --gnomad-popmax-af ~{gnomad_popmax_af_threshold}
+        --gnomad-af-field ~{gnomad_af_field} --gnomad-popmax-af ~{gnomad_popmax_af_threshold} \
+        --rec-n-hom-var ~{rec_n_cohort_hom_var_threshold} --dom-ac ~{dom_ac_threshold} --dom-ac-unaffected ~{dom_ac_unaffected_threshold}
     >>>
 
     output {

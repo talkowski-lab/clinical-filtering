@@ -12,6 +12,9 @@
 - remove sv_gene_fields input and change Python variable to be a union of restrictive_csq_fields and permissive_csq_fields
 2/20/2025:
 - allow for missing gnomAD AFs
+5/29/2025:
+- more AC and AF cutoffs, PED inputs
+- annotate cohort unaffected/affected counts and AC (moved from hail_filter_clinical_sv_v0.1.py to hail_annotate_sv_gene_level_v0.1.py)
 '''
 ###
 
@@ -38,12 +41,16 @@ parser.add_argument('--constrained-uri', dest='constrained_uri', help='File for 
 parser.add_argument('--prec-uri', dest='prec_uri', help='File for pRec genes')
 parser.add_argument('--hi-uri', dest='hi_uri', help='File for HI genes')
 parser.add_argument('--ts-uri', dest='ts_uri', help='File for TS genes')
+parser.add_argument('--ped', dest='ped_uri', help='Input ped file')
 parser.add_argument('--dom-af', dest='dom_af_threshold', help='Cohort AF threshold for dominants')
 parser.add_argument('--rec-af', dest='rec_af_threshold', help='Cohort AF threshold for recessives')
 parser.add_argument('--gnomad-dom-af', dest='gnomad_af_dom_threshold', help='gnomAD AF threshold for dominants')
 parser.add_argument('--gnomad-rec-af', dest='gnomad_af_rec_threshold', help='gnomAD AF threshold for recessives')
 parser.add_argument('--gnomad-af-field', dest='gnomad_af_field', help='Field for gnomAD AFs in INFO')
 parser.add_argument('--gnomad-popmax-af', dest='gnomad_popmax_af_threshold', help='gnomAD popmax AF threshold')
+parser.add_argument('--rec-n-hom-var', dest='rec_n_cohort_hom_var_threshold', help='Number of hom var individuals threshold for recessives')
+parser.add_argument('--dom-ac', dest='dom_ac_threshold', help='Cohort AC threshold for dominants')
+parser.add_argument('--dom-ac-unaffected', dest='dom_ac_unaffected_threshold', help='AC of unaffected individuals threshold for dominants')
 
 args = parser.parse_args()
 
@@ -58,6 +65,7 @@ size_threshold = int(args.size_threshold)
 restrictive_csq_fields = (args.restrictive_csq_fields).split(',')
 permissive_csq_fields = (args.permissive_csq_fields).split(',')
 constrained_uri = args.constrained_uri
+ped_uri = args.ped_uri
 prec_uri = args.prec_uri
 hi_uri = args.hi_uri
 ts_uri = args.ts_uri
@@ -67,6 +75,10 @@ gnomad_af_dom_threshold = float(args.gnomad_af_dom_threshold)
 gnomad_af_rec_threshold = float(args.gnomad_af_rec_threshold)
 gnomad_af_field = args.gnomad_af_field
 gnomad_popmax_af_threshold = float(args.gnomad_popmax_af_threshold)
+# NEW 5/29/2025: More AC and AF cutoffs, PED inputs
+rec_n_cohort_hom_var_threshold = args.rec_n_cohort_hom_var_threshold
+dom_ac_threshold = args.dom_ac_threshold
+dom_ac_unaffected_threshold = args.dom_ac_unaffected_threshold
 
 # NEW 2/19/2025: Remove sv_gene_fields input and change Python variable to be a union of restrictive_csq_fields and permissive_csq_fields
 sv_gene_fields = list(np.union1d(permissive_csq_fields, restrictive_csq_fields))
@@ -84,6 +96,68 @@ hl.init(min_block_size=128,
 locus_expr = 'locus_interval'
 sv_mt = hl.import_vcf(sv_vcf, reference_genome=genome_build, force_bgz=True, call_fields=[], array_elements_required=False)
 header = hl.get_vcf_metadata(sv_vcf)
+
+# NEW 5/29/2025: Moved from hail_filter_clinical_sv_v0.1.py to hail_annotate_sv_gene_level_v0.1.py
+# Annotate affected status/phenotype from pedigree
+# NEW 2/5/2025: Moved ped format standardization to before ped_ht
+tmp_ped = pd.read_csv(ped_uri, sep='\t').iloc[:,:6]
+tmp_ped.columns = ['family_id', 'sample_id', 'paternal_id', 'maternal_id', 'sex', 'phenotype']
+cropped_ped_uri = f"{os.path.basename(ped_uri).split('.ped')[0]}_crop.ped"
+tmp_ped.to_csv(cropped_ped_uri, sep='\t', index=False)
+
+ped_ht = hl.import_table(cropped_ped_uri, delimiter='\t').key_by('sample_id')
+sv_mt = sv_mt.annotate_cols(phenotype=ped_ht[sv_mt.s].phenotype)
+
+# Get cohort unaffected/affected het and homvar counts
+sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(**{
+    "n_cohort_het_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_het())),
+    "n_cohort_hom_var_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_hom_var())),
+    "n_cohort_het_affected": hl.agg.filter(sv_mt.phenotype=='2', hl.agg.sum(sv_mt.GT.is_het())),
+    "n_cohort_hom_var_affected": hl.agg.filter(sv_mt.phenotype=='2', hl.agg.sum(sv_mt.GT.is_hom_var()))
+    })
+)
+
+# NEW 5/29/2025: Annotate cohort unaffected/affected AC  
+sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(**{
+    "cohort_AC_unaffected": sv_mt.info.n_cohort_het_unaffected + 2*sv_mt.info.n_cohort_hom_var_unaffected,
+    "cohort_AC_affected": sv_mt.info.n_cohort_het_affected + 2*sv_mt.info.n_cohort_hom_var_affected
+    })
+)
+
+# Frequency flags
+# Use "max" AC and AF because Hail parses as array with 1 element
+# NEW 2/20/2025: Allow for missing gnomAD AFs
+# NEW 5/29/2025: Incorporate cohort unaffected/affected counts and AC
+sv_mt = sv_mt.annotate_rows(
+    info=sv_mt.info.annotate(
+        dominant_freq=(
+            (
+                (hl.max(sv_mt.info.AC) <= dom_ac_threshold) |
+                (hl.max(sv_mt.info.AF) <= dom_af_threshold)
+            ) &
+            (
+                (sv_mt.info[gnomad_af_field] <= gnomad_af_dom_threshold) |
+                hl.is_missing(sv_mt.info[gnomad_af_field])
+            ) &
+            (sv_mt.info.cohort_AC_unaffected <= dom_ac_unaffected_threshold)
+        ),
+        recessive_freq=(
+            (
+                (
+                    (sv_mt.info.n_cohort_hom_var_unaffected + sv_mt.info.n_cohort_hom_var_affected)
+                    <= rec_n_cohort_hom_var_threshold
+                ) |
+                (hl.max(sv_mt.info.AF) <= rec_af_threshold)
+            ) &
+            (
+                (sv_mt.info[gnomad_af_field] <= gnomad_af_rec_threshold) |
+                hl.is_missing(sv_mt.info[gnomad_af_field])
+            )
+        )
+    )
+)
+
+n_tot_samples = sv_mt.count_cols()
 
 ## ANNOTATIONS
 # Annotate genes in INFO
@@ -112,7 +186,7 @@ sv_gene_mt = sv_gene_mt.annotate_rows(
 # Annotate gene list(s)
 if gene_list_tsv!='NA':
     gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
-    gene_list = {gene_list_name: pd.read_csv(uri, sep='\t', header=None)[0].tolist() 
+    gene_list = {gene_list_name: pd.read_csv(uri, header=None)[0].tolist() 
                 for gene_list_name, uri in gene_list_uris.items()}
 
     sv_gene_mt = sv_gene_mt.annotate_rows(
@@ -224,6 +298,13 @@ header['info']['prec_genes'] = {'Description': f"All genes in genes field that a
 header['info']['hi_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(hi_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['ts_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(ts_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['gnomAD_popmax_AF'] = {'Description': f"gnomAD popmax AF taken from fields: {', '.join(gnomad_fields)}.", 'Number': '1', 'Type': 'Float'}
+# NEW 5/29/2025: Cohort affected/unaffected annotations
+header['info']['n_cohort_het_unaffected'] = {'Description': f"Number of het unaffected individuals (out of {n_tot_samples} total individuals).", 'Number': '1', 'Type': 'Int'}
+header['info']['n_cohort_hom_var_unaffected'] = {'Description': f"Number of hom var unaffected individuals (out of {n_tot_samples} total individuals).", 'Number': '1', 'Type': 'Int'}
+header['info']['n_cohort_het_affected'] = {'Description': f"Number of het affected individuals (out of {n_tot_samples} total individuals).", 'Number': '1', 'Type': 'Int'}
+header['info']['n_cohort_hom_var_affected'] = {'Description': f"Number of hom var affected individuals (out of {n_tot_samples} total individuals).", 'Number': '1', 'Type': 'Int'}
+header['info']['cohort_AC_unaffected'] = {'Description': f"AC from unaffected individuals (out of {n_tot_samples} total individuals).", 'Number': '1', 'Type': 'Int'}
+header['info']['cohort_AC_affected'] = {'Description': f"AC from affected individuals (out of {n_tot_samples} total individuals).", 'Number': '1', 'Type': 'Int'}
 # Flags
 header['info']['any_constrained'] = {'Description': f"Any gene in genes field is in {os.path.basename(constrained_uri)}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['any_prec'] = {'Description': f"Any gene in genes field is in {os.path.basename(prec_uri)}.", 'Number': '0', 'Type': 'Flag'}

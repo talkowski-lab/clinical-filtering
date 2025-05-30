@@ -145,7 +145,7 @@ sv_mt = sv_mt.annotate_rows(**{field: sv_mt.info[field] for field in cohort_affe
 phased_sv_tm = phased_sv_tm.annotate_rows(**{col: sv_mt.rows()[phased_sv_tm.row_key][col] 
                                              for col in cohort_affected_cols})
 
-family_affected_cols = [field for field in list(grouped_fam_sv_mt.row) if '_affected' in field or '_unaffected' in field]
+family_affected_cols = [field for field in list(grouped_fam_sv_mt.entry) if '_affected' in field or '_unaffected' in field]
 phased_sv_tm = phased_sv_tm.annotate_entries(**{col: grouped_fam_sv_mt[phased_sv_tm.row_key, phased_sv_tm.fam_id][col]
                                              for col in family_affected_cols})
 

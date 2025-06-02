@@ -170,6 +170,8 @@ sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(
     permissive_csq_genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in permissive_csq_fields])))))
 # Explode rows by gene for gene-level annotation
 sv_gene_mt = sv_mt.explode_rows(sv_mt.info.genes)
+sv_restrictive_gene_mt = sv_mt.explode_rows(sv_mt.info.restrictive_csq_genes)
+sv_permissive_gene_mt = sv_mt.explode_rows(sv_mt.info.permissive_csq_genes)
 
 # Annotate gene_source
 def get_predicted_sources_expr(row_expr, sv_gene_fields):
@@ -185,11 +187,10 @@ sv_gene_mt = sv_gene_mt.annotate_rows(
 
 # Annotate inheritance in SVs
 inheritance_ht = hl.import_table(inheritance_uri).key_by('approvedGeneSymbol')
-sv_gene_mt = sv_gene_mt.key_rows_by(sv_gene_mt.info.genes)
 sv_gene_mt = sv_gene_mt.annotate_rows(
-    inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.row_key]), inheritance_ht[sv_gene_mt.row_key].inheritance_code),
-    restrictive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.restrictive_csq_genes]), inheritance_ht[sv_gene_mt.info.restrictive_csq_genes].inheritance_code),
-    permissive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.permissive_csq_genes]), inheritance_ht[sv_gene_mt.info.permissive_csq_genes].inheritance_code)
+    inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.genes]), inheritance_ht[sv_gene_mt.info.genes].inheritance_code),
+    restrictive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_restrictive_gene_mt.info.restrictive_csq_genes]), inheritance_ht[sv_restrictive_gene_mt.info.restrictive_csq_genes].inheritance_code),
+    permissive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_permissive_gene_mt.info.permissive_csq_genes]), inheritance_ht[sv_permissive_gene_mt.info.permissive_csq_genes].inheritance_code)
 )
 
 # Annotate gene list(s)

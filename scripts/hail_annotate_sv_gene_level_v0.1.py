@@ -199,7 +199,7 @@ def get_gene_level_annotations(mt, gene_field, gene_field_list, inheritance_ht, 
     if gene_lists:
         gene_mt = gene_mt.annotate_rows(
             **{f"{prefix}gene_list": hl.array([
-                hl.or_missing(hl.literal(gene_set).contains(gene_mt.info[gene_field]), list_name)
+                hl.or_missing(hl.array(gene_set).contains(gene_mt.info[gene_field]), list_name)
                 for list_name, gene_set in gene_lists.items()
             ]).filter(hl.is_defined)}
         )

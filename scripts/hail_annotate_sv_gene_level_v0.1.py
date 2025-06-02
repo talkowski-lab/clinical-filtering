@@ -15,6 +15,9 @@
 5/29/2025:
 - more AC and AF cutoffs, PED inputs
 - annotate cohort unaffected/affected counts and AC (moved from hail_filter_clinical_sv_v0.1.py to hail_annotate_sv_gene_level_v0.1.py)
+6/2/2025:
+- rename permissive_csq, restrictive_csq to permissive_csq_fields, restrictive_csq_fields
+- add permissive_gene_source, restrictive_gene_source, permissive_inheritance_code, restrictive_inheritance_code
 '''
 ###
 
@@ -163,8 +166,8 @@ n_tot_samples = sv_mt.count_cols()
 # Annotate genes in INFO
 sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(
     genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in sv_gene_fields]))),
-    restrictive_csq=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in restrictive_csq_fields]))),
-    permissive_csq=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in permissive_csq_fields])))))
+    restrictive_csq_genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in restrictive_csq_fields]))),
+    permissive_csq_genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in permissive_csq_fields])))))
 # Explode rows by gene for gene-level annotation
 sv_gene_mt = sv_mt.explode_rows(sv_mt.info.genes)
 
@@ -229,18 +232,20 @@ def get_predicted_sources_expr(mt, sv_gene_fields, gene_expr):
         [hl.or_missing(hl.array(mt.info[col]).contains(gene_expr), col) for col in sv_gene_fields]
     ).filter(hl.is_defined)
 
-# Function to get gene-level annotations (including gene_list)
-def get_gene_level_annotations(mt, gene_field, gene_field_list, inheritance_ht, prefix, gene_lists=None):
-    """
-    Generalized function to annotate gene_source, inheritance_code, and gene_list.
+sv_gene_mt = sv_gene_mt.annotate_rows(
+    gene_source=get_predicted_sources_expr(sv_gene_mt, sv_gene_fields),
+    restrictive_gene_source=get_predicted_sources_expr(sv_gene_mt, restrictive_csq_fields),
+    permissive_gene_source=get_predicted_sources_expr(sv_gene_mt, permissive_csq_fields)
+)
 
-    Args:
-        mt: Hail MatrixTable
-        gene_field: str - Field in mt.info to explode by (e.g. 'genes')
-        gene_field_list: list - INFO fields to infer gene sources
-        inheritance_ht: Hail Table - keyed by gene symbol
-        prefix: str - Prefix for output field names (e.g. 'restrictive_', 'permissive_', '')
-        gene_lists: dict (optional) - {gene_list_name: list of gene symbols}
+# Annotate inheritance in SVs
+inheritance_ht = hl.import_table(inheritance_uri).key_by('approvedGeneSymbol')
+sv_gene_mt = sv_gene_mt.key_rows_by(sv_gene_mt.info.genes)
+sv_gene_mt = sv_gene_mt.annotate_rows(
+    inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.row_key]), inheritance_ht[sv_gene_mt.row_key].inheritance_code),
+    restrictive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.restrictive_csq_genes]), inheritance_ht[sv_gene_mt.info.restrictive_csq_genes].inheritance_code),
+    permissive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.permissive_csq_genes]), inheritance_ht[sv_gene_mt.info.permissive_csq_genes].inheritance_code)
+)
 
     Returns:
         MatrixTable aggregated by rsid with prefixed fields.

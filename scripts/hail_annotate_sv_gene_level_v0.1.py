@@ -163,63 +163,109 @@ sv_mt = sv_mt.annotate_rows(
 n_tot_samples = sv_mt.count_cols()
 
 ## ANNOTATIONS
-# Annotate genes in INFO
-sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(
-    genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in sv_gene_fields]))),
-    restrictive_csq_genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in restrictive_csq_fields]))),
-    permissive_csq_genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in permissive_csq_fields])))))
-# Explode rows by gene for gene-level annotation
-sv_gene_mt = sv_mt.explode_rows(sv_mt.info.genes)
-sv_gene_mt = sv_gene_mt.explode_rows(sv_gene_mt.info.restrictive_csq_genes)
-sv_gene_mt = sv_gene_mt.explode_rows(sv_gene_mt.info.permissive_csq_genes)
-
 # Annotate gene_source
 def get_predicted_sources_expr(row_expr, sv_gene_fields):
     return hl.array(
         [hl.or_missing(hl.array(row_expr.info[col]).contains(row_expr.info.genes), col) for col in sv_gene_fields]
     ).filter(hl.is_defined)
 
-sv_gene_mt = sv_gene_mt.annotate_rows(
-    gene_source=get_predicted_sources_expr(sv_gene_mt, sv_gene_fields),
-    restrictive_gene_source=get_predicted_sources_expr(sv_gene_mt, restrictive_csq_fields),
-    permissive_gene_source=get_predicted_sources_expr(sv_gene_mt, permissive_csq_fields)
-)
+# Function to get gene-level annotations (including gene_list)
+def get_gene_level_annotations(mt, gene_field, gene_field_list, inheritance_ht, prefix, gene_lists=None):
+    """
+    Generalized function to annotate gene_source, inheritance_code, and gene_list.
 
-# Annotate inheritance in SVs
-inheritance_ht = hl.import_table(inheritance_uri).key_by('approvedGeneSymbol')
-sv_gene_mt = sv_gene_mt.annotate_rows(
-    inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.genes]), inheritance_ht[sv_gene_mt.info.genes].inheritance_code),
-    restrictive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.restrictive_csq_genes]), inheritance_ht[sv_gene_mt.info.restrictive_csq_genes].inheritance_code),
-    permissive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.permissive_csq_genes]), inheritance_ht[sv_gene_mt.info.permissive_csq_genes].inheritance_code)
-)
+    Args:
+        mt: Hail MatrixTable
+        gene_field: str - Field in mt.info to explode by (e.g. 'genes')
+        gene_field_list: list - INFO fields to infer gene sources
+        inheritance_ht: Hail Table - keyed by gene symbol
+        prefix: str - Prefix for output field names (e.g. 'restrictive_', 'permissive_', '')
+        gene_lists: dict (optional) - {gene_list_name: list of gene symbols}
 
-# Annotate gene list(s)
-if gene_list_tsv!='NA':
+    Returns:
+        MatrixTable aggregated by rsid with prefixed fields.
+    """
+    gene_expr = getattr(mt.info, gene_field)
+    gene_mt = mt.explode_rows(gene_expr)
+
+    gene_mt = gene_mt.annotate_rows(
+        **{f"{prefix}gene_source": get_predicted_sources_expr(gene_mt, gene_field_list)},
+        **{f"{prefix}inheritance_code": hl.or_missing(
+            hl.is_defined(inheritance_ht[gene_expr]),
+            inheritance_ht[gene_expr].inheritance_code)}
+    )
+
+    if gene_lists:
+        gene_mt = gene_mt.annotate_rows(
+            **{f"{prefix}gene_list": hl.array([
+                hl.or_missing(hl.literal(gene_set).contains(gene_expr), list_name)
+                for list_name, gene_set in gene_lists.items()
+            ]).filter(hl.is_defined)}
+        )
+
+        # Convert gene_list to &-joined string if defined
+        gene_mt = gene_mt.annotate_rows(
+            **{f"{prefix}gene_list": hl.or_missing(
+                hl.len(gene_mt[f"{prefix}gene_list"]) > 0,
+                hl.str("&").join(gene_mt[f"{prefix}gene_list"]))}
+        )
+
+    # Convert gene_source to &-joined string
+    gene_mt = gene_mt.annotate_rows(
+        **{f"{prefix}gene_source": hl.or_missing(
+            hl.len(gene_mt[f"{prefix}gene_source"]) > 0,
+            hl.str("&").join(gene_mt[f"{prefix}gene_source"]))}
+    )
+
+    # Define aggregation fields
+    agg_fields = {
+        f"{prefix}gene_source": hl.agg.collect(gene_mt[f"{prefix}gene_source"]),
+        f"{prefix}inheritance_code": hl.agg.collect(gene_mt[f"{prefix}inheritance_code"])
+    }
+    if gene_lists:
+        agg_fields[f"{prefix}gene_list"] = hl.agg.collect(gene_mt[f"{prefix}gene_list"])
+
+    return gene_mt.group_rows_by(gene_mt.rsid).aggregate_rows(**agg_fields).result()
+
+# Load gene list file(s) if available
+if gene_list_tsv != 'NA':
     gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
-    gene_list = {gene_list_name: pd.read_csv(uri, header=None)[0].tolist() 
-                for gene_list_name, uri in gene_list_uris.items()}
+    gene_list_dict = {
+        name: hl.literal(set(pd.read_csv(uri, header=None)[0].tolist()))
+        for name, uri in gene_list_uris.items()
+    }
+else:
+    gene_list_dict = None
 
-    sv_gene_mt = sv_gene_mt.annotate_rows(
-        gene_list=hl.array([hl.or_missing(hl.array(gene_list).contains(sv_gene_mt.info.genes), gene_list_name) 
-            for gene_list_name, gene_list in gene_list.items()]).filter(hl.is_defined))
+# Load inheritance table
+inheritance_ht = hl.import_table(inheritance_uri).key_by('approvedGeneSymbol')
 
-# Convert gene_source, gene_list annotations from array<str> to &-delimited str
-sv_gene_mt = sv_gene_mt.annotate_rows(
-                        gene_source = hl.or_missing(sv_gene_mt.gene_source.size()>0,
-                                                    hl.str('&').join(sv_gene_mt.gene_source)),
-                        gene_list = hl.or_missing(sv_gene_mt.gene_list.size()>0,
-                                                    hl.str('&').join(sv_gene_mt.gene_list)))
-
-# Aggregate gene-level annotations by unique rsid
-sv_gene_agg_mt = (sv_gene_mt.group_rows_by(sv_gene_mt.rsid)
-        .aggregate_rows(gene_source = hl.agg.collect(sv_gene_mt.gene_source),
-                        inheritance_code = hl.agg.collect(sv_gene_mt.inheritance_code),
-                        gene_list = hl.agg.collect(sv_gene_mt.gene_list))).result()
-
-# Annotate original sv_mt INFO with gene-level annotations
-gene_level_annotations = [field for field in list(sv_gene_agg_mt.row) if field!='rsid']  # exclude rsid
+# Annotate genes in INFO for sv_mt
 sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(
-    **{field: sv_gene_agg_mt.rows()[sv_mt.rsid][field] for field in gene_level_annotations}))
+    genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in sv_gene_fields]))),
+    restrictive_csq_genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in restrictive_csq_fields]))),
+    permissive_csq_genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in permissive_csq_fields]))))
+)
+
+# Annotate gene-level annotations for all gene fields (including restrictive and permissive)
+sv_gene_agg_mt = get_gene_level_annotations(
+    sv_mt, 'genes', sv_gene_fields, inheritance_ht, '', gene_lists=gene_list_dict)
+
+sv_restrictive_gene_agg_mt = get_gene_level_annotations(
+    sv_mt, 'restrictive_csq_genes', restrictive_csq_fields, inheritance_ht, 'restrictive_', gene_lists=gene_list_dict)
+
+sv_permissive_gene_agg_mt = get_gene_level_annotations(
+    sv_mt, 'permissive_csq_genes', permissive_csq_fields, inheritance_ht, 'permissive_', gene_lists=gene_list_dict)
+
+# Annotate all gene-level results back onto the original sv_mt
+sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(
+    **{field: sv_gene_agg_mt.rows()[sv_mt.rsid][field]
+       for field in ['gene_source', 'inheritance_code', 'gene_list']},
+    **{field: sv_restrictive_gene_agg_mt.rows()[sv_mt.rsid][field]
+       for field in ['restrictive_gene_source', 'restrictive_inheritance_code', 'restrictive_gene_list'] if field in sv_restrictive_gene_agg_mt.row},
+    **{field: sv_permissive_gene_agg_mt.rows()[sv_mt.rsid][field]
+       for field in ['permissive_gene_source', 'permissive_inheritance_code', 'permissive_gene_list'] if field in sv_permissive_gene_agg_mt.row}
+))
 
 ## FLAGS
 constrained_gene_list =pd.read_csv(constrained_uri, sep='\t', header=None)[0].tolist()
@@ -307,6 +353,8 @@ header['info']['inheritance_code'] = {'Description': f"Inheritance codes from {o
 header['info']['restrictive_inheritance_code'] = {'Description': f"Inheritance codes from {os.path.basename(inheritance_uri)} for genes in restrictive_csq_genes field.", 'Number': '.', 'Type': 'String'}
 header['info']['permissive_inheritance_code'] = {'Description': f"Inheritance codes from {os.path.basename(inheritance_uri)} for genes in permissive_csq_genes field.", 'Number': '.', 'Type': 'String'}
 header['info']['gene_list'] = {'Description': f"Gene lists for each gene in genes field (&-delimited for multiple gene lists) from {os.path.basename(gene_list_tsv)}.", 'Number': '.', 'Type': 'String'}
+header['info']['restrictive_gene_list'] = {'Description': f"Gene lists for each gene in restrictive_csq_genes field (&-delimited for multiple gene lists) from {os.path.basename(gene_list_tsv)}.", 'Number': '.', 'Type': 'String'}
+header['info']['permissive_gene_list'] = {'Description': f"Gene lists for each gene in permissive_csq_genes field (&-delimited for multiple gene lists) from {os.path.basename(gene_list_tsv)}.", 'Number': '.', 'Type': 'String'}
 header['info']['constrained_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(constrained_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['prec_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(prec_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['hi_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(hi_uri)}.", 'Number': '.', 'Type': 'String'}

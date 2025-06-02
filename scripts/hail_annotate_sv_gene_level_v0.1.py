@@ -170,8 +170,8 @@ sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(
     permissive_csq_genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in permissive_csq_fields])))))
 # Explode rows by gene for gene-level annotation
 sv_gene_mt = sv_mt.explode_rows(sv_mt.info.genes)
-sv_restrictive_gene_mt = sv_mt.explode_rows(sv_mt.info.restrictive_csq_genes)
-sv_permissive_gene_mt = sv_mt.explode_rows(sv_mt.info.permissive_csq_genes)
+sv_gene_mt = sv_gene_mt.explode_rows(sv_gene_mt.info.restrictive_csq_genes)
+sv_gene_mt = sv_gene_mt.explode_rows(sv_gene_mt.info.permissive_csq_genes)
 
 ped_ht = hl.import_table(cropped_ped_uri, delimiter='\t').key_by('sample_id')
 sv_mt = sv_mt.annotate_cols(phenotype=ped_ht[sv_mt.s].phenotype)

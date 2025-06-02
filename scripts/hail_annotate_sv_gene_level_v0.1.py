@@ -190,7 +190,7 @@ def get_gene_level_annotations(mt, gene_field, gene_field_list, inheritance_ht, 
 
     # Now gene_expr is a scalar, so we can safely index the inheritance_ht table
     gene_mt = gene_mt.annotate_rows(
-        **{f"{prefix}gene_source": get_predicted_sources_expr(gene_mt, gene_field_list)},
+        **{f"{prefix}gene_source": get_predicted_sources_expr(gene_mt, gene_field_list, gene_mt.info[gene_field])},
         **{f"{prefix}inheritance_code": hl.or_missing(
             hl.is_defined(inheritance_ht[gene_mt.info[gene_field]]),  # Using exploded gene field
             inheritance_ht[gene_mt.info[gene_field]].inheritance_code)}

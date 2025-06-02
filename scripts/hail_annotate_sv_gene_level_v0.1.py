@@ -15,6 +15,9 @@
 5/29/2025:
 - more AC and AF cutoffs, PED inputs
 - annotate cohort unaffected/affected counts and AC (moved from hail_filter_clinical_sv_v0.1.py to hail_annotate_sv_gene_level_v0.1.py)
+6/2/2025:
+- rename permissive_csq, restrictive_csq to permissive_csq_fields, restrictive_csq_fields
+- add permissive_gene_source, restrictive_gene_source, permissive_inheritance_code, restrictive_inheritance_code
 '''
 ###
 
@@ -35,8 +38,8 @@ parser.add_argument('--inheritance', dest='inheritance_uri', help='inheritance f
 parser.add_argument('--cores', dest='cores', help='CPU cores')
 parser.add_argument('--mem', dest='mem', help='Memory')
 parser.add_argument('--build', dest='build', help='Genome build')
-parser.add_argument('--permissive-csq-fields', dest='permissive_csq_fields', help='PREDICTED_* fields to consider for permissive_csq field in INFO')
-parser.add_argument('--restrictive-csq-fields', dest='restrictive_csq_fields', help='PREDICTED_* fields to consider for restrictive_csq field in INFO')
+parser.add_argument('--permissive-csq-fields', dest='permissive_csq_fields', help='PREDICTED_* fields to consider for permissive_csq_genes field in INFO')
+parser.add_argument('--restrictive-csq-fields', dest='restrictive_csq_fields', help='PREDICTED_* fields to consider for restrictive_csq_genes field in INFO')
 parser.add_argument('--constrained-uri', dest='constrained_uri', help='File for constrained genes')
 parser.add_argument('--prec-uri', dest='prec_uri', help='File for pRec genes')
 parser.add_argument('--hi-uri', dest='hi_uri', help='File for HI genes')
@@ -163,8 +166,8 @@ n_tot_samples = sv_mt.count_cols()
 # Annotate genes in INFO
 sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(
     genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in sv_gene_fields]))),
-    restrictive_csq=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in restrictive_csq_fields]))),
-    permissive_csq=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in permissive_csq_fields])))))
+    restrictive_csq_genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in restrictive_csq_fields]))),
+    permissive_csq_genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in permissive_csq_fields])))))
 # Explode rows by gene for gene-level annotation
 sv_gene_mt = sv_mt.explode_rows(sv_mt.info.genes)
 
@@ -175,13 +178,19 @@ def get_predicted_sources_expr(row_expr, sv_gene_fields):
     ).filter(hl.is_defined)
 
 sv_gene_mt = sv_gene_mt.annotate_rows(
-    gene_source=get_predicted_sources_expr(sv_gene_mt, sv_gene_fields))
+    gene_source=get_predicted_sources_expr(sv_gene_mt, sv_gene_fields),
+    restrictive_gene_source=get_predicted_sources_expr(sv_gene_mt, restrictive_csq_fields),
+    permissive_gene_source=get_predicted_sources_expr(sv_gene_mt, permissive_csq_fields)
+)
 
 # Annotate inheritance in SVs
 inheritance_ht = hl.import_table(inheritance_uri).key_by('approvedGeneSymbol')
 sv_gene_mt = sv_gene_mt.key_rows_by(sv_gene_mt.info.genes)
 sv_gene_mt = sv_gene_mt.annotate_rows(
-    inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.row_key]), inheritance_ht[sv_gene_mt.row_key].inheritance_code))
+    inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.row_key]), inheritance_ht[sv_gene_mt.row_key].inheritance_code),
+    restrictive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.restrictive_csq_genes]), inheritance_ht[sv_gene_mt.info.restrictive_csq_genes].inheritance_code),
+    permissive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.permissive_csq_genes]), inheritance_ht[sv_gene_mt.info.permissive_csq_genes].inheritance_code)
+)
 
 # Annotate gene list(s)
 if gene_list_tsv!='NA':
@@ -288,10 +297,14 @@ sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(**{size_threshold_field: (s
 # Update header with all new annotations and flags
 # Annotations
 header['info']['genes'] = {'Description': f"All genes from (union of restrictive_csq_fields and permissive_csq_fields) {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}
-header['info']['restrictive_csq'] = {'Description': f"All genes from {', '.join(restrictive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
-header['info']['permissive_csq'] = {'Description': f"All genes from {', '.join(permissive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
+header['info']['restrictive_csq_genes'] = {'Description': f"All genes from {', '.join(restrictive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
+header['info']['permissive_csq_genes'] = {'Description': f"All genes from {', '.join(permissive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
 header['info']['gene_source'] = {'Description': f"Sources for genes in genes field, considered fields: {', '.join(sv_gene_fields)}.", 'Number': '.', 'Type': 'String'}
-header['info']['inheritance_code'] = {'Description': f"Inheritance codes from {os.path.basename(inheritance_uri)}.", 'Number': '.', 'Type': 'String'}
+header['info']['restrictive_gene_source'] = {'Description': f"Sources for genes in genes field, considered fields: {', '.join(restrictive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
+header['info']['permissive_gene_source'] = {'Description': f"Sources for genes in genes field, considered fields: {', '.join(permissive_csq_fields)}.", 'Number': '.', 'Type': 'String'}
+header['info']['inheritance_code'] = {'Description': f"Inheritance codes from {os.path.basename(inheritance_uri)} for all genes in genes field.", 'Number': '.', 'Type': 'String'}
+header['info']['restrictive_inheritance_code'] = {'Description': f"Inheritance codes from {os.path.basename(inheritance_uri)} for genes in restrictive_csq_genes field.", 'Number': '.', 'Type': 'String'}
+header['info']['permissive_inheritance_code'] = {'Description': f"Inheritance codes from {os.path.basename(inheritance_uri)} for genes in permissive_csq_genes field.", 'Number': '.', 'Type': 'String'}
 header['info']['gene_list'] = {'Description': f"Gene lists for each gene in genes field (&-delimited for multiple gene lists) from {os.path.basename(gene_list_tsv)}.", 'Number': '.', 'Type': 'String'}
 header['info']['constrained_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(constrained_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['prec_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(prec_uri)}.", 'Number': '.', 'Type': 'String'}

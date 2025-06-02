@@ -35,6 +35,8 @@
 - don't drop original info/vep fields
 - drop renamed INFO and VEP fields and retain originals (flattened later) to match other outputs
 - add sex annotation to annotate_and_filter_trio_matrix
+6/2/2025:
+- use restrictive CSQ fields for SV gene fields
 '''
 ###
 
@@ -174,18 +176,18 @@ if sv_vcf!='NA':
     
     # NEW 1/30/2025: combine gene-level annotations in INFO where there is a value for each gene
     # Annotate gene to match SNV/Indels (to explode on and keep original genes annotation)
-    # NEW 6/3/2025: use restrictive_csq_genes as "gene" field for comphets, restrictive_inheritance_code as "inheritance_code" field
-    sv_gene_fields = ['gene','inheritance_code']
-    sv_mt = sv_mt.annotate_rows(**{'gene': sv_mt['info.restrictive_csq_genes'],
-                               'inheritance_code': sv_mt['info.restrictive_inheritance_code']})
+    # NEW 6/2/2025: use restrictive CSQ fields for SV gene fields
+    sv_mt = sv_mt.annotate_rows(gene=sv_mt.genes)
+    sv_original_gene_fields = ['restrictive_csq_genes', 'restrictive_inheritance_code']
+    match_snv_gene_fields = ['gene', 'inheritance_code']
 
-    sv_mt = sv_mt.annotate_rows(gene_level=hl.zip(*[sv_mt[field] for field in sv_gene_fields])\
+    sv_mt = sv_mt.annotate_rows(gene_level=hl.zip(*[sv_mt[field] for field in sv_original_gene_fields])\
             .map(lambda x: hl.struct(**{field: x[i] 
-                                        for i, field in enumerate(sv_gene_fields)})))\
+                                        for i, field in enumerate(sv_original_gene_fields)})))\
         .explode_rows('gene_level')
-    sv_mt = sv_mt.annotate_rows(**{field: sv_mt.gene_level[field] 
-                                   for field in sv_gene_fields}).drop('gene_level')
-    
+    sv_mt = sv_mt.annotate_rows(**{field: sv_mt.gene_level[sv_original_gene_fields[i]] 
+                                   for i, field in enumerate(match_snv_gene_fields)}).drop('gene_level')
+   
     # NEW 1/28/2025: dummy variant_source annotation for SVs
     sv_mt = sv_mt.annotate_rows(variant_source='SV')
 

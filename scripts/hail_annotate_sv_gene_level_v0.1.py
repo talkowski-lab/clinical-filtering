@@ -231,7 +231,6 @@ def get_gene_level_annotations(mt, gene_field, gene_field_list, inheritance_ht, 
 # Now, use this function as before:
 
 # Load gene list file(s) if available
-gene_list_tsv = 'path_to_gene_list_file.tsv'  # Update to your gene list file
 if gene_list_tsv != 'NA':
     gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
     gene_list_dict = {
@@ -241,8 +240,7 @@ if gene_list_tsv != 'NA':
 else:
     gene_list_dict = None
 
-# Load inheritance table (replace with actual URI)
-inheritance_uri = 'path_to_inheritance_table.tsv'
+# Load inheritance table
 inheritance_ht = hl.import_table(inheritance_uri).key_by('approvedGeneSymbol')
 
 # Annotate genes in INFO for sv_mt

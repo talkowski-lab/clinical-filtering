@@ -164,9 +164,9 @@ n_tot_samples = sv_mt.count_cols()
 
 ## ANNOTATIONS
 # Annotate gene_source
-def get_predicted_sources_expr(row_expr, sv_gene_fields):
+def get_predicted_sources_expr(mt, sv_gene_fields, gene_expr):
     return hl.array(
-        [hl.or_missing(hl.array(row_expr.info[col]).contains(row_expr.info.genes), col) for col in sv_gene_fields]
+        [hl.or_missing(hl.array(mt.info[col]).contains(gene_expr), col) for col in sv_gene_fields]
     ).filter(hl.is_defined)
 
 # Function to get gene-level annotations (including gene_list)
@@ -190,7 +190,7 @@ def get_gene_level_annotations(mt, gene_field, gene_field_list, inheritance_ht, 
 
     # Now gene_expr is a scalar, so we can safely index the inheritance_ht table
     gene_mt = gene_mt.annotate_rows(
-        **{f"{prefix}gene_source": get_predicted_sources_expr(gene_mt, gene_field_list)},
+        **{f"{prefix}gene_source": get_predicted_sources_expr(gene_mt, gene_field_list, gene_mt.info[gene_field])},
         **{f"{prefix}inheritance_code": hl.or_missing(
             hl.is_defined(inheritance_ht[gene_mt.info[gene_field]]),  # Using exploded gene field
             inheritance_ht[gene_mt.info[gene_field]].inheritance_code)}

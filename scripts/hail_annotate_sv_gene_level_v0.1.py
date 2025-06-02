@@ -189,8 +189,8 @@ sv_gene_mt = sv_gene_mt.annotate_rows(
 inheritance_ht = hl.import_table(inheritance_uri).key_by('approvedGeneSymbol')
 sv_gene_mt = sv_gene_mt.annotate_rows(
     inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.genes]), inheritance_ht[sv_gene_mt.info.genes].inheritance_code),
-    restrictive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_restrictive_gene_mt.info.restrictive_csq_genes]), inheritance_ht[sv_restrictive_gene_mt.info.restrictive_csq_genes].inheritance_code),
-    permissive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_permissive_gene_mt.info.permissive_csq_genes]), inheritance_ht[sv_permissive_gene_mt.info.permissive_csq_genes].inheritance_code)
+    restrictive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.restrictive_csq_genes]), inheritance_ht[sv_gene_mt.info.restrictive_csq_genes].inheritance_code),
+    permissive_inheritance_code=hl.or_missing(hl.is_defined(inheritance_ht[sv_gene_mt.info.permissive_csq_genes]), inheritance_ht[sv_gene_mt.info.permissive_csq_genes].inheritance_code)
 )
 
 # Annotate gene list(s)

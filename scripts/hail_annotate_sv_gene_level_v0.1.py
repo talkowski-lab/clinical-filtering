@@ -170,8 +170,8 @@ sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(
     permissive_csq_genes=hl.array(hl.set(hl.flatmap(lambda x: x, [sv_mt.info[field] for field in permissive_csq_fields])))))
 # Explode rows by gene for gene-level annotation
 sv_gene_mt = sv_mt.explode_rows(sv_mt.info.genes)
-sv_restrictive_gene_mt = sv_mt.explode_rows(sv_mt.info.restrictive_csq_genes)
-sv_permissive_gene_mt = sv_mt.explode_rows(sv_mt.info.permissive_csq_genes)
+sv_gene_mt = sv_gene_mt.explode_rows(sv_gene_mt.info.restrictive_csq_genes)
+sv_gene_mt = sv_gene_mt.explode_rows(sv_gene_mt.info.permissive_csq_genes)
 
 # Annotate gene_source
 def get_predicted_sources_expr(row_expr, sv_gene_fields):

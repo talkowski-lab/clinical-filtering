@@ -186,19 +186,20 @@ def get_gene_level_annotations(mt, gene_field, gene_field_list, inheritance_ht, 
         MatrixTable aggregated by rsid with prefixed fields.
     """
     gene_expr = getattr(mt.info, gene_field)
-    gene_mt = mt.explode_rows(gene_expr)
+    gene_mt = mt.explode_rows(gene_expr)  # Exploding rows to work with individual genes
 
+    # Now gene_expr is a scalar, so we can safely index the inheritance_ht table
     gene_mt = gene_mt.annotate_rows(
         **{f"{prefix}gene_source": get_predicted_sources_expr(gene_mt, gene_field_list)},
         **{f"{prefix}inheritance_code": hl.or_missing(
-            hl.is_defined(inheritance_ht[gene_expr]),
-            inheritance_ht[gene_expr].inheritance_code)}
+            hl.is_defined(inheritance_ht[gene_mt.info[gene_field]]),  # Using exploded gene field
+            inheritance_ht[gene_mt.info[gene_field]].inheritance_code)}
     )
 
     if gene_lists:
         gene_mt = gene_mt.annotate_rows(
             **{f"{prefix}gene_list": hl.array([
-                hl.or_missing(hl.literal(gene_set).contains(gene_expr), list_name)
+                hl.or_missing(hl.literal(gene_set).contains(gene_mt.info[gene_field]), list_name)
                 for list_name, gene_set in gene_lists.items()
             ]).filter(hl.is_defined)}
         )
@@ -227,7 +228,10 @@ def get_gene_level_annotations(mt, gene_field, gene_field_list, inheritance_ht, 
 
     return gene_mt.group_rows_by(gene_mt.rsid).aggregate_rows(**agg_fields).result()
 
+# Now, use this function as before:
+
 # Load gene list file(s) if available
+gene_list_tsv = 'path_to_gene_list_file.tsv'  # Update to your gene list file
 if gene_list_tsv != 'NA':
     gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
     gene_list_dict = {
@@ -237,7 +241,8 @@ if gene_list_tsv != 'NA':
 else:
     gene_list_dict = None
 
-# Load inheritance table
+# Load inheritance table (replace with actual URI)
+inheritance_uri = 'path_to_inheritance_table.tsv'
 inheritance_ht = hl.import_table(inheritance_uri).key_by('approvedGeneSymbol')
 
 # Annotate genes in INFO for sv_mt

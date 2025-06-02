@@ -1,4 +1,5 @@
 ###
+# [DEPRECATED: I tried to merge the NIFS with the original script but they're too different so I gave up]
 # Copied over from hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py on 1/27/2025
 # to incorporate updates made to NIFS pipeline
 

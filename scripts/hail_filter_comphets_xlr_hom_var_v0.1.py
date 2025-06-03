@@ -43,6 +43,8 @@
 - use restrictive_csq_genes as "gene" field for comphets, restrictive_inheritance_code as "inheritance_code" field
 - don't drop renamed INFO and VEP fields because already renamed above
 - keep 'gene' column
+- don't filter out BNDs
+- keep XLR for all samples, not just male
 '''
 ###
 
@@ -148,7 +150,8 @@ if sv_vcf!='NA':
     sv_mt = hl.import_vcf(sv_vcf, reference_genome=build, force_bgz=True, call_fields=[], array_elements_required=False)
 
     # filter out BNDs
-    sv_mt = sv_mt.filter_rows(sv_mt.info.SVTYPE!='BND') 
+    # NEW 6/3/2025: don't filter out BNDs
+    # sv_mt = sv_mt.filter_rows(sv_mt.info.SVTYPE!='BND') 
     # NEW 1/30/2025: filter out rows where CHR2 is not the same chromosome (SV spans multiple chromosomes)
     sv_mt = sv_mt.filter_rows(sv_mt.info.CHR2==sv_mt.locus.contig)
     
@@ -474,9 +477,9 @@ mat_carrier = gene_phased_tm.filter_rows(hl.array(carrier_genes).contains(gene_p
 mat_carrier = mat_carrier.filter_entries(mat_carrier.mother_entry.GT.is_het()).key_rows_by(locus_expr, 'alleles').entries()
 
 # XLR only
+# NEW 6/3/2025: keep XLR for all samples, not just male
 xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm['inheritance_code'].matches('4'))   # OMIM XLR
-xlr_phased = xlr_phased_tm.filter_entries((xlr_phased_tm.proband_entry.GT.is_non_ref()) &
-                            (~xlr_phased_tm.is_female)).key_rows_by(locus_expr, 'alleles').entries()
+xlr_phased = xlr_phased_tm.filter_entries(xlr_phased_tm.proband_entry.GT.is_non_ref()).key_rows_by(locus_expr, 'alleles').entries()
 
 # HomVar in proband only
 phased_hom_var = gene_phased_tm.filter_entries(gene_phased_tm.proband_entry.GT.is_hom_var())

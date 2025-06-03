@@ -65,7 +65,7 @@ def remove_parent_probands_trio_matrix(tm):
         mothers = ['']
     return tm.filter_cols(hl.array(fathers + mothers).contains(tm.proband.s), keep=False)
 
-def annotate_trio_matrix(phased_tm, mt, pedigree, ped_ht):
+def annotate_trio_matrix(phased_tm, mt, pedigree, ped_ht, locus_expr='locus'):
     # Annotate trio_status
     complete_trio_probands = [trio.s for trio in pedigree.complete_trios()]
     if len(complete_trio_probands)==0:
@@ -84,7 +84,7 @@ def annotate_trio_matrix(phased_tm, mt, pedigree, ped_ht):
     })
 
     # Get Mendel code/errors, get transmission
-    phased_tm = get_mendel_errors(mt, phased_tm, pedigree)
+    phased_tm = get_mendel_errors(mt, phased_tm, pedigree, locus_expr=locus_expr)
     phased_tm = get_transmission(phased_tm)
     
     # Annotate sex in TM

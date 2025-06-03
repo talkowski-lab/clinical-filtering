@@ -229,7 +229,8 @@ if (snv_indel_vcf!='NA') and (sv_vcf!='NA'):
     snv_mt = align_mt2_cols_to_mt1(sv_mt, snv_mt)
 
     variant_types = 'SV_SNV_Indel'
-    merged_mt = sv_mt.union_rows(snv_mt)
+    # NEW 6/2/2025: drop original VEP/INFO fields
+    merged_mt = sv_mt.drop('info').union_rows(snv_mt.drop('info','vep'))
         
 elif snv_indel_vcf!='NA':
     variant_types = 'SNV_Indel'

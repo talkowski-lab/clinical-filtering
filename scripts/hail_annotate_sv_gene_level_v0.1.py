@@ -228,8 +228,6 @@ def get_gene_level_annotations(mt, gene_field, gene_field_list, inheritance_ht, 
 
     return gene_mt.group_rows_by(gene_mt.rsid).aggregate_rows(**agg_fields).result()
 
-# Now, use this function as before:
-
 # Load gene list file(s) if available
 if gene_list_tsv != 'NA':
     gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()

@@ -169,6 +169,9 @@ task filterCompHetsXLRHomVar {
 
         Int ad_alt_threshold
 
+        # optional, if including SVs
+        Array[String] sv_original_gene_fields = ['']
+        
         String prefix='NA'  # optional, for if vcf_file has a very long filename (e.g. NIFS)
         String genome_build
 
@@ -214,12 +217,13 @@ task filterCompHetsXLRHomVar {
     String file_ext = if sub(basename(vcf_file), '.vcf.gz', '')!=basename(vcf_file) then '.vcf.gz' else '.vcf.bgz'
     String new_prefix = if prefix!='NA' then prefix else basename(vcf_file, file_ext)
 
-    command {
-        curl ~{helper_functions_script} > clinical_helper_functions.py
-        curl ~{filter_comphets_xlr_hom_var_script} > filter_vcf.py
-        python3 filter_vcf.py ~{snv_indel_vcf} ~{clinvar_vcf} ~{sv_vcf} ~{ped_uri} ~{new_prefix} ~{genome_build} \
-        ~{cpu_cores} ~{memory} ~{ad_alt_threshold} ~{carrier_gene_list}
-    }
+    command <<<
+    set -eou pipefail
+    curl ~{helper_functions_script} > clinical_helper_functions.py
+    curl ~{filter_comphets_xlr_hom_var_script} > filter_vcf.py
+    python3 filter_vcf.py ~{snv_indel_vcf} ~{clinvar_vcf} ~{sv_vcf} ~{ped_uri} ~{new_prefix} ~{genome_build} \
+        ~{cpu_cores} ~{memory} ~{ad_alt_threshold} ~{carrier_gene_list} ~{sep="," sv_original_gene_fields}
+    >>>
 
     output {
         File comphet_xlr_hom_var_mat_carrier_tsv = glob('*_comp_hets_xlr_hom_var_mat_carrier.tsv.gz')[0]

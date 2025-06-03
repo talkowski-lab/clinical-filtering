@@ -34,6 +34,10 @@ workflow filterClinicalCompHets {
         String genome_build='GRCh38'
         Int families_per_chunk=500
 
+        Array[String] sv_original_gene_fields = ['info.genes','info.gene_source','info.inheritance_code','info.gene_list',
+                               'info.restrictive_csq_genes','info.restrictive_gene_source','info.restrictive_inheritance_code','info.restrictive_gene_list',
+                               'info.permissive_csq_genes','info.permissive_gene_source','info.permissive_inheritance_code','info.permissive_gene_list']
+
         RuntimeAttr? runtime_attr_split_families
         RuntimeAttr? runtime_attr_subset_vcfs_snv_indel
         RuntimeAttr? runtime_attr_subset_vcfs_sv
@@ -105,6 +109,7 @@ workflow filterClinicalCompHets {
                 helper_functions_script=helper_functions_script,
                 filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
                 genome_build=genome_build,
+                sv_original_gene_fields=sv_original_gene_fields,
                 hail_docker=hail_docker,
                 ad_alt_threshold=ad_alt_threshold,
                 carrier_gene_list=carrier_gene_list,

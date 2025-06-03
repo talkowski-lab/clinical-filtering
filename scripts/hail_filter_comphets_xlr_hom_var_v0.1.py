@@ -39,11 +39,10 @@
 - use restrictive CSQ fields for SV gene fields
 6/3/2025:
 - rename all INFO struct fields to "info.{field}" and VEP struct fields to "vep.transcript_consequences.{field}"
-- use restrictive_csq_genes as "gene" field for comphets
-- adjust INFO fields and inheritance_code field for 'info.' prefix
+- annotate inheritance_code field from vep.transcript_consequences
+- use restrictive_csq_genes as "gene" field for comphets, restrictive_inheritance_code as "inheritance_code" field
 - don't drop renamed INFO and VEP fields because already renamed above
 - keep 'gene' column
-- add sv_original_gene_fields input
 '''
 ###
 
@@ -76,7 +75,6 @@ cores = sys.argv[7]  # string
 mem = int(np.floor(float(sys.argv[8])))
 ad_alt_threshold = int(sys.argv[9])
 carrier_gene_list = sys.argv[10]
-sv_original_gene_fields = sys.argv[11].split(',')
                                
 hl.init(min_block_size=128, 
         local=f"local[*]", 
@@ -88,7 +86,6 @@ hl.init(min_block_size=128,
                     },
         tmp_dir="tmp", local_tmpdir="tmp",
                     )
-
 
 ## STEP 1: Merge SNV/Indel VCF with SV VCF (or just one of them)
 # Load SNV/Indel VCF
@@ -124,7 +121,9 @@ if snv_indel_vcf!='NA':
     snv_mt = filter_mt(snv_mt)
 
     # Filter out empty gene fields
-    snv_mt = snv_mt.annotate_rows(gene=snv_mt['vep']['transcript_consequences']['SYMBOL'])
+    # NEW 6/3/2025: annotate inheritance_code field from vep.transcript_consequences
+    snv_mt = snv_mt.annotate_rows(gene=snv_mt['vep']['transcript_consequences']['SYMBOL'],
+                                 inheritance_code=snv_mt['vep']['transcript_consequences']['inheritance_code'])
     snv_mt = snv_mt.filter_rows(snv_mt.gene!='')
 
     snv_mt = snv_mt.annotate_rows(variant_type='SNV/Indel', 
@@ -165,24 +164,25 @@ if sv_vcf!='NA':
     
     # NEW 1/30/2025: combine gene-level annotations in INFO where there is a value for each gene
     # Annotate gene to match SNV/Indels (to explode on and keep original genes annotation)
-    # NEW 6/2/2025: use restrictive CSQ fields for SV gene fields
-    sv_mt = sv_mt.annotate_rows(gene_level=hl.zip(*[sv_mt[field] for field in sv_original_gene_fields])\
+    # NEW 6/3/2025: use restrictive_csq_genes as "gene" field for comphets, restrictive_inheritance_code as "inheritance_code" field
+    sv_gene_fields = ['gene','inheritance_code']
+    sv_mt = sv_mt.annotate_rows(**{'gene': sv_mt['info.restrictive_csq_genes'],
+                               'inheritance_code': sv_mt['info.restrictive_inheritance_code']})
+
+    sv_mt = sv_mt.annotate_rows(gene_level=hl.zip(*[sv_mt[field] for field in sv_gene_fields])\
             .map(lambda x: hl.struct(**{field: x[i] 
-                                        for i, field in enumerate(sv_original_gene_fields)})))\
+                                        for i, field in enumerate(sv_gene_fields)})))\
         .explode_rows('gene_level')
     sv_mt = sv_mt.annotate_rows(**{field: sv_mt.gene_level[field] 
-                                   for field in sv_original_gene_fields}).drop('gene_level')
-   
-    # NEW 6/3/2025: use restrictive_csq_genes as "gene" field for comphets
-    sv_mt = sv_mt.annotate_rows(gene=sv_mt['info.restrictive_csq_genes'])
+                                   for field in sv_gene_fields}).drop('gene_level')
     
     # NEW 1/28/2025: dummy variant_source annotation for SVs
     sv_mt = sv_mt.annotate_rows(variant_source='SV')
 
     # OMIM recessive code
-    omim_rec_code = (sv_mt['info.inheritance_code'].matches('2'))
+    omim_rec_code = (sv_mt['inheritance_code'].matches('2'))
     # OMIM XLR code
-    omim_xlr_code = (sv_mt['info.inheritance_code'].matches('4'))
+    omim_xlr_code = (sv_mt['inheritance_code'].matches('4'))
     sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code)
     
     sv_mt = sv_mt.drop('info')
@@ -468,15 +468,13 @@ gene_phased_tm, gene_agg_phased_tm = phase_by_transmission_aggregate_by_gene(mer
 
 # NEW 1/13/2025: maternal carrier variants
 # NEW 1/30/2025: edited gene_phased_tm.vep.transcript_consequences.SYMBOL --> gene_phased_tm.gene,
-# gene_phased_tm.vep.transcript_consequences.inheritance_code --> gene_phased_tm.inheritance_code
 # in carrier gene list and mother is het
 carrier_genes = pd.read_csv(carrier_gene_list, sep='\t', header=None)[0].tolist()
 mat_carrier = gene_phased_tm.filter_rows(hl.array(carrier_genes).contains(gene_phased_tm.gene))
 mat_carrier = mat_carrier.filter_entries(mat_carrier.mother_entry.GT.is_het()).key_rows_by(locus_expr, 'alleles').entries()
 
 # XLR only
-# NEW 6/3/2025: adjust inheritance_code field for 'info.' prefix
-xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm['info.inheritance_code'].matches('4'))   # OMIM XLR
+xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm['inheritance_code'].matches('4'))   # OMIM XLR
 xlr_phased = xlr_phased_tm.filter_entries((xlr_phased_tm.proband_entry.GT.is_non_ref()) &
                             (~xlr_phased_tm.is_female)).key_rows_by(locus_expr, 'alleles').entries()
 

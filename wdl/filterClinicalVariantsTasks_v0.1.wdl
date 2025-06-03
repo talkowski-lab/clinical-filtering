@@ -169,9 +169,6 @@ task filterCompHetsXLRHomVar {
 
         Int ad_alt_threshold
 
-        # optional, if including SVs
-        Array[String] sv_original_gene_fields = ['']
-        
         String prefix='NA'  # optional, for if vcf_file has a very long filename (e.g. NIFS)
         String genome_build
 
@@ -222,7 +219,7 @@ task filterCompHetsXLRHomVar {
     curl ~{helper_functions_script} > clinical_helper_functions.py
     curl ~{filter_comphets_xlr_hom_var_script} > filter_vcf.py
     python3 filter_vcf.py ~{snv_indel_vcf} ~{clinvar_vcf} ~{sv_vcf} ~{ped_uri} ~{new_prefix} ~{genome_build} \
-        ~{cpu_cores} ~{memory} ~{ad_alt_threshold} ~{carrier_gene_list} ~{sep="," sv_original_gene_fields}
+        ~{cpu_cores} ~{memory} ~{ad_alt_threshold} ~{carrier_gene_list}
     >>>
 
     output {

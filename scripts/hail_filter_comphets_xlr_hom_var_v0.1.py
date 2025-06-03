@@ -37,11 +37,18 @@
 - add sex annotation to annotate_and_filter_trio_matrix
 6/2/2025:
 - use restrictive CSQ fields for SV gene fields
+6/3/2025:
+- rename all INFO struct fields to "info.{field}" and VEP struct fields to "vep.transcript_consequences.{field}"
+- use restrictive_csq_genes as "gene" field for comphets
+- adjust INFO fields and inheritance_code field for 'info.' prefix
+- don't drop renamed INFO and VEP fields because already renamed above
+- keep 'gene' column
+- add sv_original_gene_fields input
 '''
 ###
 
 from pyspark.sql import SparkSession
-from clinical_helper_functions import filter_mt, remove_parent_probands_trio_matrix, load_split_vep_consequences
+from clinical_helper_functions import filter_mt, remove_parent_probands_trio_matrix, load_split_vep_consequences, require_biallelic, mendel_errors, annotate_trio_matrix
 import hail as hl
 import numpy as np
 import pandas as pd
@@ -69,7 +76,8 @@ cores = sys.argv[7]  # string
 mem = int(np.floor(float(sys.argv[8])))
 ad_alt_threshold = int(sys.argv[9])
 carrier_gene_list = sys.argv[10]
-
+sv_original_gene_fields = sys.argv[11].split(',')
+                               
 hl.init(min_block_size=128, 
         local=f"local[*]", 
         spark_conf={
@@ -123,22 +131,16 @@ if snv_indel_vcf!='NA':
     # NEW 1/30/2025: flatten INFO and vep.transcript_consequences fields
     snv_info_fields = list(snv_mt.info)
     vep_fields = list(snv_mt.vep.transcript_consequences)
+            
+    # NEW 6/3/2025: rename all INFO struct fields to "info.{field}" and VEP struct fields to "vep.transcript_consequences.{field}"
+    new_info_field_map = {og_field: f"info.{og_field}" for og_field in snv_info_fields}
+    new_vep_field_map = {og_field: f"vep.transcript_consequences.{og_field}" for og_field in vep_fields}
 
-    # Check for conflicting INFO fields with FORMAT fields (e.g. DP)
-    conflicting_snv_info_fields = list(np.intersect1d(snv_info_fields, list(snv_mt.entry)))
-    # Check for conflicting INFO and VEP fields (e.g. AF)
-    conflicting_vep_fields = list(np.intersect1d(snv_info_fields, vep_fields))
-    # Retain original field order
-    new_info_field_map = {og_field: f"info.{og_field}" if og_field in conflicting_snv_info_fields 
-                          else og_field for og_field in snv_info_fields}
-    new_vep_field_map = {og_field: f"vep.{og_field}" if og_field in conflicting_vep_fields 
-                          else og_field for og_field in vep_fields}
-    
-    # NEW 5/14/2025: don't drop original info/vep fields
     snv_mt = snv_mt.annotate_rows(**{new_field: snv_mt.info[og_field] for og_field, new_field in new_info_field_map.items()} | 
-                    {new_field: snv_mt.vep.transcript_consequences[og_field] for og_field, new_field in new_vep_field_map.items()})#\
-            # .drop('vep', 'info')
+                    {new_field: snv_mt.vep.transcript_consequences[og_field] for og_field, new_field in new_vep_field_map.items()})
     
+    snv_mt = snv_mt.drop('info','vep')
+
 # Load SV VCF
 if sv_vcf!='NA':
     locus_expr = 'locus_interval'
@@ -154,37 +156,34 @@ if sv_vcf!='NA':
     # NEW 1/30/2025: flatten INFO fields
     sv_info_fields = list(sv_mt.info)
 
-    # Check for conflicting INFO fields with FORMAT fields (e.g. DP)
-    conflicting_sv_info_fields = list(np.intersect1d(sv_info_fields, list(sv_mt.entry)))
-    # Retain original field order
-    new_info_field_map = {og_field: f"info.{og_field}" if og_field in conflicting_sv_info_fields 
-                          else og_field for og_field in sv_info_fields}
-    # NEW 5/14/2025: don't drop original info/vep fields
-    sv_mt = sv_mt.annotate_rows(**{new_field: sv_mt.info[og_field] for og_field, new_field in new_info_field_map.items()})#\
-            # .drop('info')
+    # NEW 6/3/2025: rename all INFO struct fields to "info.{field}"
+    new_info_field_map = {og_field: f"info.{og_field}" for og_field in sv_info_fields}
+
+    sv_mt = sv_mt.annotate_rows(**{new_field: sv_mt.info[og_field] for og_field, new_field in new_info_field_map.items()})    
     
     # NEW 1/30/2025: combine gene-level annotations in INFO where there is a value for each gene
     # Annotate gene to match SNV/Indels (to explode on and keep original genes annotation)
     # NEW 6/2/2025: use restrictive CSQ fields for SV gene fields
-    sv_mt = sv_mt.annotate_rows(gene=sv_mt.genes)
-    sv_original_gene_fields = ['restrictive_csq_genes', 'restrictive_inheritance_code']
-    match_snv_gene_fields = ['gene', 'inheritance_code']
-
     sv_mt = sv_mt.annotate_rows(gene_level=hl.zip(*[sv_mt[field] for field in sv_original_gene_fields])\
             .map(lambda x: hl.struct(**{field: x[i] 
                                         for i, field in enumerate(sv_original_gene_fields)})))\
         .explode_rows('gene_level')
-    sv_mt = sv_mt.annotate_rows(**{field: sv_mt.gene_level[sv_original_gene_fields[i]] 
-                                   for i, field in enumerate(match_snv_gene_fields)}).drop('gene_level')
+    sv_mt = sv_mt.annotate_rows(**{field: sv_mt.gene_level[field] 
+                                   for field in sv_original_gene_fields}).drop('gene_level')
    
+    # NEW 6/3/2025: use restrictive_csq_genes as "gene" field for comphets
+    sv_mt = sv_mt.annotate_rows(gene=sv_mt['info.restrictive_csq_genes'])
+    
     # NEW 1/28/2025: dummy variant_source annotation for SVs
     sv_mt = sv_mt.annotate_rows(variant_source='SV')
 
     # OMIM recessive code
-    omim_rec_code = (sv_mt.inheritance_code.matches('2'))
+    omim_rec_code = (sv_mt['info.inheritance_code'].matches('2'))
     # OMIM XLR code
-    omim_xlr_code = (sv_mt.inheritance_code.matches('4'))
+    omim_xlr_code = (sv_mt['info.inheritance_code'].matches('4'))
     sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code)
+    
+    sv_mt = sv_mt.drop('info')
 
 # Unify SNV/Indel MT and SV MT row and entry fields
 # NEW 1/30/2025: adjusted for INFO field flattened above
@@ -229,8 +228,7 @@ if (snv_indel_vcf!='NA') and (sv_vcf!='NA'):
     snv_mt = align_mt2_cols_to_mt1(sv_mt, snv_mt)
 
     variant_types = 'SV_SNV_Indel'
-    # NEW 6/2/2025: drop original VEP/INFO fields
-    merged_mt = sv_mt.drop('info').union_rows(snv_mt.drop('info','vep'))
+    merged_mt = sv_mt.union_rows(snv_mt)
         
 elif snv_indel_vcf!='NA':
     variant_types = 'SNV_Indel'
@@ -242,11 +240,12 @@ elif sv_vcf!='NA':
 
 # Clean up merged SV VCF with SNV/Indel VCF
 # NEW 1/30/2025: adjusted for INFO field flattened above
+# NEW 6/3/2025: adjust INFO fields for 'info.' prefix
 if sv_vcf!='NA':
     # Change locus to locus_interval to include END for SVs
-    merged_mt = merged_mt.annotate_rows(end=hl.if_else(hl.is_defined(merged_mt.END2), merged_mt.END2, merged_mt.END))
+    merged_mt = merged_mt.annotate_rows(end=hl.if_else(hl.is_defined(merged_mt['info.END2']), merged_mt['info.END2'], merged_mt['info.END']))
     # Account for INS having same END but different SVLEN
-    merged_mt = merged_mt.annotate_rows(end=hl.if_else(merged_mt.SVTYPE=='INS', merged_mt.end + merged_mt.SVLEN, merged_mt.end))
+    merged_mt = merged_mt.annotate_rows(end=hl.if_else(merged_mt['info.SVTYPE']=='INS', merged_mt.end + merged_mt['info.SVLEN'], merged_mt.end))
     # Account for empty END for SNV/Indels
     merged_mt = merged_mt.annotate_rows(end=hl.if_else(merged_mt.variant_type=='SNV/Indel', merged_mt.locus.position, merged_mt.end))
     merged_mt = merged_mt.key_rows_by()
@@ -270,269 +269,6 @@ merged_mt = merged_mt.annotate_rows(**{
     "n_het_affected": hl.agg.filter(merged_mt.phenotype=='2', hl.agg.sum(merged_mt.GT.is_het())),
     "n_hom_var_affected": hl.agg.filter(merged_mt.phenotype=='2', hl.agg.sum(merged_mt.GT.is_hom_var()))
 })
-
-## EDITED HAIL FUNCTIONS
-# EDITED: don't check locus struct
-@typecheck(dataset=MatrixTable, method=str, tolerate_generic_locus=bool)
-def require_biallelic(dataset, method, tolerate_generic_locus: bool = False) -> MatrixTable:
-    return dataset._select_rows(
-        method,
-        hl.case()
-        .when(dataset.alleles.length() == 2, dataset._rvrow)
-        .or_error(
-            f"'{method}' expects biallelic variants ('alleles' field of length 2), found "
-            + hl.str(dataset.locus)
-            + ", "
-            + hl.str(dataset.alleles)
-        ),
-    )
-
-# EDITED: custom require_biallelic function
-@typecheck(call=expr_call, pedigree=Pedigree)
-def mendel_errors(call, pedigree) -> Tuple[Table, Table, Table, Table]:
-    r"""Find Mendel errors; count per variant, individual and nuclear family.
-
-    .. include:: ../_templates/req_tstring.rst
-
-    .. include:: ../_templates/req_tvariant.rst
-
-    .. include:: ../_templates/req_biallelic.rst
-
-    Examples
-    --------
-
-    Find all violations of Mendelian inheritance in each (dad, mom, kid) trio in
-    a pedigree and return four tables (all errors, errors by family, errors by
-    individual, errors by variant):
-
-    >>> ped = hl.Pedigree.read('data/trios.fam')
-    >>> all_errors, per_fam, per_sample, per_variant = hl.mendel_errors(dataset['GT'], ped)
-
-    Export all mendel errors to a text file:
-
-    >>> all_errors.export('output/all_mendel_errors.tsv')
-
-    Annotate columns with the number of Mendel errors:
-
-    >>> annotated_samples = dataset.annotate_cols(mendel=per_sample[dataset.s])
-
-    Annotate rows with the number of Mendel errors:
-
-    >>> annotated_variants = dataset.annotate_rows(mendel=per_variant[dataset.locus, dataset.alleles])
-
-    Notes
-    -----
-
-    The example above returns four tables, which contain Mendelian violations
-    grouped in various ways. These tables are modeled after the `PLINK mendel
-    formats <https://www.cog-genomics.org/plink2/formats#mendel>`_, resembling
-    the ``.mendel``, ``.fmendel``, ``.imendel``, and ``.lmendel`` formats,
-    respectively.
-
-    **First table:** all Mendel errors. This table contains one row per Mendel
-    error, keyed by the variant and proband id.
-
-        - `locus` (:class:`.tlocus`) -- Variant locus, key field.
-        - `alleles` (:class:`.tarray` of :py:data:`.tstr`) -- Variant alleles, key field.
-        - (column key of `dataset`) (:py:data:`.tstr`) -- Proband ID, key field.
-        - `fam_id` (:py:data:`.tstr`) -- Family ID.
-        - `mendel_code` (:py:data:`.tint32`) -- Mendel error code, see below.
-
-    **Second table:** errors per nuclear family. This table contains one row
-    per nuclear family, keyed by the parents.
-
-        - `pat_id` (:py:data:`.tstr`) -- Paternal ID. (key field)
-        - `mat_id` (:py:data:`.tstr`) -- Maternal ID. (key field)
-        - `fam_id` (:py:data:`.tstr`) -- Family ID.
-        - `children` (:py:data:`.tint32`) -- Number of children in this nuclear family.
-        - `errors` (:py:data:`.tint64`) -- Number of Mendel errors in this nuclear family.
-        - `snp_errors` (:py:data:`.tint64`) -- Number of Mendel errors at SNPs in this
-          nuclear family.
-
-    **Third table:** errors per individual. This table contains one row per
-    individual. Each error is counted toward the proband, father, and mother
-    according to the `Implicated` in the table below.
-
-        - (column key of `dataset`) (:py:data:`.tstr`) -- Sample ID (key field).
-        - `fam_id` (:py:data:`.tstr`) -- Family ID.
-        - `errors` (:py:data:`.tint64`) -- Number of Mendel errors involving this
-          individual.
-        - `snp_errors` (:py:data:`.tint64`) -- Number of Mendel errors involving this
-          individual at SNPs.
-
-    **Fourth table:** errors per variant.
-
-        - `locus` (:class:`.tlocus`) -- Variant locus, key field.
-        - `alleles` (:class:`.tarray` of :py:data:`.tstr`) -- Variant alleles, key field.
-        - `errors` (:py:data:`.tint64`) -- Number of Mendel errors in this variant.
-
-    This method only considers complete trios (two parents and proband with
-    defined sex). The code of each Mendel error is determined by the table
-    below, extending the
-    `Plink classification <https://www.cog-genomics.org/plink2/basic_stats#mendel>`__.
-
-    In the table, the copy state of a locus with respect to a trio is defined
-    as follows, where PAR is the `pseudoautosomal region
-    <https://en.wikipedia.org/wiki/Pseudoautosomal_region>`__ (PAR) of X and Y
-    defined by the reference genome and the autosome is defined by
-    :meth:`~.LocusExpression.in_autosome`.
-
-    - Auto -- in autosome or in PAR or female child
-    - HemiX -- in non-PAR of X and male child
-    - HemiY -- in non-PAR of Y and male child
-
-    `Any` refers to the set \{ HomRef, Het, HomVar, NoCall \} and `~`
-    denotes complement in this set.
-
-    +------+---------+---------+--------+----------------------------+
-    | Code | Dad     | Mom     | Kid    | Copy State | Implicated    |
-    +======+=========+=========+========+============+===============+
-    |    1 | HomVar  | HomVar  | Het    | Auto       | Dad, Mom, Kid |
-    +------+---------+---------+--------+------------+---------------+
-    |    2 | HomRef  | HomRef  | Het    | Auto       | Dad, Mom, Kid |
-    +------+---------+---------+--------+------------+---------------+
-    |    3 | HomRef  | ~HomRef | HomVar | Auto       | Dad, Kid      |
-    +------+---------+---------+--------+------------+---------------+
-    |    4 | ~HomRef | HomRef  | HomVar | Auto       | Mom, Kid      |
-    +------+---------+---------+--------+------------+---------------+
-    |    5 | HomRef  | HomRef  | HomVar | Auto       | Kid           |
-    +------+---------+---------+--------+------------+---------------+
-    |    6 | HomVar  | ~HomVar | HomRef | Auto       | Dad, Kid      |
-    +------+---------+---------+--------+------------+---------------+
-    |    7 | ~HomVar | HomVar  | HomRef | Auto       | Mom, Kid      |
-    +------+---------+---------+--------+------------+---------------+
-    |    8 | HomVar  | HomVar  | HomRef | Auto       | Kid           |
-    +------+---------+---------+--------+------------+---------------+
-    |    9 | Any     | HomVar  | HomRef | HemiX      | Mom, Kid      |
-    +------+---------+---------+--------+------------+---------------+
-    |   10 | Any     | HomRef  | HomVar | HemiX      | Mom, Kid      |
-    +------+---------+---------+--------+------------+---------------+
-    |   11 | HomVar  | Any     | HomRef | HemiY      | Dad, Kid      |
-    +------+---------+---------+--------+------------+---------------+
-    |   12 | HomRef  | Any     | HomVar | HemiY      | Dad, Kid      |
-    +------+---------+---------+--------+------------+---------------+
-
-    See Also
-    --------
-    :func:`.mendel_error_code`
-
-    Parameters
-    ----------
-    dataset : :class:`.MatrixTable`
-    pedigree : :class:`.Pedigree`
-
-    Returns
-    -------
-    (:class:`.Table`, :class:`.Table`, :class:`.Table`, :class:`.Table`)
-    """
-    source = call._indices.source
-    if not isinstance(source, MatrixTable):
-        raise ValueError(
-            "'mendel_errors': expected 'call' to be an expression of 'MatrixTable', found {}".format(
-                "expression of '{}'".format(source.__class__) if source is not None else 'scalar expression'
-            )
-        )
-
-    source = source.select_entries(__GT=call)
-    dataset = require_biallelic(source, 'mendel_errors', tolerate_generic_locus=True)
-    tm = hl.trio_matrix(dataset, pedigree, complete_trios=True)
-    tm = tm.select_entries(
-        mendel_code=hl.mendel_error_code(
-            tm.locus, tm.is_female, tm.father_entry['__GT'], tm.mother_entry['__GT'], tm.proband_entry['__GT']
-        )
-    )
-    ck_name = next(iter(source.col_key))
-    tm = tm.filter_entries(hl.is_defined(tm.mendel_code))
-    tm = tm.rename({'id': ck_name})
-
-    entries = tm.entries()
-
-    table1 = entries.select('fam_id', 'mendel_code')
-
-    t2 = tm.annotate_cols(errors=hl.agg.count(), snp_errors=hl.agg.count_where(hl.is_snp(tm.alleles[0], tm.alleles[1])))
-    table2 = t2.key_cols_by().cols()
-    table2 = table2.select(
-        pat_id=table2.father[ck_name],
-        mat_id=table2.mother[ck_name],
-        fam_id=table2.fam_id,
-        errors=table2.errors,
-        snp_errors=table2.snp_errors,
-    )
-    table2 = table2.group_by('pat_id', 'mat_id').aggregate(
-        fam_id=hl.agg.take(table2.fam_id, 1)[0],
-        children=hl.int32(hl.agg.count()),
-        errors=hl.agg.sum(table2.errors),
-        snp_errors=hl.agg.sum(table2.snp_errors),
-    )
-    table2 = table2.annotate(
-        errors=hl.or_else(table2.errors, hl.int64(0)), snp_errors=hl.or_else(table2.snp_errors, hl.int64(0))
-    )
-
-    # in implicated, idx 0 is dad, idx 1 is mom, idx 2 is child
-    implicated = hl.literal(
-        [
-            [0, 0, 0],  # dummy
-            [1, 1, 1],
-            [1, 1, 1],
-            [1, 0, 1],
-            [0, 1, 1],
-            [0, 0, 1],
-            [1, 0, 1],
-            [0, 1, 1],
-            [0, 0, 1],
-            [0, 1, 1],
-            [0, 1, 1],
-            [1, 0, 1],
-            [1, 0, 1],
-        ],
-        dtype=hl.tarray(hl.tarray(hl.tint64)),
-    )
-
-    table3 = (
-        tm.annotate_cols(
-            all_errors=hl.or_else(hl.agg.array_sum(implicated[tm.mendel_code]), [0, 0, 0]),
-            snp_errors=hl.or_else(
-                hl.agg.filter(hl.is_snp(tm.alleles[0], tm.alleles[1]), hl.agg.array_sum(implicated[tm.mendel_code])),
-                [0, 0, 0],
-            ),
-        )
-        .key_cols_by()
-        .cols()
-    )
-
-    table3 = table3.select(
-        xs=[
-            hl.struct(**{
-                ck_name: table3.father[ck_name],
-                'fam_id': table3.fam_id,
-                'errors': table3.all_errors[0],
-                'snp_errors': table3.snp_errors[0],
-            }),
-            hl.struct(**{
-                ck_name: table3.mother[ck_name],
-                'fam_id': table3.fam_id,
-                'errors': table3.all_errors[1],
-                'snp_errors': table3.snp_errors[1],
-            }),
-            hl.struct(**{
-                ck_name: table3.proband[ck_name],
-                'fam_id': table3.fam_id,
-                'errors': table3.all_errors[2],
-                'snp_errors': table3.snp_errors[2],
-            }),
-        ]
-    )
-    table3 = table3.explode('xs')
-    table3 = table3.select(**table3.xs)
-    table3 = (
-        table3.group_by(ck_name, 'fam_id')
-        .aggregate(errors=hl.agg.sum(table3.errors), snp_errors=hl.agg.sum(table3.snp_errors))
-        .key_by(ck_name)
-    )
-
-    table4 = tm.select_rows(errors=hl.agg.count_where(hl.is_defined(tm.mendel_code))).rows()
-
-    return table1, table2, table3, table4
 
 ## STEP 2: Get CompHets
 # Mendel errors
@@ -582,57 +318,7 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     return phased_tm, gene_agg_phased_tm
 
 def annotate_and_filter_trio_matrix(tm, mt, pedigree, ped_ht):
-    complete_trio_probands = [trio.s for trio in pedigree.complete_trios()]
-    if len(complete_trio_probands)==0:
-        complete_trio_probands = ['']
-    tm = tm.annotate_cols(trio_status=hl.if_else(tm.fam_id=='-9', 'not_in_pedigree', 
-                                                       hl.if_else(hl.array(complete_trio_probands).contains(tm.id), 'trio', 'non_trio')))
-
-    # NEW 5/14/2025: add sex annotation to annotate_and_filter_trio_matrix
-    tm = tm.annotate_cols(sex=ped_ht[tm.id].sex)
-
-    # NEW 2/3/2025: get_mendel_errors in annotate_and_filter_trio_matrix
-    tm = get_mendel_errors(mt, tm, pedigree)
-
-    # Annotate affected status/phenotype from pedigree
-    tm = tm.annotate_cols(
-        proband=tm.proband.annotate(
-            phenotype=ped_ht[tm.proband.s].phenotype),
-    mother=tm.mother.annotate(
-            phenotype=ped_ht[tm.mother.s].phenotype),
-    father=tm.father.annotate(
-            phenotype=ped_ht[tm.father.s].phenotype))
-
-    affected_cols = ['n_het_unaffected', 'n_hom_var_unaffected', 'n_het_affected', 'n_hom_var_affected']
-    tm = tm.annotate_rows(**{col: mt.rows()[tm.row_key][col] 
-                                                 for col in affected_cols})
-
-    ## Annotate dominant_gt and recessive_gt
-    # denovo
-    dom_trio_criteria = ((tm.trio_status=='trio') &  
-                         (tm.mendel_code==2))
-    # het absent in unaff
-    dom_non_trio_criteria = ((tm.trio_status!='trio') & 
-                            (tm.n_hom_var_unaffected==0) &
-                            (tm.n_het_unaffected==0) & 
-                            (tm.proband_entry.GT.is_het())
-                            )
-
-    # homozygous and het parents
-    rec_trio_criteria = ((tm.trio_status=='trio') &  
-                         (tm.proband_entry.GT.is_hom_var()) &
-                         (tm.mother_entry.GT.is_het()) &
-                         (tm.father_entry.GT.is_het())
-                        )  
-    # hom and unaff are not hom
-    rec_non_trio_criteria = ((tm.trio_status!='trio') &  
-                            (tm.n_hom_var_unaffected==0) &
-                            (tm.proband_entry.GT.is_hom_var())
-                            )
-
-    tm = tm.annotate_entries(dominant_gt=((dom_trio_criteria) | (dom_non_trio_criteria)),
-                            recessive_gt=((rec_trio_criteria) | (rec_non_trio_criteria)))
-    
+    tm = annotate_trio_matrix(tm, mt, pedigree, ped_ht) 
     # filter by AD of alternate allele in proband
     # NEW 1/30/2025: allow for missing proband_entry.AD (e.g. for SVs)
     if 'AD' in list(mt.entry):
@@ -787,7 +473,8 @@ mat_carrier = gene_phased_tm.filter_rows(hl.array(carrier_genes).contains(gene_p
 mat_carrier = mat_carrier.filter_entries(mat_carrier.mother_entry.GT.is_het()).key_rows_by(locus_expr, 'alleles').entries()
 
 # XLR only
-xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm.inheritance_code.matches('4'))   # OMIM XLR
+# NEW 6/3/2025: adjust inheritance_code field for 'info.' prefix
+xlr_phased_tm = gene_phased_tm.filter_rows(gene_phased_tm['info.inheritance_code'].matches('4'))   # OMIM XLR
 xlr_phased = xlr_phased_tm.filter_entries((xlr_phased_tm.proband_entry.GT.is_non_ref()) &
                             (~xlr_phased_tm.is_female)).key_rows_by(locus_expr, 'alleles').entries()
 
@@ -804,18 +491,20 @@ merged_comphets = merged_comphets.annotate(variant_category='comphet')
 mat_carrier = mat_carrier.annotate(variant_category='maternal_carrier')
 
 # NEW 5/14/2025: drop renamed INFO and VEP fields and retain originals (flattened later) to match other outputs
-merged_comphets = merged_comphets.drop(*(list(new_vep_field_map.values()) + list(new_info_field_map.values())))
-xlr_phased = xlr_phased.drop(*(list(new_vep_field_map.values()) + list(new_info_field_map.values())))
-phased_hom_var = phased_hom_var.drop(*(list(new_vep_field_map.values()) + list(new_info_field_map.values())))
-mat_carrier = mat_carrier.drop(*(list(new_vep_field_map.values()) + list(new_info_field_map.values())))
+# NEW 6/3/2025: don't drop renamed INFO and VEP fields because already renamed above
+# merged_comphets = merged_comphets.drop(*(list(new_vep_field_map.values()) + list(new_info_field_map.values())))
+# xlr_phased = xlr_phased.drop(*(list(new_vep_field_map.values()) + list(new_info_field_map.values())))
+# phased_hom_var = phased_hom_var.drop(*(list(new_vep_field_map.values()) + list(new_info_field_map.values())))
+# mat_carrier = mat_carrier.drop(*(list(new_vep_field_map.values()) + list(new_info_field_map.values())))
 
 # NEW 1/14/2025: use to_pandas() to bypass ClassTooLargeException in Hail tables union
 # NEW 1/22/2025: use export() and then load in pandas instead of to_pandas() to match formatting with other outputs
 # NEW 3/4/2025: remove redundant gene field from output
-merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set','gene').flatten().export('comphets.tsv.gz')
-xlr_phased.drop('gene').flatten().export('xlr.tsv.gz')
-phased_hom_var.drop('gene').flatten().export('hom_var.tsv.gz')
-mat_carrier.drop('gene').flatten().export('mat_carrier.tsv.gz')
+# NEW 6/3/2025: keep 'gene' column
+merged_comphets.drop('proband_GT','proband_GT_set','proband_PBT_GT_set').flatten().export('comphets.tsv.gz')
+xlr_phased.flatten().export('xlr.tsv.gz')
+phased_hom_var.flatten().export('hom_var.tsv.gz')
+mat_carrier.flatten().export('mat_carrier.tsv.gz')
 
 merged_comphets_df = pd.read_csv('comphets.tsv.gz', sep='\t')
 xlr_phased_df = pd.read_csv('xlr.tsv.gz', sep='\t')

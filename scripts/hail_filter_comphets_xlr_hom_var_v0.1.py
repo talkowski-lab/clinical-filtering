@@ -294,7 +294,7 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
     
     # NEW 2/3/2025: Run annotate_and_filter_trio_matrix after phasing in phase_by_transmission_aggregate_by_gene
-    phased_tm = annotate_and_filter_trio_matrix(phased_tm, mt, pedigree, ped_ht) 
+    phased_tm = annotate_and_filter_trio_matrix(phased_tm, mt, pedigree, ped_ht, locus_expr) 
     
     phased_tm = phased_tm.key_rows_by(locus_expr,'alleles','gene')
 
@@ -317,8 +317,8 @@ def phase_by_transmission_aggregate_by_gene(tm, mt, pedigree):
     
     return phased_tm, gene_agg_phased_tm
 
-def annotate_and_filter_trio_matrix(tm, mt, pedigree, ped_ht):
-    tm = annotate_trio_matrix(tm, mt, pedigree, ped_ht) 
+def annotate_and_filter_trio_matrix(tm, mt, pedigree, ped_ht, locus_expr):
+    tm = annotate_trio_matrix(tm, mt, pedigree, ped_ht, locus_expr=locus_expr) 
     # filter by AD of alternate allele in proband
     # NEW 1/30/2025: allow for missing proband_entry.AD (e.g. for SVs)
     if 'AD' in list(mt.entry):

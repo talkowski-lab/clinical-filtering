@@ -45,6 +45,7 @@
 - keep 'gene' column
 - don't filter out BNDs
 - keep XLR for all samples, not just male
+- only include AR/XLR that pass recessive_freq filter
 '''
 ###
 
@@ -186,7 +187,10 @@ if sv_vcf!='NA':
     omim_rec_code = (sv_mt['inheritance_code'].matches('2'))
     # OMIM XLR code
     omim_xlr_code = (sv_mt['inheritance_code'].matches('4'))
-    sv_mt = sv_mt.filter_rows(omim_rec_code | omim_xlr_code)
+    
+    # NEW 6/4/2025: only include AR/XLR that pass recessive_freq filter
+    sv_mt = sv_mt.filter_rows((omim_rec_code | omim_xlr_code) &
+                              (sv_mt['info.recessive_freq']))
     
     sv_mt = sv_mt.drop('info')
 

@@ -45,7 +45,9 @@
 - keep 'gene' column
 - don't filter out BNDs
 - keep XLR for all samples, not just male
+6/4/2025:
 - only include AR/XLR that pass recessive_freq filter
+- use variant_id as row key for when running on both SVs and SNV/Indels
 '''
 ###
 
@@ -144,6 +146,9 @@ if snv_indel_vcf!='NA':
                     {new_field: snv_mt.vep.transcript_consequences[og_field] for og_field, new_field in new_vep_field_map.items()})
     
     snv_mt = snv_mt.drop('info','vep')
+    
+    # NEW 6/4/2025: use variant_id as row key for when running on both SVs and SNV/Indels
+    snv_mt = snv_mt.annotate_rows(variant_id=hl.str(snv_mt.locus))
 
 # Load SV VCF
 if sv_vcf!='NA':
@@ -155,7 +160,7 @@ if sv_vcf!='NA':
     # NEW 6/3/2025: don't filter out BNDs
     # sv_mt = sv_mt.filter_rows(sv_mt.info.SVTYPE!='BND') 
     # NEW 1/30/2025: filter out rows where CHR2 is not the same chromosome (SV spans multiple chromosomes)
-    sv_mt = sv_mt.filter_rows(sv_mt.info.CHR2==sv_mt.locus.contig)
+#     sv_mt = sv_mt.filter_rows(sv_mt.info.CHR2==sv_mt.locus.contig)
     
     sv_mt = sv_mt.annotate_rows(variant_type='SV')
 
@@ -194,6 +199,9 @@ if sv_vcf!='NA':
                               (sv_mt['info.recessive_freq']))
     
     sv_mt = sv_mt.drop('info')
+    
+    # NEW 6/4/2025: use variant_id as row key for when running on both SVs and SNV/Indels
+    sv_mt = sv_mt.annotate_rows(variant_id=sv_mt.rsid)
 
 # Unify SNV/Indel MT and SV MT row and entry fields
 # NEW 1/30/2025: adjusted for INFO field flattened above
@@ -248,21 +256,7 @@ elif sv_vcf!='NA':
     variant_types = 'SV'
     merged_mt = sv_mt
 
-# Clean up merged SV VCF with SNV/Indel VCF
-# NEW 1/30/2025: adjusted for INFO field flattened above
-# NEW 6/3/2025: adjust INFO fields for 'info.' prefix
-if sv_vcf!='NA':
-    # Change locus to locus_interval to include END for SVs
-    merged_mt = merged_mt.annotate_rows(end=hl.if_else(hl.is_defined(merged_mt['info.END2']), merged_mt['info.END2'], merged_mt['info.END']))
-    # Account for INS having same END but different SVLEN
-    merged_mt = merged_mt.annotate_rows(end=hl.if_else(merged_mt['info.SVTYPE']=='INS', merged_mt.end + merged_mt['info.SVLEN'], merged_mt.end))
-    # Account for empty END for SNV/Indels
-    merged_mt = merged_mt.annotate_rows(end=hl.if_else(merged_mt.variant_type=='SNV/Indel', merged_mt.locus.position, merged_mt.end))
-    merged_mt = merged_mt.key_rows_by()
-    merged_mt = merged_mt.annotate_rows(locus_interval=hl.locus_interval(contig=merged_mt.locus.contig, 
-                                                                              start=merged_mt.locus.position,
-                                                                              end=merged_mt.end, reference_genome=build))
-    merged_mt = merged_mt.key_rows_by(locus_expr, 'alleles')
+merged_mt = merged_mt.key_rows_by(locus_expr, 'alleles')
 
 # NEW 1/14/2025: Annotate PAR status (moved up from end of script)
 merged_mt = merged_mt.annotate_rows(in_non_par=~(merged_mt.locus.in_autosome_or_par()))

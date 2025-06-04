@@ -158,10 +158,7 @@ if sv_vcf!='NA':
 
     # filter out BNDs
     # NEW 6/3/2025: don't filter out BNDs
-    # sv_mt = sv_mt.filter_rows(sv_mt.info.SVTYPE!='BND') 
-    # NEW 1/30/2025: filter out rows where CHR2 is not the same chromosome (SV spans multiple chromosomes)
-#     sv_mt = sv_mt.filter_rows(sv_mt.info.CHR2==sv_mt.locus.contig)
-    
+    # sv_mt = sv_mt.filter_rows(sv_mt.info.SVTYPE!='BND')     
     sv_mt = sv_mt.annotate_rows(variant_type='SV')
 
     # NEW 1/30/2025: flatten INFO fields

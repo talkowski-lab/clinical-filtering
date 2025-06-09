@@ -157,11 +157,12 @@ workflow filterClinicalVariantsSV {
     } 
 
     scatter (sample_file in splitFamilies.family_shard_files) {
-        call helpers.subsetVCFSamples as subsetVCFSamplesSVs {
+        call helpers.subsetVCFSamplesHail as subsetVCFSamplesSVs {
             input:
                 samples_file=sample_file,
                 vcf_file=annotateGeneLevelVCF.annotated_vcf,
-                docker=variant_interpretation_docker,
+                hail_docker=hail_docker,
+                genome_build=genome_build,
                 runtime_attr_override=runtime_attr_subset_vcfs_sv
         }
         call filterVCF {
@@ -174,6 +175,15 @@ workflow filterClinicalVariantsSV {
             filter_clinical_sv_script=filter_clinical_sv_script,
             runtime_attr_override=runtime_attr_filter_vcf
         }
+    }
+
+    call helpers.mergeResultsPython as mergeFilteredSVs {
+        input:
+            tsvs=filterVCF.sv_merged_clinical_tsv,
+            hail_docker=hail_docker,
+            input_size=size(filterVCF.sv_merged_clinical_tsv, 'GB'),
+            merged_filename="~{cohort_prefix}_merged_filtered_clinical_SVs.tsv.gz",
+            runtime_attr_override=runtime_attr_merge_results
     }
 
     call helpers.mergeResultsPython as mergeFilteredSVs {
@@ -201,7 +211,6 @@ workflow filterClinicalVariantsSV {
         ## OLD: BEFORE SPLITTING FAMILIES AND MERGING
         # File sv_merged_clinical_tsv = filterVCF.sv_merged_clinical_tsv
         File sv_merged_clinical_tsv = mergeFilteredSVs.merged_tsv
-        File sv_merged_clinical_excel = select_first([ConvertTSVtoExcel.output_excel, mergeFilteredSVs.merged_tsv])
         File sv_flagged_vcf = annotateGeneLevelVCF.annotated_vcf
         File sv_flagged_vcf_idx = annotateGeneLevelVCF.annotated_vcf_idx
     }

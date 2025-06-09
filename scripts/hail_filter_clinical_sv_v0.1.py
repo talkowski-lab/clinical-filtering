@@ -60,14 +60,6 @@ hl.init(min_block_size=128,
         tmp_dir="tmp", local_tmpdir="tmp",
                     )
 
-def get_transmission(phased_tm):
-    phased_tm = phased_tm.annotate_entries(transmission=hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|0'), 'uninherited',
-            hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|1'), 'inherited_from_mother',
-                        hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|0'), 'inherited_from_father',
-                                hl.or_missing(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|1'), 'inherited_from_both'))))
-    )
-    return phased_tm
-
 def filter_and_annotate_tm(tm, variant_category=None, filter_type='trio'):
     '''
     Filter entries by presence in trio --> annotate by variant_category (if given)

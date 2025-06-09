@@ -155,12 +155,11 @@ workflow filterClinicalVariantsSV {
     } 
 
     scatter (sample_file in splitFamilies.family_shard_files) {
-        call helpers.subsetVCFSamplesHail as subsetVCFSamplesSVs {
+        call helpers.subsetVCFSamples as subsetVCFSamplesSVs {
             input:
                 samples_file=sample_file,
                 vcf_file=annotateGeneLevelVCF.annotated_vcf,
-                hail_docker=hail_docker,
-                genome_build=genome_build,
+                docker=variant_interpretation_docker,
                 runtime_attr_override=runtime_attr_subset_vcfs_sv
         }
         call filterVCF {

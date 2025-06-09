@@ -43,6 +43,7 @@ workflow filterClinicalVariantsSV {
         Array[String] restrictive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN", "PREDICTED_INTRONIC"]
 
         Float bed_overlap_threshold=0.5
+        Int families_per_chunk=500
         Int size_threshold=500000  # in BP
         Float dom_af_threshold=0.001
         Float rec_af_threshold=0.01
@@ -56,7 +57,10 @@ workflow filterClinicalVariantsSV {
 
         RuntimeAttr? runtime_attr_bcftools
         RuntimeAttr? runtime_attr_annotate
+        RuntimeAttr? runtime_attr_split_families
         RuntimeAttr? runtime_attr_filter_vcf
+        RuntimeAttr? runtime_attr_subset_vcfs_sv
+        RuntimeAttr? runtime_attr_merge_results
     }
 
     call vcfToBed {
@@ -141,15 +145,43 @@ workflow filterClinicalVariantsSV {
         runtime_attr_override=runtime_attr_annotate
     }
 
-    call filterVCF {
+    call helpers.splitFamilies as splitFamilies {
         input:
-        vcf_file=annotateGeneLevelVCF.annotated_vcf,
-        ped_uri=ped_uri,
-        genome_build=genome_build,
-        hail_docker=hail_docker,
-        helper_functions_script=helper_functions_script,
-        filter_clinical_sv_script=filter_clinical_sv_script,
-        runtime_attr_override=runtime_attr_filter_vcf
+            ped_uri=ped_uri,
+            families_per_chunk=families_per_chunk,
+            cohort_prefix=cohort_prefix,
+            sv_base_mini_docker=hail_docker,
+            runtime_attr_override=runtime_attr_split_families
+    } 
+
+    scatter (sample_file in splitFamilies.family_shard_files) {
+        call helpers.subsetVCFSamplesHail as subsetVCFSamplesSVs {
+            input:
+                samples_file=sample_file,
+                vcf_file=annotateGeneLevelVCF.annotated_vcf,
+                hail_docker=hail_docker,
+                genome_build=genome_build,
+                runtime_attr_override=runtime_attr_subset_vcfs_sv
+        }
+        call filterVCF {
+            input:
+            vcf_file=subsetVCFSamplesSVs.vcf_subset,
+            ped_uri=ped_uri,
+            genome_build=genome_build,
+            hail_docker=hail_docker,
+            helper_functions_script=helper_functions_script,
+            filter_clinical_sv_script=filter_clinical_sv_script,
+            runtime_attr_override=runtime_attr_filter_vcf
+        }
+    }
+
+    call helpers.mergeResultsPython as mergeFilteredSVs {
+        input:
+            tsvs=filterVCF.sv_merged_clinical_tsv,
+            hail_docker=hail_docker,
+            input_size=size(filterVCF.sv_merged_clinical_tsv, 'GB'),
+            merged_filename="~{cohort_prefix}_merged_filtered_clinical_SVs.tsv.gz",
+            runtime_attr_override=runtime_attr_merge_results
     }
 
     output {
@@ -158,7 +190,9 @@ workflow filterClinicalVariantsSV {
         # File sv_large_regions_tsv = filterVCF.sv_large_regions_tsv
         # File sv_dominant_tsv = filterVCF.sv_dominant_tsv
         # File sv_recessive_tsv = filterVCF.sv_recessive_tsv
-        File sv_merged_clinical_tsv = filterVCF.sv_merged_clinical_tsv
+        ## OLD: BEFORE SPLITTING FAMILIES AND MERGING
+        # File sv_merged_clinical_tsv = filterVCF.sv_merged_clinical_tsv
+        File sv_merged_clinical_tsv = mergeFilteredSVs.merged_tsv
         File sv_flagged_vcf = annotateGeneLevelVCF.annotated_vcf
         File sv_flagged_vcf_idx = annotateGeneLevelVCF.annotated_vcf_idx
     }

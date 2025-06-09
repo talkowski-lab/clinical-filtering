@@ -759,7 +759,7 @@ task subsetVCFSamples {
     }
 
     command <<<
-    bcftools view -S ~{samples_file} ~{vcf_file} -Oz -o ~{basename(samples_file, '.txt')+'.vcf.gz'}
+    bcftools view -S ~{samples_file} --force-samples -Oz -o ~{basename(samples_file, '.txt')+'.vcf.gz'} ~{vcf_file}
     >>>
 
     output {

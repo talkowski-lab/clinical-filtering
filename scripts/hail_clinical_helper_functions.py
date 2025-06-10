@@ -58,9 +58,9 @@ def remove_parent_probands_trio_matrix(tm):
     '''
     fathers = tm.father.s.collect()
     mothers = tm.mother.s.collect()
-    if len(fathers)==0:
+    if fathers is None:
         fathers = ['']
-    if len(mothers)==0:
+    if mothers is None:
         mothers = ['']
     return tm.filter_cols(hl.array(fathers + mothers).contains(tm.proband.s), keep=False)
 

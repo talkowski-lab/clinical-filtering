@@ -222,6 +222,12 @@ if pli_uri!='':
     pli_df = pd.read_csv(pli_uri, sep='\t')
     merged_df['lof.pLI'] = merged_df.Gene.map(pli_df.set_index('gene_id')['lof.pLI'].to_dict())
 
+# NEW 6/19/2025: Make combined CANONICAL_OR_MANE_PLUS_CLINICAL column and drop duplicate rows
+# Combine CANONICAL and MANE_PLUS_CLINICAL columns
+merged_df['CANONICAL_OR_MANE_PLUS_CLINICAL'] = merged_df['CANONICAL'].fillna(merged_df['MANE_PLUS_CLINICAL'])
+# Remove MANE_PLUS_CLINICAL only rows because now redundant
+merged_df = merged_df[merged_df['MANE_PLUS_CLINICAL'].isna()]
+
 # Add 2 empty columns as spacers after priority columns (for exporting as Excel later)
 merged_df = merged_df[priority_cols + remaining_cols].copy()
 for i in range(2):

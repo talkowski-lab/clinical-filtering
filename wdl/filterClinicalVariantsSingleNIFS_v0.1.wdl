@@ -86,14 +86,15 @@ workflow filterClinicalVariants {
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
         Array[String] priority_cols=['fam_id', 'sex', 'Fetal_Fraction', 'Case_Pheno',
                         'locus', 'alleles', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
-                        'Pheno_Overlapping_HPO_IDs', 'disease_title_recessive', 'disease_title_dominant',
-                        'CLNSIG', 'CLNREVSTAT', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
-                        'CANONICAL', 'MANE_PLUS_CLINICAL', 'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 
-                        'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'lof.pLI', 'INTRON', 'comphet_ID',
+                        'Pheno_Overlapping_HPO_IDs', 
+                        'disease_title_recessive', 'disease_title_dominant','classification_title',
+                        'CLNSIG', 'CLNREVSTAT', 'CLNGENE', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
+                        'CANONICAL', 'MANE_PLUS_CLINICAL', 'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 'comphet_ID',
+                        'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'lof.pLI', 'INTRON',
                         'gene_list', 'cohort_AC', 'cohort_AF', 'cohort_AN', 'gnomad_popmax_af', 'GAF',
                         'maternal_carrier', 'filters']
         # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
-        Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense'}
+        Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense', 'GENEINFO': 'CLNGENE'}
         Array[String] static_cols = ['fam_id','id','Fetal_Fraction','sex','Case_Pheno']
         Array[String] static_cols_to_combine = ['fam_id', 'sex', 'Fetal_Fraction']  # will be '/'-separated in output
 

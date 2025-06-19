@@ -187,6 +187,8 @@ merged_df.loc[merged_df.variant_category.str.contains('comphet'), 'comphet_ID'] 
 pheno_df = pd.read_csv(pheno_uri, sep='\t')
 merged_df['disease_title_recessive'] = merged_df.SYMBOL.map(pheno_df.set_index('gene_symbol').disease_title_recessive.to_dict())
 merged_df['disease_title_dominant'] = merged_df.SYMBOL.map(pheno_df.set_index('gene_symbol').disease_title_dominant.to_dict())
+# NEW 6/19/2025: add classification_title
+merged_df['classification_title'] = merged_df.SYMBOL.map(pheno_df.set_index('gene_symbol').classification_title.to_dict())
 
 # NEW 4/2/2025: Add sample fetal fraction
 if xgenotyping_nomat_fetal_fraction_estimate!=-1:

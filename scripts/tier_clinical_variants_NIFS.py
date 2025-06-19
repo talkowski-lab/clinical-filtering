@@ -10,6 +10,9 @@
 - add Tier 6, shift other Tiers
 4/11/2025:
 - add Tier 7, shift other Tiers (for Conflicting CLNSIGCONF P/LP status)
+6/19/2025:
+- require ClinVar gene match for Tiers 1-3
+- add IMPACT criteria for Tiers 1-3
 '''
 ###
 
@@ -61,19 +64,8 @@ is_clnrevstat_one_star_plus = (df['info.CLNREVSTAT'].isin(clnrevstat_one_star_pl
 is_clinvar_P_LP_one_star_plus = is_clinvar_P_LP & is_clnrevstat_one_star_plus
 is_not_clinvar_B_LB = (~df['info.CLNSIG'].astype(str).str.contains('enign'))
 # NEW 6/19/2025: Require ClinVar gene match for Tiers 1-3
-# NEW 7/28/2025: Require exact match for ClinVar gene match
-if df.empty:
-    clinvar_gene_matches = False
-else:
-    clinvar_gene_matches = (
-        df.apply(
-            lambda row: row['vep.transcript_consequences.SYMBOL'] in [
-                gene.split(':')[0] for gene in row['info.GENEINFO'].split('|')
-            ],
-            axis=1
-        )
-        | (df['info.GENEINFO'] == '')
-    )
+clinvar_gene_matches = ((df.apply(lambda row: row['vep.transcript_consequences.SYMBOL'] in row['info.GENEINFO'], axis=1)) |  # Make sure gene matches if in ClinVar
+                       (df['info.GENEINFO']==''))
 
 # CRITERIA FOR TIERS 3-5
 vus_or_conflicting_in_clinvar = (df['info.CLNSIG'].str.contains('Uncertain') | df['info.CLNSIG'].str.contains('Conflicting'))
@@ -88,11 +80,17 @@ has_strong_definitive_evidence = (df['vep.transcript_consequences.genCC_classifi
 # Tier 4: Include VUS or Conflicting in ClinVar AND Strong/Definitive
 df.loc[passes_filters & has_strong_definitive_evidence &
        (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 4
+
+# NEW 6/19/2025: IMPACT criteria for Tiers 1-3
+high_impact = (df['vep.transcript_consequences.IMPACT']=='HIGH')  # Tier 1
+high_or_moderate_impact = df['vep.transcript_consequences.IMPACT'].isin(['HIGH','MODERATE'])  # Tier 2 or 3
+
 # NEW 4/11/2025: Tier 3: Only include Conflicting with at least one P/LP in CLNSIGCONF
 conflicting_P_LP = ((df['info.CLNSIGCONF'].astype(str).str.contains('athogenic')) |  # if Conflicting, must have at least one P/LP
                     (df['info.CLNSIGCONF'].isna()))  # if not Conflicting, CLNSIGCONF is empty
 df.loc[passes_filters & has_strong_definitive_evidence &
-       ((vus_or_conflicting_in_clinvar & conflicting_P_LP) | is_clinvar_P_LP_one_star_plus), 'Tier'] = 3
+    ((vus_or_conflicting_in_clinvar & conflicting_P_LP & clinvar_gene_matches) |
+      (is_clinvar_P_LP_one_star_plus & clinvar_gene_matches) | high_or_moderate_impact), 'Tier' ] = 3
 
 # CRITERIA FOR BOTH TIER 1 AND TIER 2
 # NEW 8/11/2025: no IMPACT=MODIFIER until Tier 3
@@ -104,9 +102,6 @@ passes_ECNT = (df['info.ECNT'] < ECNT_threshold)
 
 not_in_segdup_str_simplerep = (~df[['info.SEGDUP', 'info.STR', 'info.SIMPLEREP']].any(axis=1))  # Tier 1
 not_in_segdup = (~df['info.SEGDUP'])  # Tier 2
-
-high_impact = (df['vep.transcript_consequences.IMPACT']=='HIGH')  # Tier 1
-high_or_moderate_impact = df['vep.transcript_consequences.IMPACT'].isin(['HIGH','MODERATE'])  # Tier 2
 
 # GT CRITERIA
 if inheritance_type=='recessive':

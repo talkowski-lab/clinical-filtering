@@ -13,7 +13,6 @@
 6/19/2025:
 - require ClinVar gene match for Tiers 1-3
 - add IMPACT criteria for Tiers 1-3
-- change Tier 5 ClinVar P/LP criteria to not restrict to just 1*+
 '''
 ###
 
@@ -74,7 +73,7 @@ vus_or_conflicting_in_clinvar = (df['info.CLNSIG'].str.contains('Uncertain') | d
 
 # Tier 5: Include VUS or Conflicting in ClinVar
 df.loc[passes_filters &
-        (vus_or_conflicting_in_clinvar | is_clinvar_P_LP), 'Tier'] = 5
+        (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 5
 
 # CRITERIA FOR TIERS 1-4: STRONG/DEFINITIVE
 has_strong_definitive_evidence = (df['vep.transcript_consequences.genCC_classification']=='Strong/Definitive')

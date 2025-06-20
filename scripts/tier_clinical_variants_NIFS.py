@@ -13,7 +13,7 @@
 6/19/2025:
 - require ClinVar gene match for Tiers 1-3
 - add IMPACT criteria for Tiers 1-3
-- change Tiers 3-5 ClinVar P/LP criteria to not restrict to just 1*+
+- change Tier 5 ClinVar P/LP criteria to not restrict to just 1*+
 '''
 ###
 
@@ -81,7 +81,7 @@ has_strong_definitive_evidence = (df['vep.transcript_consequences.genCC_classifi
 
 # Tier 4: Include VUS or Conflicting in ClinVar AND Strong/Definitive
 df.loc[passes_filters & has_strong_definitive_evidence &
-       (vus_or_conflicting_in_clinvar | is_clinvar_P_LP), 'Tier'] = 4
+       (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 4
 
 # NEW 6/19/2025: IMPACT criteria for Tiers 1-3
 high_impact = (df['vep.transcript_consequences.IMPACT']=='HIGH')  # Tier 1
@@ -92,7 +92,7 @@ conflicting_P_LP = ((df['info.CLNSIGCONF'].astype(str).str.contains('athogenic')
                     (df['info.CLNSIGCONF'].isna()))  # if not Conflicting, CLNSIGCONF is empty
 df.loc[passes_filters & has_strong_definitive_evidence &
     ((vus_or_conflicting_in_clinvar & conflicting_P_LP & clinvar_gene_matches) |
-      (is_clinvar_P_LP & clinvar_gene_matches) | high_or_moderate_impact), 'Tier' ] = 3
+      (is_clinvar_P_LP_one_star_plus & clinvar_gene_matches) | high_or_moderate_impact), 'Tier' ] = 3
 
 # CRITERIA FOR BOTH TIER 1 AND TIER 2
 ncount_over_proband_DP = df['info.NCount'] / df['proband_entry.DP']

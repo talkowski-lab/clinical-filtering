@@ -96,7 +96,7 @@ workflow filterClinicalVariants {
         # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
         Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense', 'GENEINFO': 'CLNGENE'}
         Array[String] static_cols = ['fam_id','id','Fetal_Fraction','sex','Case_Pheno']
-        Array[String] static_cols_to_combine = ['fam_id', 'sex', 'Fetal_Fraction']  # will be '/'-separated in output
+        Array[String] static_cols_to_combine = ['id', 'sex', 'Fetal_Fraction']  # will be '/'-separated in output
 
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_inheritance

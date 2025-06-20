@@ -224,7 +224,7 @@ if pli_uri!='':
 
 # NEW 6/19/2025: Make combined CANONICAL_OR_MANE_PLUS_CLINICAL column and drop duplicate rows
 # Combine CANONICAL and MANE_PLUS_CLINICAL columns
-merged_df['CANONICAL_OR_MANE_PLUS_CLINICAL'] = merged_df['CANONICAL'].fillna(merged_df['MANE_PLUS_CLINICAL'])
+merged_df['CANONICAL_OR_MANE_PLUS_CLINICAL'] = merged_df['CANONICAL'].replace({'': np.nan}).fillna(merged_df['MANE_PLUS_CLINICAL'])
 # Remove MANE_PLUS_CLINICAL only rows because now redundant
 merged_df = merged_df[merged_df['MANE_PLUS_CLINICAL'].isna()]
 

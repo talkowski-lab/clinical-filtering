@@ -70,7 +70,7 @@ workflow filterClinicalVariants {
                         'disease_title_recessive', 'disease_title_dominant', 'CLNSIG', 'CLNREVSTAT', 
                         'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'CANONICAL', 'MANE_PLUS_CLINICAL',
                         'AD_ref,AD_alt', 'transmission', 'mendel_code', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT',
-                        'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 'comphet_ID',
+                        'comphet_ID', 'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 
                         'gene_list', 'cohort_AC', 'cohort_AF', 'gnomad_popmax_af', 'maternal_carrier', 'filters']
         # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
         Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense'}

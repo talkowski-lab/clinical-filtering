@@ -205,7 +205,7 @@ if (sample_hpo_uri!='NA') and (gene_hpo_uri!='NA') and (hpo_id_to_name_uri!='NA'
         hpo_id_to_name_dict = pd.read_csv(hpo_id_to_name_uri, sep='\t').set_index('hpo_id').hpo_name.to_dict()
         # Convert hpo_ids column to list
         gene_hpo_df['hpo_ids'] = gene_hpo_df.hpo_ids.str.split(', ')
-        sample_hpo_ids = sample_hpo_df.loc[sample_id, hpo_id_col].split(', ')
+        sample_hpo_ids = sample_hpo_df.loc[sample_id, hpo_id_col].fillna('').split(', ')
         merged_df['Pheno_Overlapping_HPO_IDs'] = (
             merged_df['SYMBOL']
             .map(gene_hpo_df.set_index('gene_symbol').hpo_ids.to_dict())

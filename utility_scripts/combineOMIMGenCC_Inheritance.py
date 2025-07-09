@@ -6,6 +6,8 @@
 # and creates a file with unique gene names and inheritance codes
 # 12 March 2025
 #
+# Updates: 8 July 2025
+# Updated flag text
 
 # Imports
 import sys
@@ -32,12 +34,13 @@ def separate_digits(number):
 parser = argparse.ArgumentParser()
 
 #-i INTERVAL_LIST -g GENEFILE -o OUTPUT
-parser.add_argument("-i", "--genCC_curated", help="genCC Curated Input")
-parser.add_argument("-g", "--OMIM_curated", help="OMIM Curated Input")
+parser.add_argument("-i", "--genCC_curated", help="genCC Curated Input (GenCC Processed)")
+parser.add_argument("-g", "--OMIM_curated", help="OMIM Curated Input (OMIM_Step2)")
 parser.add_argument("--a", dest="gen_CC_complete", help="genCC complete gene list as .txt")
 parser.add_argument("-o", "--output", help="Output File")
-parser.add_argument("--genCC", help="Add flag if want to add OMIM inheritance ONLY IF 1) non-autosomal OR 2) gene not in genCC. --a required if this flag is ticked.", action='store_true')
+parser.add_argument("--genCC", help="Flag: Add OMIM inheritance ONLY IF genCC gene is 1) non-autosomal OR 2) gene not in genCC complete gene list. --a required if this flag is ticked.", action='store_true')
 parser.add_argument("--limit5", help="Add flag if only want to report 5 if only output", action='store_true')
+
 parser.set_defaults(genCC=False)
 parser.set_defaults(limit5=False)
 

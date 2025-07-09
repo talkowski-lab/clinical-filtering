@@ -7,6 +7,9 @@
 # and creates a file with unique gene names and inheritance codes, geneName /t Inheritance code
 # 12 March 2025
 #
+# Updates: 
+# 8 July 2025: Update flag text 
+# Added option to export suceptibility genes
 
 
 # Imports
@@ -14,18 +17,23 @@ import sys
 import re
 import argparse
 
-
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-s", "--step", help="OMIM Step1 Parsed File")
 parser.add_argument("-o", "--output", help="Inheritance Output")
-parser.add_argument("--high", help="Add flag if want to remove suceptibility or low confidence genes", action='store_true')
-parser.add_argument("--limit5", help="Add flag if only want to report 5 if only output", action='store_true')
+parser.add_argument("--high", help="Flag: Remove suceptibility or low confidence genes", action='store_true')
+parser.add_argument("--limit5", help="Flag: Remove 5 from output, unless it is the only output inheritance", action='store_true')
+parser.add_argument("--suscept_output", help="Flag: Output suceptibility gene list as a separate file.", action='store_true')
+
 parser.set_defaults(high=False)
 parser.set_defaults(limit5=False)
-
+parser.set_defaults(suscept_output=False)
 
 args = parser.parse_args()
+
+high = args.high
+limit5 = args.limit5
+suscept_output = args.suscept_output
 
 stepFile = open(args.step, mode = 'r')
 stepLines = stepFile.readlines()
@@ -34,11 +42,11 @@ stepFile.close()
 outputFile = open(args.output, mode = 'w')
 outputFile.write("approvedGeneSymbol"+ "\t" + "inheritance_code" + "\n")
 
+if suscept_output==True:
+    susceptOutput = open("suceptibility_genes_OMIM.txt", mode = 'w')
+
 #Dictionary with genenames as keys (so no duplicates)
 phenoDict = {}
-
-high = args.high
-limit5 = args.limit5
 
 #Possible inheritances
 #NB: X-linked is classified as other. 
@@ -88,6 +96,10 @@ for line in stepLines:
     #Skip any gene without an approved gene symbol
     if approvedGeneSymbol=="":
         continue
+
+    #Activated by the --sucept_output flag
+    if (phenotype[0]=="{" or phenotype[0]=="|" or phenotype[0]=="?" or phenotype[0]=="[") and suscept_output==True:
+        susceptOutput.write(approvedGeneSymbol + "\n")
 
     #Activated by --h flag
     #Skip any provisional or suceptibility genes
@@ -183,4 +195,8 @@ for key in sorted(phenoDict.keys()):
     
     outputFile.write(phenoDict[key][0]+"\t"+ string_inh + "\n")
 
+outputFile.close()
+
+if suscept_output==True:
+    susceptOutput.close()
 exit()

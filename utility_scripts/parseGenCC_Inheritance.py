@@ -6,6 +6,10 @@
 # and creates a file with unique gene names and inheritance codes
 # 12 March 2025
 #
+# Updates: 8 July 2025
+# Changed text surround flags. 
+# Added a high-priority flag to include only strong/definitive entries, unless no strong/definitive entries exist. 
+# Added a flag to output list of genCC genes, and strong/definitive Gen CC genes
 
 # Imports
 import sys
@@ -16,9 +20,19 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("-g", "--genCC", help="genCC tsv Input file")
 parser.add_argument("-o", "--output", help="Parsed genCC Output")
-parser.add_argument("--high", help="Add flag if only want to return genes/inheritance for strong/definitive entries", action='store_true')
-parser.add_argument("--limit5", help="Only output a 5 inheritance code if no other inheritance code", action='store_true')
+parser.add_argument("--high", help="Flag: Return genes/inheritance for strong/definitive entries only", action='store_true')
+parser.add_argument("--limit5", help="Flag: Only output a 5 inheritance code if no other inheritance code", action='store_true')
+parser.add_argument("--high_priority", help="Flag: Include only strong/definitive entries, unless no strong/definitive entries exist.", action='store_true')
+
+parser.add_argument("--output_strong_list", help="Flag: Output list of genes with strong/definitive annotations.", action='store_true')
+parser.add_argument("--output_all", help="Flag: Output all genCC genes", action='store_true')
+
 parser.set_defaults(high=False)
+parser.set_defaults(limit5=False)
+parser.set_defaults(high_priority=False)
+
+parser.set_defaults(output_strong_list=False)
+parser.set_defaults(output_all=False)
 
 args = parser.parse_args()
 
@@ -28,11 +42,22 @@ genCCFile.close()
 
 high = args.high
 limit5 = args.limit5
+high_priority = args.high_priority
+output_strong = args.output_strong_list
+output_all = args.output_all
 
+#open output files
 outputFile = open(args.output, mode = 'w')
 
-#Dictionary with genenames as keys (so no duplicates)
+if output_strong == True: 
+    strongFile = open("genCC_strongDef_genes.txt", mode = 'w')
+
+if output_all == True: 
+    allFile = open("genCC_all_genes.txt", mode = 'w')
+
+#Dictionary with genenames as keys (so no duplicates), and separate for strong/definitive entries only
 geneDict = {}
+geneDict_high = {}
 
 evidenceList = ["Definitive", "Strong"]
 
@@ -69,22 +94,22 @@ for line in genCCLines:
 
     #Code inheritance
     #1 AD, 2 AR, 3 XLD, 4 XLR, 5 other
-    #Looks to see if already has inheritance type in dictionary, if not, adds
+    #Looks to see if already has inheritance type in dictionary, if not, adds.
 
-    #Adds individual inheritance code to a set associated with the gene symbol from each. 
-    #Does not add if not sufficient evidence AND high flag is marked. 
+#Gene dict high will have genes and inheritances with high or definitive evidence. Gene Dict will have all genCC genes/inheritances.
 
-    if high == True and evidence in evidenceList:
-        if geneSymbol in geneDict.keys():
-            geneDict[geneSymbol].add(inheritanceDict[inheritance])
+    if evidence in evidenceList: 
+        if geneSymbol in geneDict_high.keys():
+            geneDict_high[geneSymbol].add(inheritanceDict[inheritance])
         else: 
-            geneDict[geneSymbol] = {inheritanceDict[inheritance]}
+            geneDict_high[geneSymbol] = {inheritanceDict[inheritance]}
+        
+    if geneSymbol in geneDict.keys():
+        geneDict[geneSymbol].add(inheritanceDict[inheritance])
+    else: 
+        geneDict[geneSymbol] = {inheritanceDict[inheritance]}
 
-    if high == False: 
-        if geneSymbol in geneDict.keys():
-            geneDict[geneSymbol].add(inheritanceDict[inheritance])
-        else:
-            geneDict[geneSymbol] = {inheritanceDict[inheritance]}
+
     #Keys: 
     #1 AD only
     #2 AR only
@@ -100,15 +125,52 @@ for line in genCCLines:
     #45 XLR, other
     #345 XLD, XLR, other
 
-for key in sorted(geneDict.keys()):
-    string_list = [str(item) for item in sorted(list(geneDict[key]))]
+high_keys = sorted(geneDict_high.keys())
 
-    if limit5==True and len(string_list)>1 and ("5" in string_list):
-        string_list.remove("5")
+if high_priority == True and high == False: 
+    for key in sorted(geneDict.keys()):
+        if key in high_keys: 
+            string_list = [str(item) for item in sorted(list(geneDict_high[key]))]
+        else:
+            string_list = [str(item) for item in sorted(list(geneDict[key]))]
 
-    string_inh = "".join(string_list)
+        if limit5==True and len(string_list)>1 and ("5" in string_list):
+            string_list.remove("5")
+        
+        string_inh = "".join(string_list)
     
-    outputFile.write(key + "\t" + string_inh + "\n")
+        outputFile.write(key + "\t" + string_inh + "\n")
+
+elif (high_priority == True and high == True) or (high_priority == False and high == True):
+        for key in sorted(geneDict.keys()):
+            if key in high_keys: 
+                string_list = [str(item) for item in sorted(list(geneDict_high[key]))]
+
+            if limit5==True and len(string_list)>1 and ("5" in string_list):
+                string_list.remove("5")
+        
+        string_inh = "".join(string_list)
+    
+        outputFile.write(key + "\t" + string_inh + "\n")
+
+else: 
+    for key in sorted(geneDict.keys()):
+        string_list = [str(item) for item in sorted(list(geneDict[key]))]
+
+        if limit5==True and len(string_list)>1 and ("5" in string_list):
+           string_list.remove("5")
+        
+        string_inh = "".join(string_list)
+    
+        outputFile.write(key + "\t" + string_inh + "\n")
+
+if output_strong == True: 
+    for key in sorted(geneDict_high.keys()):
+        strongFile.write(key + "\n")
+
+if output_all == True: 
+    for key in sorted(geneDict.keys()):
+        allFile.write(key + "\n")
 
 outputFile.close()
 exit()

@@ -27,7 +27,7 @@ workflow filterClinicalVariants {
         String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_variants_inheritance_final_v0.1.py"
         String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_comphets_xlr_hom_var_v0.1.py"
         String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/tier_clinical_variants_SNV_Indel.py"
-        String add_phenotypes_merge_and_prettify_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/add_phenotypes_merge_and_prettify_clinical_variants_NIFS.py"
+        String add_phenotypes_merge_and_prettify_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/add_phenotypes_merge_and_prettify_clinical_variants.py"
 
         String hail_docker
         String sv_base_mini_docker
@@ -68,7 +68,7 @@ workflow filterClinicalVariants {
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
         Array[String] priority_cols=['fam_id', 'id', 'sex', 'trio_status', 'locus', 'alleles', 'Tier', 'inheritance_mode',
                         'disease_title_recessive', 'disease_title_dominant', 'CLNSIG', 'CLNREVSTAT', 
-                        'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'CANONICAL', 'MANE_PLUS_CLINICAL',
+                        'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'CANONICAL_OR_MANE_PLUS_CLINICAL',
                         'AD_ref,AD_alt', 'transmission', 'mendel_code', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT',
                         'comphet_ID', 'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 
                         'gene_list', 'cohort_AC', 'cohort_AF', 'gnomad_popmax_af', 'maternal_carrier', 'filters']

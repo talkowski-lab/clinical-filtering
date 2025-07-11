@@ -360,6 +360,7 @@ workflow filterClinicalVariants {
 
         # Merged and prettified
         File final_merged_clinical_tsv = splitMergedOutputBySample.final_merged_clinical_tsv
+        File final_merged_clinical_excel = splitMergedOutputBySample.final_merged_clinical_excel
 
         # Separate excel for each sample 
         Array[File] final_clinical_sample_excels = splitMergedOutputBySample.sample_excels
@@ -481,6 +482,8 @@ task splitMergedOutputBySample {
 
     # Save merged after sort_final_merged_output_by_tiers
     merged_df.to_csv(os.path.basename(input_uri).split('.tsv')[0] + '.final.tsv.gz', sep='\t', index=False)
+    # Also export full Excel
+    merged_df.to_excel(os.path.basename(input_uri).split('.tsv')[0] + '.final.xlsx', index=False)
 
     # Save each sample to separate Excel output
     all_samples = merged_df.id.unique()
@@ -496,6 +499,7 @@ task splitMergedOutputBySample {
 
     output {
         File final_merged_clinical_tsv = basename(input_tsv, file_ext) + '.final.tsv.gz'
+        File final_merged_clinical_excel = basename(input_tsv, file_ext) + '.final.xlsx'
         Array[File] sample_excels = glob('*final.merged.clinical.variants.xlsx')
     }
 }

@@ -71,6 +71,7 @@ workflow filterClinicalVariants {
         Boolean include_not_genCC_OMIM=false  # NIFS-specific
         Boolean include_all_maternal_carrier_variants=false
 
+        File omim_uri  # All OMIM genes
         File gene_phenotype_map
         File carrier_gene_list  # NIFS-specific, TODO: not actually NIFS-specific anymore?
         File sample_hpo_uri  # NIFS-specific
@@ -88,7 +89,7 @@ workflow filterClinicalVariants {
                         'locus', 'alleles', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
                         'Pheno_Overlapping_HPO_IDs', 
                         'disease_title_recessive', 'disease_title_dominant','classification_title',
-                        'CLNSIG', 'CLNREVSTAT', 'CLNGENE', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
+                        'CLNSIG', 'CLNREVSTAT', 'CLNGENE', 'OMIM_Gene', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
                         'CANONICAL_OR_MANE_PLUS_CLINICAL', 'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 'comphet_ID',
                         'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'lof.pLI', 'INTRON',
                         'gene_list', 'cohort_AC', 'cohort_AF', 'cohort_AN', 'gnomad_popmax_af', 'GAF',
@@ -289,6 +290,7 @@ workflow filterClinicalVariants {
             sample_hpo_uri=sample_hpo_uri,
             gene_hpo_uri=gene_hpo_uri,
             pli_uri=pli_uri,
+            omim_uri=omim_uri,
             hpo_id_to_name_uri=hpo_id_to_name_uri,
             hpo_id_col=hpo_id_col,
             phenotype_col=phenotype_col,

@@ -319,6 +319,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
     input {
         Array[File] input_uris
         File gene_phenotype_map  # From GenCC, expects TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns
+        File omim_uri  # All OMIM genes
         File? pli_uri 
 
         Array[String] cols_for_varkey  # Columns to use to create unique string for each row
@@ -377,7 +378,7 @@ task addPhenotypesMergeAndPrettifyOutputs {
         --sample-hpo-uri ~{sample_hpo_uri} --gene-hpo-uri ~{gene_hpo_uri} --hpo-id-to-name-uri ~{hpo_id_to_name_uri} \
         --hpo-id-col "~{hpo_id_col}" --phenotype-col "~{phenotype_col}" \
         --cols-for-varkey "~{sep=',' cols_for_varkey}" --priority-cols "~{sep=';' priority_cols}" \
-        --cols-to-rename ~{write_map(cols_to_rename)} ~{pli_input_str}
+        --cols-to-rename ~{write_map(cols_to_rename)} ~{pli_input_str} --omim-uri ~{omim_uri}
     >>>
 
     output {

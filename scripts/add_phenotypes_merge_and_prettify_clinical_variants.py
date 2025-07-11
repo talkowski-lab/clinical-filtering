@@ -21,6 +21,7 @@ parser.add_argument('--hpo-id-to-name-uri', dest='hpo_id_to_name_uri', help='Pat
 parser.add_argument('--hpo-id-col', dest='hpo_id_col', help='Column in sample HPO file with HPO IDs to intersect with gene HPO IDs')
 parser.add_argument('--phenotype-col', dest='phenotype_col', help='Column in sample HPO file to annotate with for Dx at screening')
 parser.add_argument('--pli-uri', dest='pli_uri', nargs='?', default='', help='TSV with lof.pLI column')
+parser.add_argument('--omim-uri', dest='omim_uri', nargs='?', default='', help='Gene list with all OMIM genes to flag')
 
 args = parser.parse_args()
 input_uris = args.input_uris.split(',')
@@ -39,6 +40,8 @@ hpo_id_col = args.hpo_id_col
 phenotype_col = args.phenotype_col
 # NEW 4/29/2025: Add pLI scores
 pli_uri = args.pli_uri
+# NEW 7/11/2025: Flag genes in OMIM
+omim_uri = args.omim_uri
 
 # Fix float formatting before merging variant_category column
 def convert_to_uniform_format(num):
@@ -227,6 +230,10 @@ if pli_uri!='':
 merged_df['CANONICAL_OR_MANE_PLUS_CLINICAL'] = merged_df['CANONICAL'].replace({'': np.nan}).fillna(merged_df['MANE_PLUS_CLINICAL'])
 # Remove MANE_PLUS_CLINICAL only rows because now redundant
 merged_df = merged_df[merged_df['MANE_PLUS_CLINICAL'].isna()]
+
+# NEW 7/11/2025: Flag genes in OMIM
+omim_all_genes_list = pd.read_csv(omim_uri, sep='\t', header=None)[0].tolist()
+merged_df['OMIM_Gene'] = merged_df['SYMBOL'].isin(omim_all_genes_list)
 
 # Add 2 empty columns as spacers after priority columns (for exporting as Excel later)
 merged_df = merged_df[priority_cols + remaining_cols].copy()

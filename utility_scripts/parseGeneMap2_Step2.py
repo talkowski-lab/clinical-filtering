@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
 #
 # This takes the output of parseGeneMap2
 # and creates a file with unique gene names and inheritance codes, geneName /t Inheritance code

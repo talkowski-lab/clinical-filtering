@@ -29,7 +29,7 @@ genemapFile.close()
 
 outputFile = open(args.output, mode = 'w')
 
-outputFile.write("chromosome"+"\t"+"genomicPositionStart" + "\t" + "genomicPositionEnd" + "\t" + "mimNumber"+"\t"+"geneSymbols"+"\t"+"geneName"+"\t"+"approvedGeneSymbol"+"\t"+"entrezGeneID"+"\t"+"ensemblGeneID"+"\t"+"phenotype"+"\t"+"phenotypeMim"+"\t"+"phenotypeMapping"+"\t"+"inheritance" + "\n")
+outputFile.write("chromosome"+"\t"+"genomicPositionStart" + "\t" + "genomicPositionEnd" + "\t" + "mimNumber"+"\t"+"geneSymbols"+"\t"+"geneName"+"\t"+"approvedGeneSymbol"+"\t"+"entrezGeneID"+"\t"+"ensemblGeneID"+"\t"+"phenotype"+"\t"+"phenotypeMim"+"\t"+"phenotypeMapping"+"\t"+"inheritance_1" + "\t" + "inheritance_2" + "\t" + "inheritance_3" + "\n")
 
 for line in genemapLines:
     # Skip comments

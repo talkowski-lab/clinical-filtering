@@ -63,12 +63,13 @@ workflow filterClinicalVariants {
         Boolean sort_after_merge=false
         Boolean merge_first_pass_filtered_vcfs=false
 
+        File omim_uri  # All OMIM genes
         File gene_phenotype_map
         File carrier_gene_list  
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
         Array[String] priority_cols=['fam_id', 'id', 'sex', 'trio_status', 'locus', 'alleles', 'Tier', 'inheritance_mode',
                         'disease_title_recessive', 'disease_title_dominant', 'CLNSIG', 'CLNREVSTAT', 'CLNGENE',
-                        'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'CANONICAL_OR_MANE_PLUS_CLINICAL',
+                        'OMIM_Gene', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'CANONICAL_OR_MANE_PLUS_CLINICAL',
                         'AD_ref,AD_alt', 'transmission', 'mendel_code', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT',
                         'comphet_ID', 'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 
                         'gene_list', 'cohort_AC', 'cohort_AF', 'gnomad_popmax_af', 'maternal_carrier', 'filters']
@@ -322,6 +323,7 @@ workflow filterClinicalVariants {
             cols_for_varkey=cols_for_varkey,
             priority_cols=priority_cols,
             cols_to_rename=cols_to_rename,
+            omim_uri=omim_uri,
             add_phenotypes_merge_and_prettify_script=add_phenotypes_merge_and_prettify_script,
             prefix=cohort_prefix,
             hail_docker=hail_docker,

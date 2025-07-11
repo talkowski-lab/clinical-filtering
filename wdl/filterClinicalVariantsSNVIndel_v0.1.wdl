@@ -67,13 +67,13 @@ workflow filterClinicalVariants {
         File carrier_gene_list  
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
         Array[String] priority_cols=['fam_id', 'id', 'sex', 'trio_status', 'locus', 'alleles', 'Tier', 'inheritance_mode',
-                        'disease_title_recessive', 'disease_title_dominant', 'CLNSIG', 'CLNREVSTAT', 
+                        'disease_title_recessive', 'disease_title_dominant', 'CLNSIG', 'CLNREVSTAT', 'CLNGENE',
                         'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'CANONICAL_OR_MANE_PLUS_CLINICAL',
                         'AD_ref,AD_alt', 'transmission', 'mendel_code', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT',
                         'comphet_ID', 'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 
                         'gene_list', 'cohort_AC', 'cohort_AF', 'gnomad_popmax_af', 'maternal_carrier', 'filters']
         # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
-        Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense'}
+        Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense', 'GENEINFO': 'CLNGENE'}
 
         # merge TSVs
         RuntimeAttr? runtime_attr_merge_clinvar

@@ -154,6 +154,8 @@ merged_df = merged_df.loc[:,~merged_df.columns.str.contains('\.1')]
 
 # Remove 'info.' and 'vep.transcript_consequences.' prefixes from column names
 # NEW 7/13/2025: Drop existing duplicate columns before renaming (e.g. inheritance_code)
+# Note: This will not remove duplicate names between 'info' and 'vep.transcript_consequences.' 
+# (those are removed below, 'info' is kept because of alphabetical/VCF column ordering)
 old_vep_info_cols = merged_df.columns[merged_df.columns.str.match('info|vep')].str.replace('^info\\.', '', regex=True) \
                                .str.replace('^vep\\.transcript_consequences\\.', '', regex=True)
 existing_cols_to_drop = np.intersect1d(merged_df.columns, old_vep_info_cols)

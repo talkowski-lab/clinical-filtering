@@ -153,7 +153,13 @@ merged_df = merged_df.drop_duplicates(cols_for_duplicate)
 merged_df = merged_df.loc[:,~merged_df.columns.str.contains('\.1')]
 
 # Remove 'info.' and 'vep.transcript_consequences.' prefixes from column names
-merged_df.columns = merged_df.columns.str.replace('info.','').str.replace('vep.transcript_consequences.','')
+# NEW 7/13/2025: Drop existing duplicate columns before renaming (e.g. inheritance_code)
+old_vep_info_cols = merged_df.columns[merged_df.columns.str.match('info|vep')].str.replace('^info\\.', '', regex=True) \
+                               .str.replace('^vep\\.transcript_consequences\\.', '', regex=True)
+existing_cols_to_drop = np.intersect1d(merged_df.columns, old_vep_info_cols)
+merged_df = merged_df.drop(existing_cols_to_drop, axis=1)
+merged_df.columns = merged_df.columns.str.replace('^info\\.', '', regex=True) \
+                               .str.replace('^vep\\.transcript_consequences\\.', '', regex=True)
 
 # Drop duplicate columns after renaming
 merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]
@@ -179,7 +185,6 @@ merged_df[['HGVSp_ENSP', 'HGVSp']] = merged_df['HGVSp'].str.split(':', expand=Tr
 
 # Drop VarKey column before export
 merged_df = merged_df.drop('VarKey', axis=1).copy()
-remaining_cols = list(np.setdiff1d(merged_df.columns, priority_cols))
 
 # Add comphet_ID column to keep comphets together when sorting
 merged_df['comphet_ID'] = ''
@@ -236,6 +241,7 @@ omim_all_genes_list = pd.read_csv(omim_uri, sep='\t', header=None)[0].tolist()
 merged_df['OMIM_Gene'] = merged_df['SYMBOL'].isin(omim_all_genes_list)
 
 # Add 2 empty columns as spacers after priority columns (for exporting as Excel later)
+remaining_cols = list(np.setdiff1d(merged_df.columns, priority_cols))
 merged_df = merged_df[priority_cols + remaining_cols].copy()
 for i in range(2):
     merged_df.insert(len(priority_cols)+i, f"SPACE_{i}", np.nan)

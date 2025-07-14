@@ -232,7 +232,7 @@ def get_gene_level_annotations(mt, gene_field, gene_field_list, inheritance_ht, 
 if gene_list_tsv != 'NA':
     gene_list_uris = pd.read_csv(gene_list_tsv, sep='\t', header=None).set_index(0)[1].to_dict()
     gene_list_dict = {
-        name: hl.literal(set(pd.read_csv(uri, header=None)[0].tolist()))
+        name: hl.literal(set(pd.read_csv(uri, sep='\t', header=None)[0].tolist()))
         for name, uri in gene_list_uris.items()
     }
 else:

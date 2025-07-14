@@ -24,6 +24,10 @@
 - move affected/unaffected fields out of INFO
 6/2/2025:
 - only consider restrictive genes for dominant and recessive inheritance_code filtering
+7/14/2025:
+- restrict large regions to not BND or CPX, impacts a gene from restrictive fields
+- restrict large_region only outputs to private to a family
+- new 'genic' category for any restrictive fields' genes that are in a gene list
 '''
 ###
 
@@ -192,8 +196,11 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
         ),
         
         # Category 3: Large regions (passes_SVLEN_filter)
+        # NEW 7/14/2025: restrict large regions to not BND or CPX, impacts a gene from restrictive fields
         hl.if_else(
-            phased_sv_tm.info[size_field], 
+            (phased_sv_tm.info[size_field]) &
+            (~hl.array(['BND','CPX']).contains(phased_sv_tm.info.SVTYPE)) &
+            (phased_sv_tm.info.restrictive_csq_genes.size()>0), 
             'large_region', 
             hl.missing(hl.tstr)
         ),
@@ -211,7 +218,30 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
             'recessive', 
             hl.missing(hl.tstr)
         ),
+
+        # Category 6: Genic
+        # NEW 7/14/2025: new 'genic' category for any restrictive fields' genes that are in a gene list
+        hl.if_else(
+            (phased_sv_tm.info.restrictive_gene_list.size()>0),
+            'genic', 
+            hl.missing(hl.tstr)
+        )
     ]).filter(lambda x: hl.is_defined(x))  # Filter out null values
+)
+
+# NEW 7/14/2025: restrict large_region only outputs to private to a family
+phased_sv_tm = phased_sv_tm.filter_entries(
+    (
+        (phased_sv_tm.variant_category.size() == 1) &
+        (phased_sv_tm.variant_category[0] == 'large_region')
+    ) &
+    # Private to a family
+    (
+        (phased_sv_tm.n_cohort_het_unaffected == phased_sv_tm.n_family_het_unaffected) &
+        (phased_sv_tm.n_cohort_hom_var_unaffected == phased_sv_tm.n_family_hom_var_unaffected) &
+        (phased_sv_tm.n_cohort_het_affected == phased_sv_tm.n_family_het_affected) &
+        (phased_sv_tm.n_cohort_hom_var_affected == phased_sv_tm.n_family_hom_var_affected)
+    )
 )
 
 merged_output_tm = phased_sv_tm.filter_rows(phased_sv_tm.variant_category.size()>0)

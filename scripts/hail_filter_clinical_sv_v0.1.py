@@ -24,6 +24,10 @@
 - move affected/unaffected fields out of INFO
 6/2/2025:
 - only consider restrictive genes for dominant and recessive inheritance_code filtering
+7/14/2025:
+- restrict large regions to not BND or CPX, impacts a gene from restrictive fields
+- restrict large_region only outputs to private to a family
+- new 'genic' category for any restrictive fields' genes that are in a gene list
 '''
 ###
 
@@ -196,8 +200,7 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
         hl.if_else(
             (phased_sv_tm.info[size_field]) &
             (~hl.array(['BND','CPX']).contains(phased_sv_tm.info.SVTYPE)) &
-            (phased_sv_tm.info.restrictive_csq_genes.size()>0) &
-            (phased_sv_tm.info.dominant_freq), 
+            (phased_sv_tm.info.restrictive_csq_genes.size()>0), 
             'large_region', 
             hl.missing(hl.tstr)
         ),
@@ -219,49 +222,25 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
         # Category 6: Genic
         # NEW 7/14/2025: new 'genic' category for any restrictive fields' genes that are in a gene list
         hl.if_else(
-            (phased_sv_tm.info.restrictive_gene_list.filter(hl.is_defined).size()>0) & (phased_sv_tm.info.dominant_freq),
+            (phased_sv_tm.info.restrictive_gene_list.size()>0),
             'genic', 
             hl.missing(hl.tstr)
         )
-    ]).filter(hl.is_defined)  # Filter out null values
+    ]).filter(lambda x: hl.is_defined(x))  # Filter out null values
 )
 
-# NEW 7/14/2025: restrict large_region-only outputs to private to a family
+# NEW 7/14/2025: restrict large_region only outputs to private to a family
 phased_sv_tm = phased_sv_tm.filter_entries(
     (
-        # large_region-only variants that are private to a family
-        (
-            (phased_sv_tm.variant_category.size() == 1) &
-            (phased_sv_tm.variant_category[0] == 'large_region')
-        ) &
-        (
-            (phased_sv_tm.n_cohort_het_unaffected == phased_sv_tm.n_family_het_unaffected) &
-            (phased_sv_tm.n_cohort_hom_var_unaffected == phased_sv_tm.n_family_hom_var_unaffected) &
-            (phased_sv_tm.n_cohort_het_affected == phased_sv_tm.n_family_het_affected) &
-            (phased_sv_tm.n_cohort_hom_var_affected == phased_sv_tm.n_family_hom_var_affected)
-        )
-    ) |
-    # variants that are not exclusively large_region
+        (phased_sv_tm.variant_category.size() == 1) &
+        (phased_sv_tm.variant_category[0] == 'large_region')
+    ) &
+    # Private to a family
     (
-        hl.set(['large_region']).intersection(hl.set(phased_sv_tm.variant_category)).size() <
-        hl.set(phased_sv_tm.variant_category).size()
-    )
-)
-
-# NEW 9/3/2025: require 1/1 for recessives
-phased_sv_tm = phased_sv_tm.filter_entries(
-    (
-        # recessive-only variants
-        (
-            (phased_sv_tm.variant_category.size() == 1) &
-            (phased_sv_tm.variant_category[0] == 'recessive')
-        ) &
-        (phased_sv_tm.proband_entry.GT.is_hom_var())
-    ) |
-    # variants that are not exclusively recessive
-    (
-        hl.set(['recessive']).intersection(hl.set(phased_sv_tm.variant_category)).size() <
-        hl.set(phased_sv_tm.variant_category).size()
+        (phased_sv_tm.n_cohort_het_unaffected == phased_sv_tm.n_family_het_unaffected) &
+        (phased_sv_tm.n_cohort_hom_var_unaffected == phased_sv_tm.n_family_hom_var_unaffected) &
+        (phased_sv_tm.n_cohort_het_affected == phased_sv_tm.n_family_het_affected) &
+        (phased_sv_tm.n_cohort_hom_var_affected == phased_sv_tm.n_family_hom_var_affected)
     )
 )
 

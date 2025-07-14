@@ -229,18 +229,25 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
     ]).filter(lambda x: hl.is_defined(x))  # Filter out null values
 )
 
-# NEW 7/14/2025: restrict large_region only outputs to private to a family
+# NEW 7/14/2025: restrict large_region-only outputs to private to a family
 phased_sv_tm = phased_sv_tm.filter_entries(
     (
-        (phased_sv_tm.variant_category.size() == 1) &
-        (phased_sv_tm.variant_category[0] == 'large_region')
-    ) &
-    # Private to a family
+        # large_region-only variants that are private to a family
+        (
+            (phased_sv_tm.variant_category.size() == 1) &
+            (phased_sv_tm.variant_category[0] == 'large_region')
+        ) &
+        (
+            (phased_sv_tm.n_cohort_het_unaffected == phased_sv_tm.n_family_het_unaffected) &
+            (phased_sv_tm.n_cohort_hom_var_unaffected == phased_sv_tm.n_family_hom_var_unaffected) &
+            (phased_sv_tm.n_cohort_het_affected == phased_sv_tm.n_family_het_affected) &
+            (phased_sv_tm.n_cohort_hom_var_affected == phased_sv_tm.n_family_hom_var_affected)
+        )
+    ) |
+    # variants that are not exclusively large_region
     (
-        (phased_sv_tm.n_cohort_het_unaffected == phased_sv_tm.n_family_het_unaffected) &
-        (phased_sv_tm.n_cohort_hom_var_unaffected == phased_sv_tm.n_family_hom_var_unaffected) &
-        (phased_sv_tm.n_cohort_het_affected == phased_sv_tm.n_family_het_affected) &
-        (phased_sv_tm.n_cohort_hom_var_affected == phased_sv_tm.n_family_hom_var_affected)
+        hl.set(['large_region']).intersection(hl.set(phased_sv_tm.variant_category)).size() <
+        hl.set(phased_sv_tm.variant_category).size()
     )
 )
 

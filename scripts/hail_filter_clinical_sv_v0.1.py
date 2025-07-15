@@ -222,11 +222,11 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
         # Category 6: Genic
         # NEW 7/14/2025: new 'genic' category for any restrictive fields' genes that are in a gene list
         hl.if_else(
-            (phased_sv_tm.info.restrictive_gene_list.size()>0),
+            (phased_sv_tm.info.restrictive_gene_list.filter(hl.is_defined).size()>0),
             'genic', 
             hl.missing(hl.tstr)
         )
-    ]).filter(lambda x: hl.is_defined(x))  # Filter out null values
+    ]).filter(hl.is_defined)  # Filter out null values
 )
 
 # NEW 7/14/2025: restrict large_region-only outputs to private to a family

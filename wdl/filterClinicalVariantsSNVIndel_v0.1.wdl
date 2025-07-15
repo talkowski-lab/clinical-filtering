@@ -1,7 +1,7 @@
 version 1.0
 
-import "mergeVCFs.wdl" as mergeVCFs
-import "helpers.wdl" as helpers
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/mergeVCFs.wdl" as mergeVCFs
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/helpers.wdl" as helpers
 import "filterClinicalVariantsTasks_v0.1.wdl" as filterClinicalVariants
 import "filterClinicalCompHets_v0.1.wdl" as filterClinicalCompHets
 

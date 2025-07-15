@@ -255,4 +255,5 @@ merged_output_tm = phased_sv_tm.filter_rows(phased_sv_tm.variant_category.size()
 merged_output_tm = filter_and_annotate_tm(merged_output_tm)
 
 # export merged TSV
-merged_output_tm.entries().flatten().export(os.path.basename(sv_vcf).split('.vcf')[0] + '_merged_variants.tsv.gz', delimiter='\t')
+prefix = os.path.basename(sv_vcf).split('.vcf')[0] + '_merged_variants'
+merged_output_tm.entries().flatten().export(f"{prefix}.tsv.gz", delimiter='\t')

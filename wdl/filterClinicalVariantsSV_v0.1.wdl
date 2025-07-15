@@ -1,7 +1,7 @@
 version 1.0
 
-import "mergeVCFs.wdl" as mergeVCFs
-import "helpers.wdl" as helpers
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/mergeVCFs.wdl" as mergeVCFs
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/helpers.wdl" as helpers
 
 struct RuntimeAttr {
     Float? mem_gb
@@ -183,6 +183,12 @@ workflow filterClinicalVariantsSV {
             runtime_attr_override=runtime_attr_merge_results
     }
 
+    call helpers.ConvertTSVtoExcel as ConvertTSVtoExcel {
+        input:
+            tsv=mergeFilteredSVs.merged_tsv,
+            hail_docker=hail_docker
+    }
+
     output {
         # File sv_pathogenic_tsv = filterVCF.sv_pathogenic_tsv
         # File sv_genomic_disorders_tsv = filterVCF.sv_genomic_disorders_tsv
@@ -192,6 +198,7 @@ workflow filterClinicalVariantsSV {
         ## OLD: BEFORE SPLITTING FAMILIES AND MERGING
         # File sv_merged_clinical_tsv = filterVCF.sv_merged_clinical_tsv
         File sv_merged_clinical_tsv = mergeFilteredSVs.merged_tsv
+        File sv_merged_clinical_excel = ConvertTSVtoExcel.output_excel
         File sv_flagged_vcf = annotateGeneLevelVCF.annotated_vcf
         File sv_flagged_vcf_idx = annotateGeneLevelVCF.annotated_vcf_idx
     }

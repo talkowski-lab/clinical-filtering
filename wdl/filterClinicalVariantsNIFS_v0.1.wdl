@@ -2,7 +2,8 @@ version 1.0
 
 import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/mergeVCFs.wdl" as mergeVCFs
 import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/helpers.wdl" as helpers
-import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/mergeVCFSamples.wdl" as mergeVCFsimport "filterClinicalVariantsSingleNIFS_v0.1.wdl" as filterClinicalVariantsSingleNIFS
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/mergeVCFSamples.wdl" as mergeVCFSamples
+import "filterClinicalVariantsSingleNIFS_v0.1.wdl" as filterClinicalVariantsSingleNIFS
 
 struct RuntimeAttr {
     Float? mem_gb

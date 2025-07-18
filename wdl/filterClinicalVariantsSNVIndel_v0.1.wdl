@@ -483,7 +483,12 @@ task splitMergedOutputBySample {
     # Save merged after sort_final_merged_output_by_tiers
     merged_df.to_csv(os.path.basename(input_uri).split('.tsv')[0] + '.final.tsv.gz', sep='\t', index=False)
     # Also export full Excel
-    merged_df.to_excel(os.path.basename(input_uri).split('.tsv')[0] + '.final.xlsx', index=False)
+    try:
+        merged_df.to_excel(os.path.basename(input_uri).split('.tsv')[0] + '.final.xlsx', index=False)
+    except Exception as e:
+        print(str(e))
+        # Empty Excel output if too large
+        pd.DataFrame().to_excel(os.path.basename(input_uri).split('.tsv')[0] + '.final.xlsx', index=False)
 
     # Save each sample to separate Excel output
     all_samples = merged_df.id.unique()

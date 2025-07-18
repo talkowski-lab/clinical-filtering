@@ -75,7 +75,7 @@ df.loc[passes_filters &
         (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 5
 
 # CRITERIA FOR TIERS 1-4: STRONG/DEFINITIVE
-has_strong_definitive_evidence = (df['vep.transcript_consequences.genCC_classification'].str.match('Strong|Definitive'))
+has_strong_definitive_evidence = (df['vep.transcript_consequences.genCC_classification'].astype(str).str.match('Strong|Definitive'))
 
 # Tier 4: Include VUS or Conflicting in ClinVar AND Strong/Definitive
 df.loc[passes_filters & has_strong_definitive_evidence &

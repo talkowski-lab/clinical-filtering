@@ -34,7 +34,7 @@ workflow filterClinicalVariants {
 
         Int ad_alt_threshold=3
         Float spliceAI_threshold=0.8
-        Float af_threshold=0.05
+        Float af_threshold=0.1
         Float clinvar_conf_af_threshold=0.05
         Int ac_threshold=10
         Int ac_rec_threshold=10  # TODO

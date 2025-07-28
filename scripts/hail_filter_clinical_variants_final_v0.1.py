@@ -37,6 +37,7 @@ parser.add_argument('--mem', type=float, help="Memory in GB (as integer, floor c
 parser.add_argument('--ped_uri', type=str, help="URI to the PED file")
 parser.add_argument('--af_threshold', type=float, help="Allele frequency threshold")
 parser.add_argument('--ac_threshold', type=int, help="Allele count threshold")
+parser.add_argument('--clinvar_conf_af_threshold', type=float, help="Allele frequency threshold for Conflicting ClinVar variants")
 parser.add_argument('--gnomad_af_threshold', type=float, help="gnomAD allele frequency threshold")
 parser.add_argument('--build', type=str, help="Genome build (e.g., GRCh38, hg19)")
 parser.add_argument('--pass_filter', type=str, help="Whether to apply the PASS filter (True/False)")
@@ -52,6 +53,7 @@ mem = np.floor(float(args.mem))  # Ensure it's floored as a float
 ped_uri = args.ped_uri
 af_threshold = args.af_threshold
 ac_threshold = args.ac_threshold
+clinvar_conf_af_threshold = args.clinvar_conf_af_threshold
 gnomad_af_threshold = args.gnomad_af_threshold
 build = args.build
 pass_filter = ast.literal_eval(args.pass_filter.capitalize())
@@ -133,14 +135,15 @@ header['info']['CA_from_GT'] = {'Description': "Cluster assignment, CA, based on
 # Output 1: grab ClinVar only
 # NEW 3/5/2025: Fix string matching for ClinVar P/LP output to exclude 'Conflicting'
 # NEW 4/5/2025: TEST including ClinVar 1*+ P/LP in CLNSIGCONF
+# NEW 7/28/2025: Add clinvar_conf_af_threshold for ClinVar 1*+ P/LP CLNSIGCONF
 clinvar_CLNSIG_P_LP_no_conflicting_mt_cond = hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), mt.info.CLNSIG)
-clinvar_CLNSIGCONF_P_LP_mt_cond = ((hl.any(lambda x: x.matches('athogenic'), mt.info.CLNSIGCONF)) & 
-                                   ((mt.info.cohort_AC<=ac_threshold) | (mt.info.cohort_AF<=af_threshold)))
+clinvar_CLNSIGCONF_P_LP_mt_cond = ((hl.any(lambda x: x.matches('athogenic'), mt.info.CLNSIGCONF)) &
+                                   (mt.info.cohort_AF<=clinvar_conf_af_threshold))
 clinvar_mt = mt.filter_rows(clinvar_CLNSIG_P_LP_no_conflicting_mt_cond | clinvar_CLNSIGCONF_P_LP_mt_cond)
 
 clinvar_CLNSIG_P_LP_no_conflicting_tm_cond = hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), phased_tm.info.CLNSIG)
 clinvar_CLNSIGCONF_P_LP_tm_cond = ((hl.any(lambda x: x.matches('athogenic'), phased_tm.info.CLNSIGCONF)) & 
-                                   ((phased_tm.info.cohort_AC<=ac_threshold) | (phased_tm.info.cohort_AF<=af_threshold)))
+                                   (phased_tm.info.cohort_AF<=clinvar_conf_af_threshold))
 clinvar_tm = phased_tm.filter_rows(clinvar_CLNSIG_P_LP_no_conflicting_tm_cond | clinvar_CLNSIGCONF_P_LP_tm_cond)
 
 # NEW 1/9/2025: Keep 2*+ ClinVar only

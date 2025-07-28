@@ -23,6 +23,7 @@ task runClinicalFiltering {
 
         Int ac_threshold
         Float af_threshold
+        Float clinvar_conf_af_threshold
         Float gnomad_af_threshold
         Boolean pass_filter
         Boolean include_all_maternal_carrier_variants
@@ -65,6 +66,7 @@ task runClinicalFiltering {
         curl ~{filter_clinical_variants_snv_indel_script} > filter_vcf.py
         python3 filter_vcf.py --vcf_file ~{vcf_file} --prefix ~{new_prefix} --cores ~{cpu_cores} --mem ~{memory} \
             --ped_uri ~{ped_uri} --af_threshold ~{af_threshold} --ac_threshold ~{ac_threshold} \
+            --clinvar_conf_af_threshold ~{clinvar_conf_af_threshold} \
             --gnomad_af_threshold ~{gnomad_af_threshold} --build ~{genome_build} --pass_filter ~{pass_filter} \
             --include_all_maternal_carrier_variants ~{include_all_maternal_carrier_variants}
     }

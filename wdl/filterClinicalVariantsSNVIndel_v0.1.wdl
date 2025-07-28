@@ -68,7 +68,7 @@ workflow filterClinicalVariants {
         File carrier_gene_list  
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
         Array[String] priority_cols=['fam_id', 'id', 'sex', 'trio_status', 'ID', 'Tier', 'inheritance_mode',
-                        'disease_title_recessive', 'disease_title_dominant', 'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE',
+                        'disease_title_dominant', 'disease_title_recessive', 'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE',
                         'OMIM_Gene', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'CANONICAL_OR_MANE_PLUS_CLINICAL',
                         'AD_ref,AD_alt', 'transmission', 'mendel_code', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT',
                         'comphet_ID', 'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 

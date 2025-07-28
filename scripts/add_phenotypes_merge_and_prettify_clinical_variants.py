@@ -115,7 +115,7 @@ recessive_substrings = ['recessive', 'XLR', 'maternal_carrier', 'hom_var']
 
 # NEW 3/31/2025: add 'other' category
 def condense_output_category_and_tier(row):
-    tier_dict = {'comphet': [], 'recessive': [], 'dominant': [], 'other': []}
+    tier_dict = {'dominant': [], 'comphet': [], 'recessive': [], 'other': []}
     
     # Iterate through the output categories and their corresponding tiers
     for output_category, tier in zip(row.output_category_list, row.Tier_List):

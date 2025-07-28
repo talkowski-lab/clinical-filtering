@@ -245,7 +245,6 @@ merged_df['OMIM_Gene'] = merged_df['SYMBOL'].isin(omim_all_genes_list)
 # NEW 7/28/2025: Change locus/alleles column to ID (CHR#-POS-REF-ALT), no 'chr' prefix
 merged_df['ID'] = merged_df['locus'].str.split('chr').str[1].str.split(':').apply('-'.join) + '-' + \
     merged_df['alleles'].str.split(',').apply('-'.join)
-merged_df = merged_df.drop(['locus', 'alleles'], axis=1).copy()
 
 # Add 2 empty columns as spacers after priority columns (for exporting as Excel later)
 remaining_cols = list(np.setdiff1d(merged_df.columns, priority_cols))

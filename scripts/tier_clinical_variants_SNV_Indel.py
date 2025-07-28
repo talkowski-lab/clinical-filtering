@@ -48,11 +48,19 @@ is_clnrevstat_one_star_plus = (df['info.CLNREVSTAT'].isin(clnrevstat_one_star_pl
 is_clinvar_P_LP_one_star_plus = is_clinvar_P_LP & is_clnrevstat_one_star_plus
 is_not_clinvar_B_LB = (~df['info.CLNSIG'].astype(str).str.contains('enign'))
 # NEW 7/11/2025: Require ClinVar gene match for Tiers 1-3
+# NEW 7/28/2025: Require exact match for ClinVar gene match
 if df.empty:
     clinvar_gene_matches = False
 else:
-    clinvar_gene_matches = ((df.apply(lambda row: row['vep.transcript_consequences.SYMBOL'] in row['info.GENEINFO'], axis=1)) |  # Make sure gene matches if in ClinVar
-                           (df['info.GENEINFO']==''))
+    clinvar_gene_matches = (
+        df.apply(
+            lambda row: row['vep.transcript_consequences.SYMBOL'] in [
+                gene.split(':')[0] for gene in row['info.GENEINFO'].split('|')
+            ],
+            axis=1
+        )
+        | (df['info.GENEINFO'] == '')
+    )
 
 # CRITERIA FOR TIERS 3-5
 vus_or_conflicting_in_clinvar = (df['info.CLNSIG'].str.contains('Uncertain') | df['info.CLNSIG'].str.contains('Conflicting'))

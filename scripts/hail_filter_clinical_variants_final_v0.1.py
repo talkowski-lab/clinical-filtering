@@ -133,12 +133,15 @@ header['info']['CA_from_GT'] = {'Description': "Cluster assignment, CA, based on
 # Output 1: grab ClinVar only
 # NEW 3/5/2025: Fix string matching for ClinVar P/LP output to exclude 'Conflicting'
 # NEW 4/5/2025: TEST including ClinVar 1*+ P/LP in CLNSIGCONF
+# NEW 7/28/2025: Require passing cohort AC and AF filters for CLNSIGCONF P/LP 1*+
 clinvar_CLNSIG_P_LP_no_conflicting_mt_cond = hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), mt.info.CLNSIG)
-clinvar_CLNSIGCONF_P_LP_mt_cond = hl.any(lambda x: x.matches('athogenic'), mt.info.CLNSIGCONF)
+clinvar_CLNSIGCONF_P_LP_mt_cond = ((hl.any(lambda x: x.matches('athogenic'), mt.info.CLNSIGCONF)) & 
+                                   ((mt.info.cohort_AC<=ac_threshold) | (mt.info.cohort_AF<=af_threshold)))
 clinvar_mt = mt.filter_rows(clinvar_CLNSIG_P_LP_no_conflicting_mt_cond | clinvar_CLNSIGCONF_P_LP_mt_cond)
 
 clinvar_CLNSIG_P_LP_no_conflicting_tm_cond = hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), phased_tm.info.CLNSIG)
-clinvar_CLNSIGCONF_P_LP_tm_cond = hl.any(lambda x: x.matches('athogenic'), phased_tm.info.CLNSIGCONF)
+clinvar_CLNSIGCONF_P_LP_tm_cond = ((hl.any(lambda x: x.matches('athogenic'), phased_tm.info.CLNSIGCONF)) & 
+                                   ((mt.info.cohort_AC<=ac_threshold) | (mt.info.cohort_AF<=af_threshold)))
 clinvar_tm = phased_tm.filter_rows(clinvar_CLNSIG_P_LP_no_conflicting_tm_cond | clinvar_CLNSIGCONF_P_LP_tm_cond)
 
 # NEW 1/9/2025: Keep 2*+ ClinVar only

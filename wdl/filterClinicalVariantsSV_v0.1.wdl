@@ -55,6 +55,8 @@ workflow filterClinicalVariantsSV {
         Int dom_ac_unaffected_threshold=5
         String gnomad_af_field='gnomad_v4.1_sv_AF'
 
+        Boolean output_excel=true
+
         RuntimeAttr? runtime_attr_bcftools
         RuntimeAttr? runtime_attr_annotate
         RuntimeAttr? runtime_attr_split_families
@@ -183,12 +185,13 @@ workflow filterClinicalVariantsSV {
             runtime_attr_override=runtime_attr_merge_results
     }
 
-    call helpers.ConvertTSVtoExcel as ConvertTSVtoExcel {
-        input:
-            tsv=mergeFilteredSVs.merged_tsv,
-            hail_docker=hail_docker
+    if (output_excel) {
+        call helpers.ConvertTSVtoExcel as ConvertTSVtoExcel {
+            input:
+                tsv=mergeFilteredSVs.merged_tsv,
+                hail_docker=hail_docker
+        }
     }
-
     output {
         # File sv_pathogenic_tsv = filterVCF.sv_pathogenic_tsv
         # File sv_genomic_disorders_tsv = filterVCF.sv_genomic_disorders_tsv
@@ -198,7 +201,7 @@ workflow filterClinicalVariantsSV {
         ## OLD: BEFORE SPLITTING FAMILIES AND MERGING
         # File sv_merged_clinical_tsv = filterVCF.sv_merged_clinical_tsv
         File sv_merged_clinical_tsv = mergeFilteredSVs.merged_tsv
-        File sv_merged_clinical_excel = ConvertTSVtoExcel.output_excel
+        File sv_merged_clinical_excel = select_first([ConvertTSVtoExcel.output_excel, mergeFilteredSVs.merged_tsv])
         File sv_flagged_vcf = annotateGeneLevelVCF.annotated_vcf
         File sv_flagged_vcf_idx = annotateGeneLevelVCF.annotated_vcf_idx
     }

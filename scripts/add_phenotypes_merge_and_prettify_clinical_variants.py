@@ -167,7 +167,12 @@ merged_df.columns = merged_df.columns.str.replace('^info\\.', '', regex=True) \
 merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]
 
 # NEW 3/12/2025: Drop columns where all values are empty
-merged_df = merged_df.dropna(axis=1, how='all').copy()
+# Identify columns that are all NA
+all_na_cols = merged_df.columns[merged_df.isna().all()]
+# From these, exclude priority_cols
+cols_to_drop = [col for col in all_na_cols if col not in priority_cols]
+# Drop only those columns
+merged_df = merged_df.drop(columns=cols_to_drop).copy()
 
 # NEW 4/2/2025: Remove all mother_entry columns that are identical to proband_entry
 mother_entry_cols = merged_df.columns[merged_df.columns.str.contains('mother_entry')]

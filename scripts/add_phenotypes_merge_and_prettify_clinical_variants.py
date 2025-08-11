@@ -170,7 +170,7 @@ merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]
 # Identify columns that are all NA
 all_na_cols = merged_df.columns[merged_df.isna().all()]
 # From these, exclude priority_cols
-cols_to_drop = [col for col in all_na_cols if col not in priority_cols + ['CANONICAL', 'MANE_PLUS_CLINICAL']]
+cols_to_drop = [col for col in all_na_cols if col not in priority_cols]
 # Drop only those columns
 merged_df = merged_df.drop(columns=cols_to_drop).copy()
 

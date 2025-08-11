@@ -97,8 +97,10 @@ df.loc[passes_filters & has_strong_definitive_evidence &
                 clinvar_gene_matches), 'Tier'] = 3
 
 # CRITERIA FOR BOTH TIER 1 AND TIER 2
+# NEW 8/11/2025: no IMPACT=MODIFIER until Tier 3
 ncount_over_proband_DP = df['info.NCount'] / df['proband_entry.DP']
 passes_ncount_over_proband_DP = (ncount_over_proband_DP < ncount_over_proband_DP_threshold)
+not_modifier = df['vep.transcript_consequences.IMPACT']!='MODIFIER'
 
 passes_ECNT = (df['info.ECNT'] < ECNT_threshold)
 

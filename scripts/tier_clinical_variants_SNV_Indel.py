@@ -83,8 +83,10 @@ df.loc[passes_filters & has_strong_definitive_evidence &
                 clinvar_gene_matches), 'Tier'] = 3
 
 # CRITERIA FOR BOTH TIER 1 AND TIER 2
+# NEW 8/11/2025: no IMPACT=MODIFIER until Tier 3
 high_impact = (df['vep.transcript_consequences.IMPACT']=='HIGH')  # Tier 1
 high_or_moderate_impact = df['vep.transcript_consequences.IMPACT'].isin(['HIGH','MODERATE'])  # Tier 2
+not_modifier = df['vep.transcript_consequences.IMPACT']!='MODIFIER'
 
 # GT CRITERIA
 if inheritance_type=='recessive':
@@ -123,7 +125,8 @@ else:  # 'other' inheritance_type --> force into Tiers 3 and above
 passes_tier_1_and_2 = (is_not_clinvar_B_LB &
                         ~vus_or_conflicting_in_clinvar &
                         passes_filters &
-                        has_strong_definitive_evidence)
+                        has_strong_definitive_evidence &
+                        not_modifier)
 
 # Tier 2: ClinVar P/LP 1*+ OR HIGH/MODERATE IMPACT, not in SEGDUP, etc.
 df.loc[((is_clinvar_P_LP_one_star_plus & clinvar_gene_matches) | high_or_moderate_impact) &

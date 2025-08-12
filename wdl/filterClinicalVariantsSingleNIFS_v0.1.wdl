@@ -89,8 +89,9 @@ workflow filterClinicalVariants {
                         'ID', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
                         'Pheno_Overlapping_HPO_IDs', 
                         'disease_title_dominant', 'disease_title_recessive','classification_title',
-                        'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE', 'OMIM_Gene', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
-                        'CANONICAL_OR_MANE_PLUS_CLINICAL', 'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 'comphet_ID',
+                        'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE', 'OMIM_Gene', 'SYMBOL', 'HGVSc', 'HGVSp', 
+                        'IMPACT', 'Consequence', 'EXON', 'INTRON', 'CANONICAL_OR_MANE_PLUS_CLINICAL', 
+                        'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 'comphet_ID',
                         'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'lof.pLI', 'INTRON',
                         'gene_list', 'cohort_AC', 'cohort_AF', 'cohort_AN', 'gnomad_popmax_af', 'GAF',
                         'maternal_carrier', 'filters']

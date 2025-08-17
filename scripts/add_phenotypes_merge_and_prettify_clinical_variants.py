@@ -72,8 +72,9 @@ for i, uri in enumerate(input_uris):
         continue
     # Strip quotes etc. from every column
     for col in df.columns:
+        df[col] = df[col].replace({np.nan: ''})
         if df[col].dtype=='object':
-            df[col] = df[col].replace({np.nan: ''}).astype(str).str.strip('\n').str.replace('\"','').str.replace('[','').str.replace(']','').replace({'': np.nan})
+            df[col] = df[col].astype(str).str.strip('\n').str.replace('\"','').str.replace('[','').str.replace(']','')
             try:  # convert float column
                 df[col] = df[col].astype(float)
             except:

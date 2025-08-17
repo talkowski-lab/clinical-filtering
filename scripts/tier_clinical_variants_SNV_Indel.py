@@ -31,8 +31,9 @@ clnrevstat_one_star_plus = ['practice_guideline', 'reviewed_by_expert_panel', 'c
 df = pd.read_csv(uri, sep='\t')
 # Strip quotes etc. from every column
 for col in df.columns:
+    df[col] = df[col].replace({np.nan: ''})
     if df[col].dtype=='object':
-        df[col] = df[col].replace({np.nan: ''}).astype(str).str.strip('\n').str.replace('\"','').str.replace('[','').str.replace(']','')
+        df[col] = df[col].astype(str).str.strip('\n').str.replace('\"','').str.replace('[','').str.replace(']','')
 
 # Tier 7: default/lowest tier
 df['Tier'] = 7

@@ -29,6 +29,7 @@ inheritance_type = args.type
 clnrevstat_one_star_plus = ['practice_guideline', 'reviewed_by_expert_panel', 'criteria_provided,_multiple_submitters,_no_conflicts', 'criteria_provided,_conflicting_classifications', 'criteria_provided,_single_submitter']
 
 df = pd.read_csv(uri, sep='\t')
+# NEW ? replace nan with empty string before stripping
 # Strip quotes etc. from every column
 for col in df.columns:
     df[col] = df[col].replace({np.nan: ''})
@@ -77,8 +78,9 @@ has_strong_definitive_evidence = (df['vep.transcript_consequences.genCC_classifi
 df.loc[passes_filters & has_strong_definitive_evidence &
        (vus_or_conflicting_in_clinvar | is_clinvar_P_LP_one_star_plus), 'Tier'] = 4
 # NEW 4/11/2025: Tier 3: Only include Conflicting with at least one P/LP in CLNSIGCONF
+# NEW 8/26/2025: CLNSIGCONF as empty string, instead of nan
 conflicting_P_LP = ((df['info.CLNSIGCONF'].astype(str).str.contains('athogenic')) |  # if Conflicting, must have at least one P/LP
-                    (df['info.CLNSIGCONF'].isna()))  # if not Conflicting, CLNSIGCONF is empty
+                    (df['info.CLNSIGCONF']==''))  # if not Conflicting, CLNSIGCONF is empty
 df.loc[passes_filters & has_strong_definitive_evidence & 
         (((vus_or_conflicting_in_clinvar & conflicting_P_LP) | is_clinvar_P_LP_one_star_plus) & 
                 clinvar_gene_matches), 'Tier'] = 3

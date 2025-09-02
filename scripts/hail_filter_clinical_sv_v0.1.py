@@ -28,6 +28,8 @@
 - restrict large regions to not BND or CPX, impacts a gene from restrictive fields
 - restrict large_region only outputs to private to a family
 - new 'genic' category for any restrictive fields' genes that are in a gene list
+9/2/2025:
+- use dominant_freq filter for 'genic' category
 '''
 ###
 
@@ -221,8 +223,9 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
 
         # Category 6: Genic
         # NEW 7/14/2025: new 'genic' category for any restrictive fields' genes that are in a gene list
+        # NEW 9/2/2025: use dominant_freq filter for 'genic' category
         hl.if_else(
-            (phased_sv_tm.info.restrictive_gene_list.filter(hl.is_defined).size()>0),
+            (phased_sv_tm.info.restrictive_gene_list.filter(hl.is_defined).size()>0) & (phased_sv_tm.info.dominant_freq),
             'genic', 
             hl.missing(hl.tstr)
         )

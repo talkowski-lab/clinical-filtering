@@ -30,6 +30,9 @@
 - new 'genic' category for any restrictive fields' genes that are in a gene list
 9/2/2025:
 - use dominant_freq filter for 'genic' category
+9/3/2025:
+- use dominant_freq filter for 'P/LP' and 'large_region' categories
+- require 1/1 for recessives
 '''
 ###
 
@@ -178,6 +181,9 @@ phased_sv_tm = phased_sv_tm.annotate_entries(dominant_gt=((dom_trio_criteria) | 
 # NEW 2/19/2025: Annotate categories for merged output, instead of filtering
 # NEW 2/20/2025: Rewrote variant_category annotation because using append was messing things up in Hail?
 # NEW 5/29/2025: Added PREDICTED_LOF only criterion for P/LP output
+# NEW 9/2/2025: use dominant_freq filter for 'genic' category
+# NEW 9/3/2025: use dominant_freq filter for 'P/LP' and 'large_region' categories
+# NEW 9/3/2025: require 1/1 for recessives
 size_field = [x for x in list(sv_mt.info) if 'passes_SVLEN_filter_' in x][0]
 phased_sv_tm = phased_sv_tm.annotate_rows(
     variant_category = hl.array([
@@ -185,7 +191,8 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
         hl.if_else(
             ((hl.any(lambda x: x.matches('athogenic'), phased_sv_tm.info.clinical_interpretation)) |  # ClinVar P/LP
             (hl.is_defined(phased_sv_tm.info.dbvar_pathogenic))) &  # dbVar Pathogenic 
-            (phased_sv_tm.info.PREDICTED_LOF.size()!=0),  # PREDICTED_LOF only
+            (phased_sv_tm.info.PREDICTED_LOF.size()!=0) &  # PREDICTED_LOF only
+            (phased_sv_tm.info.dominant_freq),
             'P/LP', 
             hl.missing(hl.tstr)
         ),
@@ -202,7 +209,8 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
         hl.if_else(
             (phased_sv_tm.info[size_field]) &
             (~hl.array(['BND','CPX']).contains(phased_sv_tm.info.SVTYPE)) &
-            (phased_sv_tm.info.restrictive_csq_genes.size()>0), 
+            (phased_sv_tm.info.restrictive_csq_genes.size()>0) &
+            (phased_sv_tm.info.dominant_freq), 
             'large_region', 
             hl.missing(hl.tstr)
         ),
@@ -216,14 +224,15 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
         
         # Category 5: OMIM AR and XLR (recessive_freq)
         hl.if_else(
-            (hl.any(lambda x: x.matches('2') | x.matches('4'), phased_sv_tm.info.restrictive_inheritance_code)) & (phased_sv_tm.info.recessive_freq),
+            (hl.any(lambda x: x.matches('2') | x.matches('4'), phased_sv_tm.info.restrictive_inheritance_code)) & 
+            (phased_sv_tm.info.recessive_freq) &
+            (phased_sv_tm.proband_entry.GT.is_hom_var()),
             'recessive', 
             hl.missing(hl.tstr)
         ),
 
         # Category 6: Genic
         # NEW 7/14/2025: new 'genic' category for any restrictive fields' genes that are in a gene list
-        # NEW 9/2/2025: use dominant_freq filter for 'genic' category
         hl.if_else(
             (phased_sv_tm.info.restrictive_gene_list.filter(hl.is_defined).size()>0) & (phased_sv_tm.info.dominant_freq),
             'genic', 

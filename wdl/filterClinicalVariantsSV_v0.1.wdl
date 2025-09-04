@@ -51,7 +51,7 @@ workflow filterClinicalVariantsSV {
         Float gnomad_af_rec_threshold=0.01
         Float gnomad_popmax_af_threshold=0.01
         Int rec_n_cohort_hom_var_threshold=10
-        Int dom_ac_threshold=10
+        Int dom_ac_threshold=3
         Int dom_ac_unaffected_threshold=5
         String gnomad_af_field='gnomad_v4.1_sv_AF'
 

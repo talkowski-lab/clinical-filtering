@@ -305,21 +305,6 @@ sv_mt = sv_mt.annotate_rows(
     )
 )
 
-# Frequency flags
-# NEW 2/20/2025: Allow for missing gnomAD AFs
-sv_mt = sv_mt.annotate_rows(
-    info=sv_mt.info.annotate(
-        dominant_freq=((hl.max(sv_mt.info.AF)<=dom_af_threshold) & 
-            ((sv_mt.info[gnomad_af_field]<=gnomad_af_dom_threshold) | 
-            (hl.is_missing(sv_mt.info[gnomad_af_field])))
-        ),
-        recessive_freq=((hl.max(sv_mt.info.AF)<=rec_af_threshold) & 
-            ((sv_mt.info[gnomad_af_field]<=gnomad_af_rec_threshold) |
-            (hl.is_missing(sv_mt.info[gnomad_af_field])))
-        )
-    )
-)
-
 # Annotate gnomAD_popmax_AF and gnomad_popmax_freq flag
 gnomad_fields = [x for x in list(sv_mt.info) if 'gnomad' in x.lower() 
                 and 'ac' not in x.lower() and 'an' not in x.lower() 

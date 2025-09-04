@@ -183,7 +183,6 @@ phased_sv_tm = phased_sv_tm.annotate_entries(dominant_gt=((dom_trio_criteria) | 
 # NEW 5/29/2025: Added PREDICTED_LOF only criterion for P/LP output
 # NEW 9/2/2025: use dominant_freq filter for 'genic' category
 # NEW 9/3/2025: use dominant_freq filter for 'P/LP' and 'large_region' categories
-# NEW 9/3/2025: require 1/1 for recessives
 size_field = [x for x in list(sv_mt.info) if 'passes_SVLEN_filter_' in x][0]
 phased_sv_tm = phased_sv_tm.annotate_rows(
     variant_category = hl.array([
@@ -225,8 +224,7 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
         # Category 5: OMIM AR and XLR (recessive_freq)
         hl.if_else(
             (hl.any(lambda x: x.matches('2') | x.matches('4'), phased_sv_tm.info.restrictive_inheritance_code)) & 
-            (phased_sv_tm.info.recessive_freq) &
-            (phased_sv_tm.proband_entry.GT.is_hom_var()),
+            (phased_sv_tm.info.recessive_freq),
             'recessive', 
             hl.missing(hl.tstr)
         ),
@@ -259,6 +257,23 @@ phased_sv_tm = phased_sv_tm.filter_entries(
     # variants that are not exclusively large_region
     (
         hl.set(['large_region']).intersection(hl.set(phased_sv_tm.variant_category)).size() <
+        hl.set(phased_sv_tm.variant_category).size()
+    )
+)
+
+# NEW 9/3/2025: require 1/1 for recessives
+phased_sv_tm = phased_sv_tm.filter_entries(
+    (
+        # recessive-only variants
+        (
+            (phased_sv_tm.variant_category.size() == 1) &
+            (phased_sv_tm.variant_category[0] == 'recessive')
+        ) &
+        (phased_sv_tm.proband_entry.GT.is_hom_var())
+    ) |
+    # variants that are not exclusively recessive
+    (
+        hl.set(['recessive']).intersection(hl.set(phased_sv_tm.variant_category)).size() <
         hl.set(phased_sv_tm.variant_category).size()
     )
 )

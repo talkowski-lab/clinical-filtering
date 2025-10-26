@@ -66,13 +66,24 @@ workflow filterClinicalVariants {
         File omim_uri  # All OMIM genes
         File gene_phenotype_map
         File carrier_gene_list  
+        File sample_hpo_uri  
+        File gene_hpo_uri  
+        File hpo_id_to_name_uri  
+        File pli_uri
+        String hpo_id_col = 'Anomalies with HPO codes (Screening)'
+        String phenotype_col = 'Anomalies on PG03 at Eligibility Screening'
+        File carrier_gene_list  
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
         Array[String] priority_cols=['fam_id', 'id', 'sex', 'trio_status', 'ID', 'Tier', 'inheritance_mode',
-                        'disease_title_dominant', 'disease_title_recessive', 'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE',
-                        'OMIM_Gene', 'gene_list_status', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'INTRON', 'CANONICAL_OR_MANE_PLUS_CLINICAL',
-                        'AD_ref,AD_alt', 'transmission', 'mendel_code', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT',
-                        'comphet_ID', 'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 
+                        'Pheno_Overlapping_HPO_IDs',
+                        'disease_title_dominant', 'disease_title_recessive', 'classification_title',
+                        'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE', 'OMIM_Gene', 'gene_list_status', 
+                        'SYMBOL', 'HGVSc', 'HGVSp', 
+                        'IMPACT', 'Consequence', 'EXON', 'INTRON', 'CANONICAL_OR_MANE_PLUS_CLINICAL',
+                        'AD_ref,AD_alt', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT', 'comphet_ID', 
+                        'transmission', 'mendel_code', 'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'lof.pLI', 'INTRON', 
                         'gene_list', 'cohort_AC', 'cohort_AF', 'gnomad_popmax_af', 'maternal_carrier', 'filters']
+
         # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
         Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense', 'GENEINFO': 'CLNGENE'}
 
@@ -326,6 +337,13 @@ workflow filterClinicalVariants {
             omim_uri=omim_uri,
             add_phenotypes_merge_and_prettify_script=add_phenotypes_merge_and_prettify_script,
             prefix=cohort_prefix,
+            sample_hpo_uri=sample_hpo_uri,
+            gene_hpo_uri=gene_hpo_uri,
+            pli_uri=pli_uri,
+            omim_uri=omim_uri,
+            hpo_id_to_name_uri=hpo_id_to_name_uri,
+            hpo_id_col=hpo_id_col,
+            phenotype_col=phenotype_col,
             hail_docker=hail_docker,
             runtime_attr_override=runtime_attr_merge_prettify
     }

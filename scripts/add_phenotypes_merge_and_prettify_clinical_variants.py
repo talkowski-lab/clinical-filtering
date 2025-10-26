@@ -212,25 +212,46 @@ if xgenotyping_nomat_fetal_fraction_estimate!=-1:
 # NEW 4/2/2025: Add sample HPO terms
 if (sample_hpo_uri!='NA') and (gene_hpo_uri!='NA') and (hpo_id_to_name_uri!='NA') and (phenotype_col!='NA') and (hpo_id_col!='NA'):
     sample_hpo_df = pd.read_csv(sample_hpo_uri, sep='\t', dtype='str').set_index('Participant')
-    # Check that sample is in HPO file
-    if sample_id in sample_hpo_df.index:
-        merged_df['Case_Pheno'] = sample_hpo_df.loc[sample_id, phenotype_col]    
-        # NEW 4/11/2025: Add overlap between sample HPO terms and Gene HPO terms as Pheno_Overlapping_HPO_IDs column
-        gene_hpo_df = pd.read_csv(gene_hpo_uri, sep='\t')
-        hpo_id_to_name_dict = pd.read_csv(hpo_id_to_name_uri, sep='\t').set_index('hpo_id').hpo_name.to_dict()
-        # Convert hpo_ids column to list
-        gene_hpo_df['hpo_ids'] = gene_hpo_df.hpo_ids.str.split(', ')
-        sample_hpo_ids = sample_hpo_df[hpo_id_col].fillna('').loc[sample_id].split(', ')
-        merged_df['Pheno_Overlapping_HPO_IDs'] = (
-            merged_df['SYMBOL']
-            .map(gene_hpo_df.set_index('gene_symbol').hpo_ids.to_dict())
-            .apply(lambda gene_hpo_ids: np.intersect1d(gene_hpo_ids, sample_hpo_ids))
-            .apply(lambda hpo_id_list: [hpo_id_to_name_dict[hpo_id] for hpo_id in hpo_id_list])
-            .apply(', '.join)
-        )
+    # NEW 4/11/2025: Add overlap between sample HPO terms and Gene HPO terms as Pheno_Overlapping_HPO_IDs column
+    gene_hpo_df = pd.read_csv(gene_hpo_uri, sep='\t')
+    hpo_id_to_name_dict = pd.read_csv(hpo_id_to_name_uri, sep='\t').set_index('hpo_id').hpo_name.to_dict()
+    # Convert hpo_ids column to list
+    gene_hpo_df['hpo_ids'] = gene_hpo_df.hpo_ids.str.split(', ')
+    
+    # Single-sample
+    if sample_id!='NA':
+        # Check that sample is in HPO file
+        if sample_id in sample_hpo_df.index:
+            merged_df['Case_Pheno'] = sample_hpo_df.loc[sample_id, phenotype_col]    
+            sample_hpo_ids = sample_hpo_df[hpo_id_col].fillna('').loc[sample_id].split(', ')
+            merged_df['Pheno_Overlapping_HPO_IDs'] = (
+                merged_df['SYMBOL']
+                .map(gene_hpo_df.set_index('gene_symbol').hpo_ids.to_dict())
+                .apply(lambda gene_hpo_ids: np.intersect1d(gene_hpo_ids, sample_hpo_ids))
+                .apply(lambda hpo_id_list: [hpo_id_to_name_dict[hpo_id] for hpo_id in hpo_id_list])
+                .apply(', '.join)
+            )
+        else:
+            merged_df['Case_Pheno'] = np.nan
+            merged_df['Pheno_Overlapping_HPO_IDs'] = np.nan
+
+    # Multiple samples
     else:
-        merged_df['Case_Pheno'] = np.nan
-        merged_df['Pheno_Overlapping_HPO_IDs'] = np.nan
+        merged_df['Case_Pheno'] = merged_df['id'].map(sample_hpo_df[phenotype_col].to_dict())
+        merged_df['Sample_HPO_IDs'] = merged_df['id'].map(sample_hpo_df[hpo_id_col].fillna('').split(', ').to_dict())
+        merged_df['Pheno_Overlapping_HPO_IDs'] = (
+            merged_df.apply(
+                lambda x: ', '.join(
+                    [hpo_id_to_name_dict[hpo_id] for hpo_id in np.intersect1d(
+                        x['Sample_HPO_IDs'],
+                        gene_hpo_df.loc[
+                            gene_hpo_df['gene_symbol'] == x['SYMBOL'], 'hpo_ids'
+                        ].values[0] if x['SYMBOL'] in gene_hpo_df['gene_symbol'].values else []
+                    )]
+                ),
+                axis=1
+            )
+        )
 
 # NEW 4/29/2025: Add pLI scores (optional)
 if pli_uri!='':

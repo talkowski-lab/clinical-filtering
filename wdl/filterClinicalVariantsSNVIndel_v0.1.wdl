@@ -66,9 +66,9 @@ workflow filterClinicalVariants {
         File omim_uri  # All OMIM genes
         File gene_phenotype_map
         File carrier_gene_list  
-        File sample_hpo_uri  
-        File gene_hpo_uri  
-        File hpo_id_to_name_uri  
+        String sample_hpo_uri='NA'
+        String gene_hpo_uri='NA'
+        String hpo_id_to_name_uri='NA'
         File pli_uri
         String hpo_id_col = 'Anomalies with HPO codes (Screening)'
         String phenotype_col = 'Anomalies on PG03 at Eligibility Screening'

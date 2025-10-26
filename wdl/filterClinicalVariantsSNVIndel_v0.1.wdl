@@ -74,7 +74,8 @@ workflow filterClinicalVariants {
         String phenotype_col = 'Anomalies on PG03 at Eligibility Screening'
         File carrier_gene_list  
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
-        Array[String] priority_cols=['fam_id', 'id', 'sex', 'trio_status', 'ID', 'Tier', 'inheritance_mode',
+        Array[String] priority_cols=['fam_id', 'id', 'sex', 'trio_status', 'Case_Pheno', 
+                        'ID', 'Tier', 'inheritance_mode',
                         'Pheno_Overlapping_HPO_IDs',
                         'disease_title_dominant', 'disease_title_recessive', 'classification_title',
                         'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE', 'OMIM_Gene', 'gene_list_status', 
@@ -344,6 +345,7 @@ workflow filterClinicalVariants {
             hpo_id_to_name_uri=hpo_id_to_name_uri,
             hpo_id_col=hpo_id_col,
             phenotype_col=phenotype_col,
+            sample_id='NA',
             hail_docker=hail_docker,
             runtime_attr_override=runtime_attr_merge_prettify
     }

@@ -53,8 +53,7 @@ workflow filterClinicalVariants {
         Float af_dom_threshold=0.01  
 
         Float gnomad_af_threshold=0.05
-        Float am_rec_threshold=0.56
-        Float am_dom_threshold=0.56
+        Float am_threshold=0.56
         Float mpc_rec_threshold=2
         Float mpc_dom_threshold=2
         Float gnomad_af_rec_threshold=0.001
@@ -69,7 +68,7 @@ workflow filterClinicalVariants {
         String genome_build='GRCh38'
 
         Boolean pass_filter=false
-        Boolean include_not_genCC_OMIM=false  # NIFS-specific
+        Boolean include_not_in_genelists=false  # NIFS-specific
         Boolean include_all_maternal_carrier_variants=false
 
         File omim_uri  # All OMIM genes
@@ -90,7 +89,8 @@ workflow filterClinicalVariants {
                         'ID', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
                         'Pheno_Overlapping_HPO_IDs', 
                         'disease_title_dominant', 'disease_title_recessive','classification_title',
-                        'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE', 'OMIM_Gene', 'SYMBOL', 'HGVSc', 'HGVSp', 
+                        'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE', 'OMIM_Gene', 'gene_list_status',
+                        'SYMBOL', 'HGVSc', 'HGVSp', 
                         'IMPACT', 'Consequence', 'EXON', 'INTRON', 'CANONICAL_OR_MANE_PLUS_CLINICAL', 
                         'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 'comphet_ID',
                         'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'lof.pLI', 'INTRON',
@@ -150,8 +150,7 @@ workflow filterClinicalVariants {
         ac_dom_threshold=ac_dom_threshold,
         af_dom_threshold=af_dom_threshold,
         ad_alt_threshold=ad_alt_threshold,
-        am_rec_threshold=am_rec_threshold,
-        am_dom_threshold=am_dom_threshold,
+        am_threshold=am_threshold,
         mpc_rec_threshold=mpc_rec_threshold,
         mpc_dom_threshold=mpc_dom_threshold,
         gnomad_af_rec_threshold=gnomad_af_rec_threshold,
@@ -159,7 +158,7 @@ workflow filterClinicalVariants {
         loeuf_v2_threshold=loeuf_v2_threshold,
         loeuf_v4_threshold=loeuf_v4_threshold,
         genome_build=genome_build,
-        include_not_genCC_OMIM=include_not_genCC_OMIM,
+        include_not_in_genelists=include_not_in_genelists,
         rec_gene_list_tsv=rec_gene_list_tsv,
         dom_gene_list_tsv=dom_gene_list_tsv,
         runtime_attr_override=runtime_attr_filter_inheritance

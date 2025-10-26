@@ -34,7 +34,7 @@ workflow filterClinicalVariants {
 
         Int ad_alt_threshold=3
         Float spliceAI_threshold=0.8
-        Float af_threshold=0.1
+        Float af_threshold=0.05
         Float clinvar_conf_af_threshold=0.05
         Int ac_threshold=10
         Int ac_rec_threshold=10  # TODO
@@ -42,8 +42,7 @@ workflow filterClinicalVariants {
         Float af_rec_threshold=0.05
         Float af_dom_threshold=0.01
         Float gnomad_af_threshold=0.05
-        Float am_rec_threshold=0.56
-        Float am_dom_threshold=0.56
+        Float am_threshold=0.56
         Float mpc_rec_threshold=2
         Float mpc_dom_threshold=2
         Float gnomad_af_rec_threshold=0.001
@@ -56,7 +55,7 @@ workflow filterClinicalVariants {
 
         Boolean include_all_maternal_carrier_variants=false
         Boolean pass_filter=false
-        Boolean include_not_genCC_OMIM=true  # NIFS-specific
+        Boolean include_not_in_genelists=true  # NIFS-specific
 
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
         String dom_gene_list_tsv='NA' 
@@ -70,7 +69,7 @@ workflow filterClinicalVariants {
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
         Array[String] priority_cols=['fam_id', 'id', 'sex', 'trio_status', 'ID', 'Tier', 'inheritance_mode',
                         'disease_title_dominant', 'disease_title_recessive', 'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE',
-                        'OMIM_Gene', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'INTRON', 'CANONICAL_OR_MANE_PLUS_CLINICAL',
+                        'OMIM_Gene', 'gene_list_status', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON', 'INTRON', 'CANONICAL_OR_MANE_PLUS_CLINICAL',
                         'AD_ref,AD_alt', 'transmission', 'mendel_code', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT',
                         'comphet_ID', 'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 
                         'gene_list', 'cohort_AC', 'cohort_AF', 'gnomad_popmax_af', 'maternal_carrier', 'filters']
@@ -131,8 +130,7 @@ workflow filterClinicalVariants {
             af_rec_threshold=af_rec_threshold,
             af_dom_threshold=af_dom_threshold,
             ad_alt_threshold=ad_alt_threshold,
-            am_rec_threshold=am_rec_threshold,
-            am_dom_threshold=am_dom_threshold,
+            am_threshold=am_threshold,
             mpc_rec_threshold=mpc_rec_threshold,
             mpc_dom_threshold=mpc_dom_threshold,
             gnomad_af_rec_threshold=gnomad_af_rec_threshold,
@@ -140,7 +138,7 @@ workflow filterClinicalVariants {
             loeuf_v2_threshold=loeuf_v2_threshold,
             loeuf_v4_threshold=loeuf_v4_threshold,
             genome_build=genome_build,
-            include_not_genCC_OMIM=include_not_genCC_OMIM,
+            include_not_in_genelists=include_not_in_genelists,
             rec_gene_list_tsv=rec_gene_list_tsv,
             dom_gene_list_tsv=dom_gene_list_tsv,
             runtime_attr_override=runtime_attr_filter_inheritance

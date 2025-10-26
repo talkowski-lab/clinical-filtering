@@ -6,10 +6,12 @@
 ## CHANGE LOG:
 '''
 4/18/2025:
-- set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True
+- set filter_by_in_gene_list=False in filter_mt if include_not_in_genelists=True
 4/19/2025:
 - add in_non_par annotation
 - annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
+10/26/2025:
+- change AlphaMissense filter to all outputs
 '''
 ###
 
@@ -39,8 +41,7 @@ parser.add_argument('--ac_rec_threshold', type=int, help='AC rec threshold')
 parser.add_argument('--af_rec_threshold', type=float, help='AF rec threshold')
 parser.add_argument('--ac_dom_threshold', type=int, help='AC dom threshold')
 parser.add_argument('--af_dom_threshold', type=float, help='AF dom threshold')
-parser.add_argument('--am_rec_threshold', type=float, help='AM rec threshold')
-parser.add_argument('--am_dom_threshold', type=float, help='AM dom threshold')
+parser.add_argument('--am_threshold', type=float, help='AlphaMissense threshold')
 parser.add_argument('--mpc_rec_threshold', type=float, help='MPC rec threshold')
 parser.add_argument('--mpc_dom_threshold', type=float, help='MPC dom threshold')
 parser.add_argument('--gnomad_af_rec_threshold', type=float, help='gnomAD AF rec threshold')
@@ -49,7 +50,7 @@ parser.add_argument('--loeuf_v2_threshold', type=float, help='LOEUF v2 threshold
 parser.add_argument('--loeuf_v4_threshold', type=float, help='LOEUF v4 threshold')
 parser.add_argument('--build', type=str, help='Build version')
 parser.add_argument('--ad_alt_threshold', type=int, help='AD ALT threshold')
-parser.add_argument('--include_not_genCC_OMIM', type=str, help='Include not GenCC_OMIM (True/False)')
+parser.add_argument('--include_not_in_genelists', type=str, help='Include not GenCC_OMIM (True/False)')
 parser.add_argument('--spliceAI_threshold', type=float, help='SpliceAI threshold')
 parser.add_argument('--rec_gene_list_tsv', type=str, help='rec gene list TSV')
 parser.add_argument('--dom_gene_list_tsv', type=str, help='dom gene list TSV')
@@ -57,7 +58,7 @@ parser.add_argument('--dom_gene_list_tsv', type=str, help='dom gene list TSV')
 args = parser.parse_args()
 
 mem = int(np.floor(args.mem))
-include_not_genCC_OMIM = ast.literal_eval(args.include_not_genCC_OMIM.capitalize())
+include_not_in_genelists = ast.literal_eval(args.include_not_in_genelists.capitalize())
 
 vcf_file = args.vcf_file
 prefix = args.prefix
@@ -67,8 +68,7 @@ ac_rec_threshold = args.ac_rec_threshold
 af_rec_threshold = args.af_rec_threshold
 ac_dom_threshold = args.ac_dom_threshold
 af_dom_threshold = args.af_dom_threshold
-am_rec_threshold = args.am_rec_threshold
-am_dom_threshold = args.am_dom_threshold
+am_threshold = args.am_threshold
 mpc_rec_threshold = args.mpc_rec_threshold
 mpc_dom_threshold = args.mpc_dom_threshold
 gnomad_af_rec_threshold = args.gnomad_af_rec_threshold
@@ -112,8 +112,8 @@ ped_ht = hl.import_table(ped_uri, delimiter='\t').key_by('sample_id')
 phased_tm = annotate_trio_matrix(phased_tm, mt, pedigree, ped_ht)
 
 gene_phased_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
-# NEW 4/18/2025: Set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True
-gene_phased_tm = filter_mt(gene_phased_tm, filter_by_in_gene_list=not include_not_genCC_OMIM)
+# NEW 4/18/2025: Set filter_by_in_gene_list=False in filter_mt if include_not_in_genelists=True
+gene_phased_tm = filter_mt(gene_phased_tm, filter_by_in_gene_list=not include_not_in_genelists)
 
 # annotate spliceAI score if missing
 if 'spliceAI_score' not in list(gene_phased_tm.vep.transcript_consequences):
@@ -144,6 +144,14 @@ is_splice_var_only = (hl.set(splice_vars).intersection(
 
 fails_spliceAI_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.spliceAI_score=='', 1, 
                 hl.float(gene_phased_tm.vep.transcript_consequences.spliceAI_score))<spliceAI_threshold)
+
+# NEW 10/26/2025: change AlphaMissense filter to all outputs
+is_missense_var = (hl.set(['missense_variant']).intersection(
+            hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()>0)
+passes_alpha_missense_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.am_pathogenicity=='', 1, 
+                hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_threshold)
+passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_missense_var))
+gene_phased_tm = gene_phased_tm.filter_rows(passes_alpha_missense)
 
 # NEW 1/15/2025: changed has_low_or_modifier_impact to is_moderate_or_high_impact inverse logic
 is_moderate_or_high_impact = (hl.array(['HIGH','MODERATE']).contains(gene_phased_tm.vep.transcript_consequences.IMPACT))
@@ -191,16 +199,9 @@ passes_gnomad_af_rec = ((gene_phased_tm.info.gnomad_popmax_af<=gnomad_af_rec_thr
 passes_mpc_rec = ((gene_phased_tm.info.MPC>=mpc_rec_threshold) | (hl.is_missing(gene_phased_tm.info.MPC)))
 # AlphaMissense filter
 # NEW 1/7/2025 only apply on missense variants
-is_missense_var = (hl.set(['missense_variant']).intersection(
-            hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()>0)
-passes_alpha_missense_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.am_pathogenicity=='', 1, 
-                hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_rec_threshold)
-passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_missense_var))
-
-if include_not_genCC_OMIM:
+if include_not_in_genelists:
     rec_mt_gene_phased_tm = gene_phased_tm.filter_rows(
         (passes_ac_af_rec) &
-        (passes_alpha_missense) &
         (
             ar_inheritance_code |
             xlr_inheritance_code |
@@ -215,7 +216,6 @@ if include_not_genCC_OMIM:
 else:
     rec_mt_gene_phased_tm = gene_phased_tm.filter_rows(
         (passes_ac_af_rec) &
-        (passes_alpha_missense) &
             (ar_inheritance_code | xlr_inheritance_code | in_rec_gene_list)        
     )
 
@@ -272,11 +272,10 @@ passes_loeuf_v2 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v
 passes_loeuf_v4 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v4=='', 0, 
                         hl.float(gene_phased_tm.vep.transcript_consequences.LOEUF_v4))<=loeuf_v4_threshold)
 
-if include_not_genCC_OMIM:
+if include_not_in_genelists:
     dom_mt = gene_phased_tm.filter_rows(
         (passes_ac_af_dom) &
         (passes_gnomad_af_dom) &
-        (passes_alpha_missense) &
         (
             ad_inheritance_code |
             xld_inheritance_code |
@@ -294,7 +293,6 @@ else:
     dom_mt = gene_phased_tm.filter_rows(
         (passes_ac_af_dom) &
         (passes_gnomad_af_dom) &
-        (passes_alpha_missense) &
         (ad_inheritance_code | xld_inheritance_code | in_dom_gene_list)
     )
 

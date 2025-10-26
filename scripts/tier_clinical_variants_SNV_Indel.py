@@ -5,6 +5,8 @@
 '''
 4/19/2025:
 - change is_female field to sex to account for missing sex information
+10/26/2025:
+- variant_
 '''
 ###
 
@@ -151,6 +153,11 @@ is_maternal_variant = df['mother_entry.GT'].str.contains('1')
 df['maternal_carrier'] = ((is_clinvar_P_LP_one_star_plus | high_or_moderate_impact) &
         passes_tier_1_and_2 & 
         is_maternal_variant)
+
+# NEW 10/26/2025: Add gene_list_status column
+df['gene_list_status'] = 'Not in gene lists, high impact'
+df.loc[(df['vep.transcript_consequences.gene_list']!=''), 'gene_list_status'] = 'In GenCC/OMIM with inheritance code'
+df.loc[(df['variant_category']=='inheritance_other'), 'gene_list_status'] = 'In gene lists, no inheritance code'
 
 output_filename = f"{prefix}_tiers.tsv.gz"
 df.to_csv(output_filename, sep='\t', index=False)

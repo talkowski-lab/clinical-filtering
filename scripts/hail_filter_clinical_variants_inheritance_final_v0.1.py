@@ -6,10 +6,12 @@
 ## CHANGE LOG:
 '''
 4/18/2025:
-- set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True
+- set filter_by_in_gene_list=False in filter_mt if include_not_in_genelists=True
 4/19/2025:
 - add in_non_par annotation
 - annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
+10/26/2025:
+- change AlphaMissense filter to all outputs
 '''
 ###
 
@@ -110,8 +112,8 @@ ped_ht = hl.import_table(ped_uri, delimiter='\t').key_by('sample_id')
 phased_tm = annotate_trio_matrix(phased_tm, mt, pedigree, ped_ht)
 
 gene_phased_tm = phased_tm.explode_rows(phased_tm.vep.transcript_consequences)
-# NEW 4/18/2025: Set filter_by_in_gene_list=False in filter_mt if include_not_genCC_OMIM=True
-gene_phased_tm = filter_mt(gene_phased_tm, filter_by_in_gene_list=not include_not_genCC_OMIM)
+# NEW 4/18/2025: Set filter_by_in_gene_list=False in filter_mt if include_not_in_genelists=True
+gene_phased_tm = filter_mt(gene_phased_tm, filter_by_in_gene_list=not include_not_in_genelists)
 
 # annotate spliceAI score if missing
 if 'spliceAI_score' not in list(gene_phased_tm.vep.transcript_consequences):
@@ -142,6 +144,14 @@ is_splice_var_only = (hl.set(splice_vars).intersection(
 
 fails_spliceAI_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.spliceAI_score=='', 1, 
                 hl.float(gene_phased_tm.vep.transcript_consequences.spliceAI_score))<spliceAI_threshold)
+
+# NEW 10/26/2025: change AlphaMissense filter to all outputs
+is_missense_var = (hl.set(['missense_variant']).intersection(
+            hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()>0)
+passes_alpha_missense_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.am_pathogenicity=='', 1, 
+                hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_threshold)
+passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_missense_var))
+gene_phased_tm = gene_phased_tm.filter_rows(passes_alpha_missense)
 
 # NEW 1/15/2025: changed has_low_or_modifier_impact to is_moderate_or_high_impact inverse logic
 is_moderate_or_high_impact = (hl.array(['HIGH','MODERATE']).contains(gene_phased_tm.vep.transcript_consequences.IMPACT))

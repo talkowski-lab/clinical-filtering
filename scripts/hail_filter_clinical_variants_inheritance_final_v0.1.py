@@ -258,13 +258,6 @@ passes_ac_af_dom = ((gene_phased_tm.info.cohort_AC<=ac_dom_threshold) | (gene_ph
 passes_gnomad_af_dom = ((gene_phased_tm.info.gnomad_popmax_af<=gnomad_af_dom_threshold) | (hl.is_missing(gene_phased_tm.info.gnomad_popmax_af)))
 # MPC filter
 passes_mpc_dom = ((gene_phased_tm.info.MPC>=mpc_dom_threshold) | (hl.is_missing(gene_phased_tm.info.MPC)))
-# AlphaMissense filter
-# NEW 1/7/2025 only apply on missense variants
-is_missense_var = (hl.set(['missense_variant']).intersection(
-            hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()>0)
-passes_alpha_missense_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.am_pathogenicity=='', 1, 
-                hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_dom_threshold)
-passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_missense_var))
 # LOEUF v2/v4 filters
 passes_loeuf_v2 = (hl.if_else(gene_phased_tm.vep.transcript_consequences.LOEUF_v2=='', 0, 
                         hl.float(gene_phased_tm.vep.transcript_consequences.LOEUF_v2))<=loeuf_v2_threshold)

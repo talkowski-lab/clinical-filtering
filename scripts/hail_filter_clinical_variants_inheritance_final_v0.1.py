@@ -145,6 +145,11 @@ is_splice_var_only = (hl.set(splice_vars).intersection(
 fails_spliceAI_score = (hl.if_else(gene_phased_tm.vep.transcript_consequences.spliceAI_score=='', 1, 
                 hl.float(gene_phased_tm.vep.transcript_consequences.spliceAI_score))<spliceAI_threshold)
 
+# NEW 1/15/2025: changed has_low_or_modifier_impact to is_moderate_or_high_impact inverse logic
+is_moderate_or_high_impact = (hl.array(['HIGH','MODERATE']).contains(gene_phased_tm.vep.transcript_consequences.IMPACT))
+gene_phased_tm = gene_phased_tm.filter_rows((is_splice_var_only | 
+                                             (has_splice_var & ~is_moderate_or_high_impact)) & fails_spliceAI_score, keep=False)
+
 # NEW 10/26/2025: change AlphaMissense filter to all outputs
 is_missense_var = (hl.set(['missense_variant']).intersection(
             hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()>0)
@@ -152,11 +157,6 @@ passes_alpha_missense_score = (hl.if_else(gene_phased_tm.vep.transcript_conseque
                 hl.float(gene_phased_tm.vep.transcript_consequences.am_pathogenicity))>=am_threshold)
 passes_alpha_missense = ((is_missense_var & passes_alpha_missense_score) | (~is_missense_var))
 gene_phased_tm = gene_phased_tm.filter_rows(passes_alpha_missense)
-
-# NEW 1/15/2025: changed has_low_or_modifier_impact to is_moderate_or_high_impact inverse logic
-is_moderate_or_high_impact = (hl.array(['HIGH','MODERATE']).contains(gene_phased_tm.vep.transcript_consequences.IMPACT))
-gene_phased_tm = gene_phased_tm.filter_rows((is_splice_var_only | 
-                                             (has_splice_var & ~is_moderate_or_high_impact)) & fails_spliceAI_score, keep=False)
 
 # NEW 3/28/2025: Output 'other' inheritance as separate output
 # Output 1: Other inheritance

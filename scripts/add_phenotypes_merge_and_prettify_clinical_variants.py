@@ -217,7 +217,7 @@ if (sample_hpo_uri!='NA') and (gene_hpo_uri!='NA') and (hpo_id_to_name_uri!='NA'
     hpo_id_to_name_dict = pd.read_csv(hpo_id_to_name_uri, sep='\t').set_index('hpo_id').hpo_name.to_dict()
     # Convert hpo_ids column to list
     gene_hpo_df['hpo_ids'] = gene_hpo_df.hpo_ids.str.split(', ')
-    
+
     # Single-sample
     if sample_id!='NA':
         # Check that sample is in HPO file
@@ -238,7 +238,7 @@ if (sample_hpo_uri!='NA') and (gene_hpo_uri!='NA') and (hpo_id_to_name_uri!='NA'
     # Multiple samples
     else:
         merged_df['Case_Pheno'] = merged_df['id'].map(sample_hpo_df[phenotype_col].to_dict())
-        merged_df['Sample_HPO_IDs'] = merged_df['id'].map(sample_hpo_df[hpo_id_col].fillna('').split(', ').to_dict())
+        merged_df['Sample_HPO_IDs'] = merged_df['id'].map(sample_hpo_df[hpo_id_col].fillna('').str.split(', ').to_dict())
         merged_df['Pheno_Overlapping_HPO_IDs'] = (
             merged_df.apply(
                 lambda x: ', '.join(

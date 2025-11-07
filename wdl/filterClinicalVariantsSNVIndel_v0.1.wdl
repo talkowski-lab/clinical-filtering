@@ -82,7 +82,7 @@ workflow filterClinicalVariants {
                         'SYMBOL', 'HGVSc', 'HGVSp', 
                         'IMPACT', 'Consequence', 'EXON', 'INTRON', 'CANONICAL_OR_MANE_PLUS_CLINICAL',
                         'AD_ref,AD_alt', 'proband_entry.GT', 'father_entry.GT', 'mother_entry.GT', 'comphet_ID', 
-                        'transmission', 'mendel_code', 'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'lof.pLI', 'INTRON', 
+                        'transmission', 'mendel_code', 'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'lof.pLI',
                         'gene_list', 'cohort_AC', 'cohort_AF', 'gnomad_popmax_af', 'maternal_carrier', 'filters']
 
         # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes

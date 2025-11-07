@@ -41,7 +41,8 @@ def filter_mt(mt, filter_csq=True, filter_impact=True, filter_by_in_gene_list=Tr
 
     # filter by Impact and splice/noncoding consequence
     if filter_impact:
-        splice_vars = ['splice_donor_5th_base_variant', 'splice_region_variant', 'splice_donor_region_variant']
+        splice_vars = splice_vars = ['splice_acceptor_variant', 'splice_donor_variant', 'splice_donor_5th_base_variant', 
+                                     'splice_region_variant', 'splice_donor_region_variant', 'splice_polypyrimidine_tract_variant']
         keep_vars = ['non_coding_transcript_exon_variant']
         mt = mt.filter_rows(
             (hl.set(splice_vars + keep_vars).intersection(

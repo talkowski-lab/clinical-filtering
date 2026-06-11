@@ -1,7 +1,7 @@
 version 1.0
 
-import "mergeVCFs.wdl" as mergeVCFs
-import "helpers.wdl" as helpers
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/mergeVCFs.wdl" as mergeVCFs
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/helpers.wdl" as helpers
 
 struct RuntimeAttr {
     Float? mem_gb
@@ -32,28 +32,37 @@ workflow filterClinicalVariantsSV {
         String hail_docker
         String variant_interpretation_docker
 
-        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_clinical_helper_functions.py"
-        String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
-        String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_annotate_sv_gene_level_v0.1.py"
-        String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_sv_v0.1.py"
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_clinical_helper_functions.py"
+        String annotate_sv_from_intersect_bed_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_annotate_sv_from_intersect_bed_v0.1.py"
+        String annotate_sv_gene_level_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_annotate_sv_gene_level_v0.1.py"
+        String filter_clinical_sv_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_sv_v0.1.py"
 
         Array[String] permissive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN",
                          "PREDICTED_PARTIAL_EXON_DUP", "PREDICTED_DUP_PARTIAL", "PREDICTED_INTRONIC",
                          "PREDICTED_INV_SPAN", "PREDICTED_UTR", "PREDICTED_PROMOTER", "PREDICTED_BREAKEND_EXONIC"]
-        Array[String] restrictive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN"]
+        Array[String] restrictive_csq_fields = ["PREDICTED_LOF", "PREDICTED_INTRAGENIC_EXON_DUP", "PREDICTED_COPY_GAIN", "PREDICTED_INTRONIC"]
 
         Float bed_overlap_threshold=0.5
+        Int families_per_chunk=500
         Int size_threshold=500000  # in BP
-        Float dom_af_threshold=0.001
-        Float rec_af_threshold=0.01
+        Float dom_af_threshold=0.01
+        Float rec_af_threshold=0.05
         Float gnomad_af_dom_threshold=0.01
         Float gnomad_af_rec_threshold=0.01
-        Float gnomad_popmax_af_threshold=0.05
+        Float gnomad_popmax_af_threshold=0.01
+        Int rec_n_cohort_hom_var_threshold=10
+        Int dom_ac_threshold=3
+        Int dom_ac_unaffected_threshold=5
         String gnomad_af_field='gnomad_v4.1_sv_AF'
+
+        Boolean output_excel=true
 
         RuntimeAttr? runtime_attr_bcftools
         RuntimeAttr? runtime_attr_annotate
+        RuntimeAttr? runtime_attr_split_families
         RuntimeAttr? runtime_attr_filter_vcf
+        RuntimeAttr? runtime_attr_subset_vcfs_sv
+        RuntimeAttr? runtime_attr_merge_results
     }
 
     call vcfToBed {
@@ -119,6 +128,7 @@ workflow filterClinicalVariantsSV {
         prec_uri=prec_uri,
         hi_uri=hi_uri,
         ts_uri=ts_uri,
+        ped_uri=ped_uri,
         permissive_csq_fields=permissive_csq_fields,
         restrictive_csq_fields=restrictive_csq_fields,
         size_threshold=size_threshold,
@@ -128,30 +138,70 @@ workflow filterClinicalVariantsSV {
         gnomad_af_rec_threshold=gnomad_af_rec_threshold,
         gnomad_popmax_af_threshold=gnomad_popmax_af_threshold,
         gnomad_af_field=gnomad_af_field,
+        rec_n_cohort_hom_var_threshold=rec_n_cohort_hom_var_threshold,
+        dom_ac_threshold=dom_ac_threshold,
+        dom_ac_unaffected_threshold=dom_ac_unaffected_threshold,
         genome_build=genome_build,
         hail_docker=hail_docker,
         annotate_sv_gene_level_script=annotate_sv_gene_level_script,
         runtime_attr_override=runtime_attr_annotate
     }
 
-    call filterVCF {
+    call helpers.splitFamilies as splitFamilies {
         input:
-        vcf_file=annotateGeneLevelVCF.annotated_vcf,
-        ped_uri=ped_uri,
-        genome_build=genome_build,
-        hail_docker=hail_docker,
-        helper_functions_script=helper_functions_script,
-        filter_clinical_sv_script=filter_clinical_sv_script,
-        runtime_attr_override=runtime_attr_filter_vcf
+            ped_uri=ped_uri,
+            families_per_chunk=families_per_chunk,
+            cohort_prefix=cohort_prefix,
+            sv_base_mini_docker=hail_docker,
+            runtime_attr_override=runtime_attr_split_families
+    } 
+
+    scatter (sample_file in splitFamilies.family_shard_files) {
+        call helpers.subsetVCFSamples as subsetVCFSamplesSVs {
+            input:
+                samples_file=sample_file,
+                vcf_file=annotateGeneLevelVCF.annotated_vcf,
+                docker=variant_interpretation_docker,
+                runtime_attr_override=runtime_attr_subset_vcfs_sv
+        }
+        call filterVCF {
+            input:
+            vcf_file=subsetVCFSamplesSVs.vcf_subset,
+            ped_uri=ped_uri,
+            genome_build=genome_build,
+            hail_docker=hail_docker,
+            helper_functions_script=helper_functions_script,
+            filter_clinical_sv_script=filter_clinical_sv_script,
+            runtime_attr_override=runtime_attr_filter_vcf
+        }
     }
 
+    call helpers.mergeResultsPython as mergeFilteredSVs {
+        input:
+            tsvs=filterVCF.sv_merged_clinical_tsv,
+            hail_docker=hail_docker,
+            input_size=size(filterVCF.sv_merged_clinical_tsv, 'GB'),
+            merged_filename="~{cohort_prefix}_merged_filtered_clinical_SVs.tsv.gz",
+            runtime_attr_override=runtime_attr_merge_results
+    }
+
+    if (output_excel) {
+        call helpers.ConvertTSVtoExcel as ConvertTSVtoExcel {
+            input:
+                tsv=mergeFilteredSVs.merged_tsv,
+                hail_docker=hail_docker
+        }
+    }
     output {
         # File sv_pathogenic_tsv = filterVCF.sv_pathogenic_tsv
         # File sv_genomic_disorders_tsv = filterVCF.sv_genomic_disorders_tsv
         # File sv_large_regions_tsv = filterVCF.sv_large_regions_tsv
         # File sv_dominant_tsv = filterVCF.sv_dominant_tsv
         # File sv_recessive_tsv = filterVCF.sv_recessive_tsv
-        File sv_merged_clinical_tsv = filterVCF.sv_merged_clinical_tsv
+        ## OLD: BEFORE SPLITTING FAMILIES AND MERGING
+        # File sv_merged_clinical_tsv = filterVCF.sv_merged_clinical_tsv
+        File sv_merged_clinical_tsv = mergeFilteredSVs.merged_tsv
+        File sv_merged_clinical_excel = select_first([ConvertTSVtoExcel.output_excel, mergeFilteredSVs.merged_tsv])
         File sv_flagged_vcf = annotateGeneLevelVCF.annotated_vcf
         File sv_flagged_vcf_idx = annotateGeneLevelVCF.annotated_vcf_idx
     }
@@ -383,6 +433,7 @@ task annotateGeneLevelVCF {
         File prec_uri
         File hi_uri
         File ts_uri
+        File ped_uri
 
         Array[String] permissive_csq_fields
         Array[String] restrictive_csq_fields
@@ -393,6 +444,9 @@ task annotateGeneLevelVCF {
         Float gnomad_af_dom_threshold
         Float gnomad_af_rec_threshold
         Float gnomad_popmax_af_threshold
+        Int rec_n_cohort_hom_var_threshold
+        Int dom_ac_threshold
+        Int dom_ac_unaffected_threshold
 
         String gnomad_af_field
         String genome_build
@@ -438,10 +492,11 @@ task annotateGeneLevelVCF {
     python3 annotate_vcf.py -i ~{vcf_file} -o ~{output_filename} -l ~{gene_list_tsv} -s ~{size_threshold} \
         --inheritance ~{inheritance_uri} --cores ~{cpu_cores} --mem ~{memory} --build ~{genome_build} \
         --permissive-csq-fields ~{sep=',' permissive_csq_fields} --restrictive-csq-fields ~{sep=',' restrictive_csq_fields} \
-        --constrained-uri ~{constrained_uri} --prec-uri ~{prec_uri} --hi-uri ~{hi_uri} --ts-uri ~{ts_uri} \
+        --constrained-uri ~{constrained_uri} --prec-uri ~{prec_uri} --hi-uri ~{hi_uri} --ts-uri ~{ts_uri} --ped ~{ped_uri} \
         --dom-af ~{dom_af_threshold} --rec-af ~{rec_af_threshold} \
         --gnomad-dom-af ~{gnomad_af_dom_threshold} --gnomad-rec-af ~{gnomad_af_rec_threshold} \
-        --gnomad-af-field ~{gnomad_af_field} --gnomad-popmax-af ~{gnomad_popmax_af_threshold}
+        --gnomad-af-field ~{gnomad_af_field} --gnomad-popmax-af ~{gnomad_popmax_af_threshold} \
+        --rec-n-hom-var ~{rec_n_cohort_hom_var_threshold} --dom-ac ~{dom_ac_threshold} --dom-ac-unaffected ~{dom_ac_unaffected_threshold}
     >>>
 
     output {

@@ -19,10 +19,24 @@
 - get affected/unaffected counts at family-level
 2/20/2025:
 - rewrote variant_category annotation because using append was messing things up in Hail
+5/29/2025:
+- annotate family unaffected/affected AC
+- move affected/unaffected fields out of INFO
+6/2/2025:
+- only consider restrictive genes for dominant and recessive inheritance_code filtering
+7/14/2025:
+- restrict large regions to not BND or CPX, impacts a gene from restrictive fields
+- restrict large_region only outputs to private to a family
+- new 'genic' category for any restrictive fields' genes that are in a gene list
+9/2/2025:
+- use dominant_freq filter for 'genic' category
+9/3/2025:
+- use dominant_freq filter for 'P/LP' and 'large_region' categories
+- require 1/1 for recessives
 '''
 ###
 
-from clinical_helper_functions import remove_parent_probands_trio_matrix
+from clinical_helper_functions import remove_parent_probands_trio_matrix, get_transmission
 import datetime
 import pandas as pd
 import hail as hl
@@ -46,13 +60,14 @@ cores = args.cores  # string
 mem = int(np.floor(float(args.mem)))
 genome_build = args.build
 
-def get_transmission(phased_tm):
-    phased_tm = phased_tm.annotate_entries(transmission=hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|0'), 'uninherited',
-            hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('0|1'), 'inherited_from_mother',
-                        hl.if_else(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|0'), 'inherited_from_father',
-                                hl.or_missing(phased_tm.proband_entry.PBT_GT==hl.parse_call('1|1'), 'inherited_from_both'))))
-    )
-    return phased_tm
+hl.init(min_block_size=128, 
+        local=f"local[*]", 
+        spark_conf={
+                    "spark.driver.memory": f"{int(np.floor(mem*0.8))}g",
+                    "spark.speculation": 'true'
+                    }, 
+        tmp_dir="tmp", local_tmpdir="tmp",
+                    )
 
 def filter_and_annotate_tm(tm, variant_category=None, filter_type='trio'):
     '''
@@ -83,14 +98,6 @@ tmp_ped.to_csv(cropped_ped_uri, sep='\t', index=False)
 ped_ht = hl.import_table(cropped_ped_uri, delimiter='\t').key_by('sample_id')
 sv_mt = sv_mt.annotate_cols(phenotype=ped_ht[sv_mt.s].phenotype)
 
-# Get cohort unaffected/affected het and homvar counts
-sv_mt = sv_mt.annotate_rows(**{
-    "n_cohort_het_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_het())),
-    "n_cohort_hom_var_unaffected": hl.agg.filter(sv_mt.phenotype=='1', hl.agg.sum(sv_mt.GT.is_hom_var())),
-    "n_cohort_het_affected": hl.agg.filter(sv_mt.phenotype=='2', hl.agg.sum(sv_mt.GT.is_het())),
-    "n_cohort_hom_var_affected": hl.agg.filter(sv_mt.phenotype=='2', hl.agg.sum(sv_mt.GT.is_hom_var()))
-})
-
 # Phasing
 pedigree = hl.Pedigree.read(cropped_ped_uri, delimiter='\t')
 
@@ -101,6 +108,12 @@ grouped_fam_sv_mt = fam_sv_mt.group_cols_by(fam_sv_mt.family_id).aggregate(**{
     "n_family_hom_var_unaffected": hl.agg.filter(fam_sv_mt.phenotype=='1', hl.agg.sum(fam_sv_mt.GT.is_hom_var())),
     "n_family_het_affected": hl.agg.filter(fam_sv_mt.phenotype=='2', hl.agg.sum(fam_sv_mt.GT.is_het())),
     "n_family_hom_var_affected": hl.agg.filter(fam_sv_mt.phenotype=='2', hl.agg.sum(fam_sv_mt.GT.is_hom_var()))
+})
+
+# NEW 5/29/2025: Annotate family unaffected/affected AC  
+grouped_fam_sv_mt = grouped_fam_sv_mt.annotate_entries(**{
+    "family_AC_unaffected": grouped_fam_sv_mt.n_family_het_unaffected + 2*grouped_fam_sv_mt.n_family_hom_var_unaffected,
+    "family_AC_affected": grouped_fam_sv_mt.n_family_het_affected + 2*grouped_fam_sv_mt.n_family_hom_var_affected
 })
 
 sv_tm = hl.trio_matrix(sv_mt, pedigree, complete_trios=False)
@@ -128,11 +141,14 @@ phased_sv_tm = phased_sv_tm.annotate_cols(
     father=phased_sv_tm.father.annotate(
             phenotype=ped_ht[phased_sv_tm.father.s].phenotype))
 
-cohort_affected_cols = ["n_cohort_het_unaffected", "n_cohort_hom_var_unaffected", "n_cohort_het_affected", "n_cohort_hom_var_affected"]
-phased_sv_tm = phased_sv_tm.annotate_rows(**{col: sv_mt.rows()[phased_sv_tm.row_key][col] 
-                                             for col in cohort_affected_cols})
+# NEW 5/29/2025: Move affected/unaffected fields out of INFO
+cohort_affected_cols = [field for field in list(sv_mt.info) if '_affected' in field or '_unaffected' in field]
+sv_mt = sv_mt.annotate_rows(**{field: sv_mt.info[field] for field in cohort_affected_cols})
 
-family_affected_cols = ["n_family_het_unaffected", "n_family_hom_var_unaffected", "n_family_het_affected", "n_family_hom_var_affected"]
+phased_sv_tm = phased_sv_tm.annotate_rows(**{col: sv_mt.rows()[phased_sv_tm.row_key][col] 
+                                             for col in cohort_affected_cols}  | 
+                                            {'info': phased_sv_tm.info.drop(*cohort_affected_cols)})
+family_affected_cols = [field for field in list(grouped_fam_sv_mt.entry) if '_affected' in field or '_unaffected' in field]
 phased_sv_tm = phased_sv_tm.annotate_entries(**{col: grouped_fam_sv_mt[phased_sv_tm.row_key, phased_sv_tm.fam_id][col]
                                              for col in family_affected_cols})
 
@@ -164,13 +180,18 @@ phased_sv_tm = phased_sv_tm.annotate_entries(dominant_gt=((dom_trio_criteria) | 
 
 # NEW 2/19/2025: Annotate categories for merged output, instead of filtering
 # NEW 2/20/2025: Rewrote variant_category annotation because using append was messing things up in Hail?
+# NEW 5/29/2025: Added PREDICTED_LOF only criterion for P/LP output
+# NEW 9/2/2025: use dominant_freq filter for 'genic' category
+# NEW 9/3/2025: use dominant_freq filter for 'P/LP' and 'large_region' categories
 size_field = [x for x in list(sv_mt.info) if 'passes_SVLEN_filter_' in x][0]
 phased_sv_tm = phased_sv_tm.annotate_rows(
     variant_category = hl.array([
         # Category 1: Pathogenic only (P/LP)
         hl.if_else(
-            (hl.any(lambda x: x.matches('athogenic'), phased_sv_tm.info.clinical_interpretation)) |  # ClinVar P/LP
-            (hl.is_defined(phased_sv_tm.info.dbvar_pathogenic)),  # dbVar Pathogenic 
+            ((hl.any(lambda x: x.matches('athogenic'), phased_sv_tm.info.clinical_interpretation)) |  # ClinVar P/LP
+            (hl.is_defined(phased_sv_tm.info.dbvar_pathogenic))) &  # dbVar Pathogenic 
+            (phased_sv_tm.info.PREDICTED_LOF.size()!=0) &  # PREDICTED_LOF only
+            (phased_sv_tm.info.dominant_freq),
             'P/LP', 
             hl.missing(hl.tstr)
         ),
@@ -183,30 +204,83 @@ phased_sv_tm = phased_sv_tm.annotate_rows(
         ),
         
         # Category 3: Large regions (passes_SVLEN_filter)
+        # NEW 7/14/2025: restrict large regions to not BND or CPX, impacts a gene from restrictive fields
         hl.if_else(
-            phased_sv_tm.info[size_field], 
+            (phased_sv_tm.info[size_field]) &
+            (~hl.array(['BND','CPX']).contains(phased_sv_tm.info.SVTYPE)) &
+            (phased_sv_tm.info.restrictive_csq_genes.size()>0) &
+            (phased_sv_tm.info.dominant_freq), 
             'large_region', 
             hl.missing(hl.tstr)
         ),
         
         # Category 4: OMIM AD and XLD (dominant_freq)
         hl.if_else(
-            (hl.any(lambda x: x.matches('1') | x.matches('3'), phased_sv_tm.info.inheritance_code)) & (phased_sv_tm.info.dominant_freq),
+            (hl.any(lambda x: x.matches('1') | x.matches('3'), phased_sv_tm.info.restrictive_inheritance_code)) & (phased_sv_tm.info.dominant_freq),
             'dominant', 
             hl.missing(hl.tstr)
         ),
         
         # Category 5: OMIM AR and XLR (recessive_freq)
         hl.if_else(
-            (hl.any(lambda x: x.matches('2') | x.matches('4'), phased_sv_tm.info.inheritance_code)) & (phased_sv_tm.info.recessive_freq),
+            (hl.any(lambda x: x.matches('2') | x.matches('4'), phased_sv_tm.info.restrictive_inheritance_code)) & 
+            (phased_sv_tm.info.recessive_freq),
             'recessive', 
             hl.missing(hl.tstr)
         ),
-    ]).filter(lambda x: hl.is_defined(x))  # Filter out null values
+
+        # Category 6: Genic
+        # NEW 7/14/2025: new 'genic' category for any restrictive fields' genes that are in a gene list
+        hl.if_else(
+            (phased_sv_tm.info.restrictive_gene_list.filter(hl.is_defined).size()>0) & (phased_sv_tm.info.dominant_freq),
+            'genic', 
+            hl.missing(hl.tstr)
+        )
+    ]).filter(hl.is_defined)  # Filter out null values
+)
+
+# NEW 7/14/2025: restrict large_region-only outputs to private to a family
+phased_sv_tm = phased_sv_tm.filter_entries(
+    (
+        # large_region-only variants that are private to a family
+        (
+            (phased_sv_tm.variant_category.size() == 1) &
+            (phased_sv_tm.variant_category[0] == 'large_region')
+        ) &
+        (
+            (phased_sv_tm.n_cohort_het_unaffected == phased_sv_tm.n_family_het_unaffected) &
+            (phased_sv_tm.n_cohort_hom_var_unaffected == phased_sv_tm.n_family_hom_var_unaffected) &
+            (phased_sv_tm.n_cohort_het_affected == phased_sv_tm.n_family_het_affected) &
+            (phased_sv_tm.n_cohort_hom_var_affected == phased_sv_tm.n_family_hom_var_affected)
+        )
+    ) |
+    # variants that are not exclusively large_region
+    (
+        hl.set(['large_region']).intersection(hl.set(phased_sv_tm.variant_category)).size() <
+        hl.set(phased_sv_tm.variant_category).size()
+    )
+)
+
+# NEW 9/3/2025: require 1/1 for recessives
+phased_sv_tm = phased_sv_tm.filter_entries(
+    (
+        # recessive-only variants
+        (
+            (phased_sv_tm.variant_category.size() == 1) &
+            (phased_sv_tm.variant_category[0] == 'recessive')
+        ) &
+        (phased_sv_tm.proband_entry.GT.is_hom_var())
+    ) |
+    # variants that are not exclusively recessive
+    (
+        hl.set(['recessive']).intersection(hl.set(phased_sv_tm.variant_category)).size() <
+        hl.set(phased_sv_tm.variant_category).size()
+    )
 )
 
 merged_output_tm = phased_sv_tm.filter_rows(phased_sv_tm.variant_category.size()>0)
 merged_output_tm = filter_and_annotate_tm(merged_output_tm)
 
 # export merged TSV
-merged_output_tm.entries().flatten().export(os.path.basename(sv_vcf).split('.vcf')[0] + '_merged_variants.tsv.gz', delimiter='\t')
+prefix = os.path.basename(sv_vcf).split('.vcf')[0] + '_merged_variants'
+merged_output_tm.entries().flatten().export(f"{prefix}.tsv.gz", delimiter='\t')

@@ -1,7 +1,7 @@
 version 1.0
 
-import "mergeVCFs.wdl" as mergeVCFs
-import "helpers.wdl" as helpers
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/mergeVCFs.wdl" as mergeVCFs
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/helpers.wdl" as helpers
 import "filterClinicalVariantsTasks_v0.1.wdl" as filterClinicalVariants
 
 struct RuntimeAttr {
@@ -25,8 +25,8 @@ workflow filterClinicalCompHets {
 
         Int ad_alt_threshold=3
 
-        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_clinical_helper_functions.py"
-        String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_v0.1.py"
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_clinical_helper_functions.py"
+        String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_comphets_xlr_hom_var_v0.1.py"
 
         String hail_docker
         String sv_base_mini_docker
@@ -101,6 +101,7 @@ workflow filterClinicalCompHets {
                 clinvar_vcf=select_first([subsetVCFSamplesSNVIndelsClinVar.vcf_subset, 'NA']),
                 sv_vcf=select_first([subsetVCFSamplesSVs.vcf_subset, 'NA']),
                 ped_uri=select_first([addSVSamplesToPed.output_ped, ped_uri]),
+                prefix=cohort_prefix,
                 helper_functions_script=helper_functions_script,
                 filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
                 genome_build=genome_build,

@@ -1,8 +1,8 @@
 version 1.0
 
-import "mergeVCFs.wdl" as mergeVCFs
-import "mergeVCFSamples.wdl" as mergeVCFSamples
-import "helpers.wdl" as helpers
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/mergeVCFs.wdl" as mergeVCFs
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/helpers.wdl" as helpers
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/mergeVCFSamples.wdl" as mergeVCFSamples
 import "filterClinicalVariantsTasks_v0.1.wdl" as filterClinicalVariants
 
 struct RuntimeAttr {
@@ -31,13 +31,13 @@ workflow filterClinicalVariants {
         String predicted_sex_chrom_ploidy  # XX or XY, NIFS-specific
         Float xgenotyping_nomat_fetal_fraction_estimate  # NIFS-specific
 
-        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_NIFS_v0.1.py"
-        String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_NIFS_v0.1.py"
-        String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py"
-        String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/tier_clinical_variants_NIFS.py"
-        String add_phenotypes_merge_and_prettify_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/add_phenotypes_merge_and_prettify_clinical_variants_NIFS.py"
-        String flag_from_confirmation_maternal_vcf_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/flag_clinical_variants_from_confirmation_maternal_NIFS.py"
-        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_clinical_helper_functions.py"
+        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_variants_final_v0.1.py"
+        String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_clinical_variants_inheritance_final_v0.1.py"
+        String filter_comphets_xlr_hom_var_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_filter_comphets_xlr_hom_var_NIFS_v0.1.py"
+        String filter_final_tiers_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/tier_clinical_variants_NIFS.py"
+        String add_phenotypes_merge_and_prettify_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/add_phenotypes_merge_and_prettify_clinical_variants.py"
+        String flag_from_confirmation_maternal_vcf_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/flag_clinical_variants_from_confirmation_maternal_NIFS.py"
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_small_variants_test_CLNSIGCONF/scripts/hail_clinical_helper_functions.py"
 
         String hail_docker
         String sv_base_mini_docker
@@ -45,15 +45,15 @@ workflow filterClinicalVariants {
         Int ad_alt_threshold=3
         Float spliceAI_threshold=0.8
         Float af_threshold=0.1
+        Float clinvar_conf_af_threshold=0.05
         Int ac_threshold=10  
         Int ac_rec_threshold=10  
         Int ac_dom_threshold=3  
         Float af_rec_threshold=0.05  
-        Float af_dom_threshold=0.05  
+        Float af_dom_threshold=0.01  
 
         Float gnomad_af_threshold=0.05
-        Float am_rec_threshold=0.56
-        Float am_dom_threshold=0.56
+        Float am_threshold=0.56
         Float mpc_rec_threshold=2
         Float mpc_dom_threshold=2
         Float gnomad_af_rec_threshold=0.001
@@ -68,33 +68,38 @@ workflow filterClinicalVariants {
         String genome_build='GRCh38'
 
         Boolean pass_filter=false
-        Boolean include_not_genCC_OMIM=false  # NIFS-specific
+        Boolean include_not_in_genelists=false  # NIFS-specific
         Boolean include_all_maternal_carrier_variants=false
 
-        File gene_phenotype_map  # NIFS-specific for now (2/27/2025)
+        File omim_uri  # All OMIM genes
+        File gene_phenotype_map
         File carrier_gene_list  # NIFS-specific, TODO: not actually NIFS-specific anymore?
         File sample_hpo_uri  # NIFS-specific
         File gene_hpo_uri  # NIFS-specific
         File hpo_id_to_name_uri  # NIFS-specific
+        File pli_uri
         String hpo_id_col = 'Anomalies with HPO codes (Screening)'
         String phenotype_col = 'Anomalies on PG03 at Eligibility Screening'
         String rec_gene_list_tsv='NA'  # for filtering by gene list(s), tab-separated "gene_list_name"\t"gene_list_uri"
         String dom_gene_list_tsv='NA'
 
         # ALL NIFS-specific, for addPhenotypesMergeAndPrettifyOutputs task
-        Array[String] dup_exclude_cols=['info.CSQ','Tier','variant_source']  # DEPRECATED 4/1/2025, TODO: REMOVE
         Array[String] cols_for_varkey=['locus','alleles','id','vep.transcript_consequences.SYMBOL','vep.transcript_consequences.Feature','vep.transcript_consequences.Consequence','vep.transcript_consequences.HGVSc']
-        Array[String] float_cols=['vep.transcript_consequences.cDNA_position', 'vep.transcript_consequences.CDS_position', 'vep.transcript_consequences.Protein_position']  # DEPRECATED 4/1/2025, TODO: REMOVE
-        Array[String] priority_cols=['fam_id', 'is_female', 'Fetal_Fraction', 'Case_Pheno',
-                        'locus', 'alleles', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
-                        'Pheno_Overlapping_HPO_IDs', 'disease_title_recessive', 'disease_title_dominant',
-                        'CLNSIG', 'CLNREVSTAT', 'SYMBOL', 'HGVSc', 'HGVSp', 'IMPACT', 'Consequence', 'EXON',  
-                        'CANONICAL', 'MANE_PLUS_CLINICAL', 'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 
-                        'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'INTRON', 'comphet_ID',
+        Array[String] priority_cols=['fam_id', 'sex', 'Fetal_Fraction', 'Case_Pheno',
+                        'ID', 'Tier', 'inheritance_mode', 'HGVSc_symbol',
+                        'Pheno_Overlapping_HPO_IDs', 
+                        'disease_title_dominant', 'disease_title_recessive','classification_title',
+                        'CLNSIG', 'CLNSIGCONF', 'CLNREVSTAT', 'CLNGENE', 'OMIM_Gene', 'gene_list_status',
+                        'SYMBOL', 'HGVSc', 'HGVSp', 
+                        'IMPACT', 'Consequence', 'EXON', 'INTRON', 'CANONICAL_OR_MANE_PLUS_CLINICAL', 
+                        'AD_ref,AD_alt', 'proband_entry.GT', 'mother_entry.GT', 'comphet_ID',
+                        'AlphaMissense', 'REVEL', 'MPC', 'spliceAI_score', 'lof.pLI', 
                         'gene_list', 'cohort_AC', 'cohort_AF', 'cohort_AN', 'gnomad_popmax_af', 'GAF',
                         'maternal_carrier', 'filters']
         # Rename columns in prettify step, after removing 'vep.transcript_consequences.' and 'info.' prefixes
-        Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense'}
+        Map[String, String] cols_to_rename={'proband_entry.AD': 'AD_ref,AD_alt', 'am_pathogenicity': 'AlphaMissense', 'GENEINFO': 'CLNGENE'}
+        Array[String] static_cols = ['fam_id','id','Fetal_Fraction','sex','Case_Pheno']
+        Array[String] static_cols_to_combine = ['fam_id', 'sex', 'Fetal_Fraction']  # will be '/'-separated in output
 
         RuntimeAttr? runtime_attr_filter
         RuntimeAttr? runtime_attr_filter_inheritance
@@ -121,6 +126,7 @@ workflow filterClinicalVariants {
         filter_clinical_variants_snv_indel_script=filter_clinical_variants_snv_indel_script,
         hail_docker=hail_docker,
         af_threshold=af_threshold,
+        clinvar_conf_af_threshold=clinvar_conf_af_threshold,
         ac_threshold=ac_threshold,
         gnomad_af_threshold=gnomad_af_threshold,
         genome_build=genome_build,
@@ -144,8 +150,7 @@ workflow filterClinicalVariants {
         ac_dom_threshold=ac_dom_threshold,
         af_dom_threshold=af_dom_threshold,
         ad_alt_threshold=ad_alt_threshold,
-        am_rec_threshold=am_rec_threshold,
-        am_dom_threshold=am_dom_threshold,
+        am_threshold=am_threshold,
         mpc_rec_threshold=mpc_rec_threshold,
         mpc_dom_threshold=mpc_dom_threshold,
         gnomad_af_rec_threshold=gnomad_af_rec_threshold,
@@ -153,7 +158,7 @@ workflow filterClinicalVariants {
         loeuf_v2_threshold=loeuf_v2_threshold,
         loeuf_v4_threshold=loeuf_v4_threshold,
         genome_build=genome_build,
-        include_not_genCC_OMIM=include_not_genCC_OMIM,
+        include_not_in_genelists=include_not_in_genelists,
         rec_gene_list_tsv=rec_gene_list_tsv,
         dom_gene_list_tsv=dom_gene_list_tsv,
         runtime_attr_override=runtime_attr_filter_inheritance
@@ -175,7 +180,7 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_comphets
     }
 
-    call splitByInheritance as splitClinVarByInheritance {
+    call filterClinicalVariants.splitByInheritance as splitClinVarByInheritance {
         input:
             input_tsv=runClinicalFiltering.clinvar_tsv,
             hail_docker=hail_docker,
@@ -267,7 +272,7 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_filter_tiers
     }
 
-    call addPhenotypesMergeAndPrettifyOutputs {
+    call filterClinicalVariants.addPhenotypesMergeAndPrettifyOutputs as addPhenotypesMergeAndPrettifyOutputs {
         input:
             input_uris=[finalFilteringTiersCompHet.filtered_tsv,  # ORDER MATTERS (CompHet output first)
                 finalFilteringTiersRecessive.filtered_tsv,
@@ -277,9 +282,7 @@ workflow filterClinicalVariants {
                 finalFilteringTiersClinVarOther.filtered_tsv,
                 finalFilteringTiersInheritanceOther.filtered_tsv],
             gene_phenotype_map=gene_phenotype_map,
-            dup_exclude_cols=dup_exclude_cols,
             cols_for_varkey=cols_for_varkey,
-            float_cols=float_cols,
             priority_cols=priority_cols,
             cols_to_rename=cols_to_rename,
             add_phenotypes_merge_and_prettify_script=add_phenotypes_merge_and_prettify_script,
@@ -288,6 +291,8 @@ workflow filterClinicalVariants {
             xgenotyping_nomat_fetal_fraction_estimate=xgenotyping_nomat_fetal_fraction_estimate,
             sample_hpo_uri=sample_hpo_uri,
             gene_hpo_uri=gene_hpo_uri,
+            pli_uri=pli_uri,
+            omim_uri=omim_uri,
             hpo_id_to_name_uri=hpo_id_to_name_uri,
             hpo_id_col=hpo_id_col,
             phenotype_col=phenotype_col,
@@ -304,7 +309,10 @@ workflow filterClinicalVariants {
             maternal_sample_id=select_first([maternal_sample_id, 'NA']),
             hail_docker=hail_docker,
             genome_build=genome_build,
+            helper_functions_script=helper_functions_script,
             flag_from_confirmation_maternal_vcf_script=flag_from_confirmation_maternal_vcf_script,
+            static_cols=static_cols,
+            static_cols_to_combine=static_cols_to_combine,
             runtime_attr_override=runtime_attr_flag_conf_mat_gt
     }
 
@@ -318,6 +326,7 @@ workflow filterClinicalVariants {
         File dominant_tsv = runClinicalFilteringInheritance.dominant_tsv
         File comphet_xlr_hom_var_mat_carrier_tsv = filterCompHetsXLRHomVar.comphet_xlr_hom_var_mat_carrier_tsv
 
+        # After tiering
         File final_recessive_tsv = finalFilteringTiersRecessive.filtered_tsv  # NEW 2/25/2025
         File final_dominant_tsv = finalFilteringTiersDominant.filtered_tsv  # NEW 2/10/2025
         File final_comphet_xlr_hom_var_mat_carrier_tsv = finalFilteringTiersCompHet.filtered_tsv  # NEW 2/10/2025
@@ -440,94 +449,6 @@ task makeDummyPed {
     }
 }
 
-task splitByInheritance {
-    input {
-        File input_tsv
-
-        String inheritance_code_col
-        String hail_docker
-        
-        RuntimeAttr? runtime_attr_override
-    }
-    Float input_size = size(input_tsv, 'GB')
-    Float base_disk_gb = 10.0
-    Float input_disk_scale = 5.0
-
-    RuntimeAttr runtime_default = object {
-        mem_gb: 4,
-        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
-        cpu_cores: 1,
-        preemptible_tries: 3,
-        max_retries: 1,
-        boot_disk_gb: 10
-    }
-
-    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
-
-    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
-    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
-    
-    runtime {
-        memory: "~{memory} GB"
-        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
-        cpu: cpu_cores
-        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
-        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
-        docker: hail_docker
-        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
-    }
-
-    String file_ext = if sub(basename(input_tsv), '.tsv.gz', '')!=basename(input_tsv) then '.tsv.gz' else '.tsv'
-
-    command <<<
-    set -eou pipefail
-    cat <<EOF > split_by_inheritance.py
-    import datetime
-    import pandas as pd
-    import numpy as np
-    import sys
-    import ast
-    import os
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Parse arguments')
-    parser.add_argument('-i', dest='input_uri', help='Input TSV')
-    parser.add_argument('-c', dest='inheritance_code_col', help='Column containing the (numeric) inheritance code (e.g. vep.transcript_consequences.inheritance_code)')
-    parser.add_argument('--file-ext', dest='file_ext', help='File extension (.tsv or .tsv.gz)')
-
-    args = parser.parse_args()
-    input_uri = args.input_uri
-    inheritance_code_col = args.inheritance_code_col
-    file_ext = args.file_ext
-
-    df = pd.read_csv(input_uri, sep='\t')
-
-    rec_df = df[(df[inheritance_code_col].astype(str).str.contains('2')) | 
-                (df[inheritance_code_col].astype(str).str.contains('4'))]
-    dom_df = df[(df[inheritance_code_col].astype(str).str.contains('1')) | 
-                (df[inheritance_code_col].astype(str).str.contains('3'))]
-    other_df = df[(df[inheritance_code_col].astype(str).str.contains('5')) | 
-                (df[inheritance_code_col].astype(str).str.contains('6'))]
-
-    rec_df.loc[:, 'variant_category'] = rec_df['variant_category'] + '_recessive'
-    dom_df.loc[:, 'variant_category'] = dom_df['variant_category'] + '_dominant'
-    other_df.loc[:, 'variant_category'] = other_df['variant_category'] + '_other'
-
-    rec_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.recessive.tsv', sep='\t', index=False)
-    dom_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.dominant.tsv', sep='\t', index=False)
-    other_df.to_csv(os.path.basename(input_uri).split(file_ext)[0] + '.other.tsv', sep='\t', index=False)
-    EOF
-    
-    python3 split_by_inheritance.py -i ~{input_tsv} -c ~{inheritance_code_col} --file-ext ~{file_ext}
-    >>>
-
-    output {
-        File recessive_tsv = basename(input_tsv, file_ext) + '.recessive.tsv'
-        File dominant_tsv = basename(input_tsv, file_ext) + '.dominant.tsv'
-        File other_tsv = basename(input_tsv, file_ext) + '.other.tsv'
-    }
-}
-
 task finalFilteringTiers {
     input {
         File input_tsv
@@ -582,76 +503,7 @@ task finalFilteringTiers {
     >>>
 
     output {
-        File filtered_tsv = prefix + '_tiers.tsv'
-    }
-}
-
-task addPhenotypesMergeAndPrettifyOutputs {
-    input {
-        Array[File] input_uris
-        File gene_phenotype_map  # From GenCC, expects TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns
-        File sample_hpo_uri  # Maps samples to HPO IDs and phenotypes
-        File gene_hpo_uri  # Maps genes to HPO IDs
-        File hpo_id_to_name_uri  # Maps HPO IDs to HPO names
-
-        Array[String] dup_exclude_cols  # Columns to exclude when calculating duplicate rows to drop
-        Array[String] cols_for_varkey  # Columns to use to create unique string for each row
-        Array[String] float_cols  # Columns to convert from float to int to str for uniform formatting across inputs
-        Array[String] priority_cols  # Columns to prioritize/put at front of output
-        Map[String, String] cols_to_rename  # Columns to rename after removing 'vep.transcript_consequences.' and 'info.' prefixes
-        String prefix
-        String sample_id
-        String hpo_id_col
-        String phenotype_col
-        Float xgenotyping_nomat_fetal_fraction_estimate
-
-        String add_phenotypes_merge_and_prettify_script
-        String hail_docker
-
-        RuntimeAttr? runtime_attr_override
-    }
-    Float input_size = size(input_uris, 'GB')
-    Float base_disk_gb = 10.0
-    Float input_disk_scale = 5.0
-
-    RuntimeAttr runtime_default = object {
-        mem_gb: 4,
-        disk_gb: ceil(base_disk_gb + input_size * input_disk_scale),
-        cpu_cores: 1,
-        preemptible_tries: 3,
-        max_retries: 1,
-        boot_disk_gb: 10
-    }
-
-    RuntimeAttr runtime_override = select_first([runtime_attr_override, runtime_default])
-
-    Float memory = select_first([runtime_override.mem_gb, runtime_default.mem_gb])
-    Int cpu_cores = select_first([runtime_override.cpu_cores, runtime_default.cpu_cores])
-    
-    runtime {
-        memory: "~{memory} GB"
-        disks: "local-disk ~{select_first([runtime_override.disk_gb, runtime_default.disk_gb])} HDD"
-        cpu: cpu_cores
-        preemptible: select_first([runtime_override.preemptible_tries, runtime_default.preemptible_tries])
-        maxRetries: select_first([runtime_override.max_retries, runtime_default.max_retries])
-        docker: hail_docker
-        bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
-    }
-    command <<<
-    set -eou pipefail
-    curl ~{add_phenotypes_merge_and_prettify_script} > add_phenotypes_merge_and_prettify.py
-
-    python3 add_phenotypes_merge_and_prettify.py -i ~{sep="," input_uris} -p ~{prefix} -g ~{gene_phenotype_map} \
-        -s ~{sample_id} --ff-estimate ~{xgenotyping_nomat_fetal_fraction_estimate} \
-        --sample-hpo-uri ~{sample_hpo_uri} --gene-hpo-uri ~{gene_hpo_uri} --hpo-id-to-name-uri ~{hpo_id_to_name_uri} \
-        --hpo-id-col "~{hpo_id_col}" --phenotype-col "~{phenotype_col}" \
-        --exclude-cols "~{sep=',' dup_exclude_cols}" --cols-for-varkey "~{sep=',' cols_for_varkey}" \
-        --float-cols "~{sep=',' float_cols}" --priority-cols "~{sep=';' priority_cols}" \
-        --cols-to-rename ~{write_map(cols_to_rename)}
-    >>>
-
-    output {
-        File merged_output = prefix + '.merged.clinical.variants.tsv'
+        File filtered_tsv = prefix + '_tiers.tsv.gz'
     }
 }
 
@@ -664,8 +516,12 @@ task flagFromConfirmationMaternalVCF {
         String confirmation_sample_id
         String maternal_sample_id
         String hail_docker
+        String helper_functions_script
         String flag_from_confirmation_maternal_vcf_script
         String genome_build
+
+        Array[String] static_cols
+        Array[String] static_cols_to_combine
 
         RuntimeAttr? runtime_attr_override
     }
@@ -697,17 +553,19 @@ task flagFromConfirmationMaternalVCF {
         bootDiskSizeGb: select_first([runtime_override.boot_disk_gb, runtime_default.boot_disk_gb])
     }
 
-    String prefix = basename(input_tsv, '.tsv')
+    String file_ext = if sub(basename(input_tsv), '.tsv.gz', '')!=basename(input_tsv) then '.tsv.gz' else '.tsv'
+    String prefix = basename(input_tsv, file_ext)
     command <<<
     set -eou pipefail
+    curl ~{helper_functions_script} > clinical_helper_functions.py
     curl ~{flag_from_confirmation_maternal_vcf_script} > add_GT_flags.py
     
     python3 add_GT_flags.py -i ~{input_tsv} -c ~{confirmation_vcf} -m ~{maternal_vcf} -p ~{prefix} \
-        --build ~{genome_build} --conf-id ~{confirmation_sample_id} --mat-id ~{maternal_sample_id}
+        --build ~{genome_build} --conf-id ~{confirmation_sample_id} --mat-id ~{maternal_sample_id} \
+        --static-cols ~{sep=',' static_cols} --static-cols-to-combine ~{sep=',' static_cols_to_combine}
     >>>
 
     output {
         File flagged_excel = prefix + '.conf.mat.flag.xlsx'
     }
-
 }

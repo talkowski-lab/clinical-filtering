@@ -160,7 +160,7 @@ if 'spliceAI_score' not in list(gene_phased_tm.vep.transcript_consequences):
 #             hl.set(gene_phased_tm.vep.transcript_consequences.Consequence)).size()==
 #                 hl.set(gene_phased_tm.vep.transcript_consequences.Consequence).size())
 
-# NEW 4/2/2025: 
+# NEW 4/2/2025: Match any splice variant
 has_splice_var = hl.any(lambda x: x.matches('splice'), gene_phased_tm.vep.transcript_consequences.Consequence)
 is_splice_var_only = hl.all(lambda x: x.matches('splice'), gene_phased_tm.vep.transcript_consequences.Consequence)
 

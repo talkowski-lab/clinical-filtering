@@ -1,8 +1,8 @@
 version 1.0
 
-import "mergeVCFs.wdl" as mergeVCFs
-import "mergeVCFSamples.wdl" as mergeVCFSamples
-import "helpers.wdl" as helpers
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/mergeVCFs.wdl" as mergeVCFs
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/helpers.wdl" as helpers
+import "https://raw.githubusercontent.com/talkowski-lab/preprocessing/refs/heads/eren_dev/wdl/mergeVCFSamples.wdl" as mergeVCFSamples
 import "filterClinicalVariantsSingleNIFS_v0.1.wdl" as filterClinicalVariantsSingleNIFS
 
 struct RuntimeAttr {
@@ -111,7 +111,7 @@ workflow mergeClinicalVariants {
             excel_files=final_merged_clinical_excel,
             hail_docker=hail_docker,
             input_size=size(final_merged_clinical_excel, 'GB'),
-            merged_filename="~{cohort_prefix}_merged_clinical_variants.tsv.gz",
+            merged_filename="~{cohort_prefix}merged_clinical_variants.tsv.gz",
             runtime_attr_override=runtime_attr_merge_excels
     }
 
@@ -178,7 +178,9 @@ task mergeExcelsPython {
         for i, uri in enumerate(excel_files):
             if (i+1)%100==0:
                 print(f"Loading excel {i+1}/{tot}...")
-            df = pd.read_excel(uri)
+            df = pd.read_excel(uri, sheet_name=None)
+            if type(df)==dict:
+                df = df['variant_info']  # 2nd sheet contains variants
             merged_df = pd.concat([merged_df, df])
         merged_df.to_csv(merged_filename, sep='\t', index=False)
         EOF

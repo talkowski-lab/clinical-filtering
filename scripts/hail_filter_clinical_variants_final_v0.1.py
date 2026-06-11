@@ -7,11 +7,14 @@
 '''
 4/7/2025:
 - add in_non_par annotation
+4/19/2025:
+- annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
+- filter_by_in_gene_list=False for ClinVar output
 '''
 ###
 
 from pyspark.sql import SparkSession
-from clinical_helper_functions import filter_mt, remove_parent_probands_trio_matrix, load_split_vep_consequences
+from clinical_helper_functions import filter_mt, remove_parent_probands_trio_matrix, load_split_vep_consequences, annotate_trio_matrix
 import hail as hl
 import numpy as np
 import pandas as pd
@@ -34,6 +37,7 @@ parser.add_argument('--mem', type=float, help="Memory in GB (as integer, floor c
 parser.add_argument('--ped_uri', type=str, help="URI to the PED file")
 parser.add_argument('--af_threshold', type=float, help="Allele frequency threshold")
 parser.add_argument('--ac_threshold', type=int, help="Allele count threshold")
+parser.add_argument('--clinvar_conf_af_threshold', type=float, help="Allele frequency threshold for Conflicting ClinVar variants")
 parser.add_argument('--gnomad_af_threshold', type=float, help="gnomAD allele frequency threshold")
 parser.add_argument('--build', type=str, help="Genome build (e.g., GRCh38, hg19)")
 parser.add_argument('--pass_filter', type=str, help="Whether to apply the PASS filter (True/False)")
@@ -49,6 +53,7 @@ mem = np.floor(float(args.mem))  # Ensure it's floored as a float
 ped_uri = args.ped_uri
 af_threshold = args.af_threshold
 ac_threshold = args.ac_threshold
+clinvar_conf_af_threshold = args.clinvar_conf_af_threshold
 gnomad_af_threshold = args.gnomad_af_threshold
 build = args.build
 pass_filter = ast.literal_eval(args.pass_filter.capitalize())
@@ -91,6 +96,16 @@ tm = hl.trio_matrix(mt, pedigree, complete_trios=False)
 tm = remove_parent_probands_trio_matrix(tm)  # NEW 1/31/2025: Removes redundant "trios"  
 phased_tm = hl.experimental.phase_trio_matrix_by_transmission(tm, call_field='GT', phased_call_field='PBT_GT')
 
+# Load pedigree as HT for sample annotations
+ped_ht = hl.import_table(ped_uri, delimiter='\t').key_by('sample_id')
+# NEW 4/19/2025: annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
+phased_tm = annotate_trio_matrix(phased_tm, mt, pedigree, ped_ht)
+
+# Load pedigree as HT for sample annotations
+ped_ht = hl.import_table(ped_uri, delimiter='\t').key_by('sample_id')
+# NEW 4/19/2025: annotate_trio_matrix function (includes get_mendel_errors, get_transmission)
+phased_tm = annotate_trio_matrix(phased_tm, mt, pedigree, ped_ht)
+
 # NEW 1/21/2025: NIFS-specific
 # make new row-level annotation, similar to CA, but purely based on GT
 phased_tm = phased_tm.annotate_entries(CA_from_GT=hl.if_else(
@@ -122,15 +137,20 @@ mt = mt.annotate_rows(info=phased_tm.rows()[mt.row_key].info)
 header['info']['CA_from_GT'] = {'Description': "Cluster assignment, CA, based on fetal/maternal GTs only.",
     'Number': '1', 'Type': 'Int'}
 
-# Mendel errors
-all_errors, per_fam, per_sample, per_variant = hl.mendel_errors(mt['GT'], pedigree)
-all_errors_mt = all_errors.key_by().to_matrix_table(row_key=['locus','alleles'], col_key=['s'], row_fields=['fam_id'])
-phased_tm = phased_tm.annotate_entries(mendel_code=all_errors_mt[phased_tm.row_key, phased_tm.col_key].mendel_code)
-
 # Output 1: grab ClinVar only
 # NEW 3/5/2025: Fix string matching for ClinVar P/LP output to exclude 'Conflicting'
-clinvar_mt = mt.filter_rows(hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), mt.info.CLNSIG))
-clinvar_tm = phased_tm.filter_rows(hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), phased_tm.info.CLNSIG))
+# NEW 4/5/2025: TEST including ClinVar 1*+ P/LP in CLNSIGCONF
+# NEW 7/28/2025: Add clinvar_conf_af_threshold for ClinVar 1*+ P/LP CLNSIGCONF
+clinvar_CLNSIG_P_LP_no_conflicting_mt_cond = hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), mt.info.CLNSIG)
+clinvar_CLNSIGCONF_P_LP_mt_cond = ((hl.any(lambda x: x.matches('athogenic'), mt.info.CLNSIGCONF)) &
+                                   (mt.info.cohort_AF<=clinvar_conf_af_threshold))
+clinvar_mt = mt.filter_rows(clinvar_CLNSIG_P_LP_no_conflicting_mt_cond | clinvar_CLNSIGCONF_P_LP_mt_cond)
+
+clinvar_CLNSIG_P_LP_no_conflicting_tm_cond = hl.any(lambda x: (x.matches('athogenic')) & (~x.matches('Conflicting')), phased_tm.info.CLNSIG)
+clinvar_CLNSIGCONF_P_LP_tm_cond = ((hl.any(lambda x: x.matches('athogenic'), phased_tm.info.CLNSIGCONF)) & 
+                                   (phased_tm.info.cohort_AF<=clinvar_conf_af_threshold))
+clinvar_tm = phased_tm.filter_rows(clinvar_CLNSIG_P_LP_no_conflicting_tm_cond | clinvar_CLNSIGCONF_P_LP_tm_cond)
+
 # NEW 1/9/2025: Keep 2*+ ClinVar only
 clnrevstat_one_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided','_multiple_submitters','_no_conflicts'], ['criteria_provided','_conflicting_classifications'], ['criteria_provided','_single_submitter']]
 clnrevstat_two_star_plus = [['practice_guideline'], ['reviewed_by_expert_panel'], ['criteria_provided', '_multiple_submitters', '_no_conflicts']]
@@ -144,7 +164,7 @@ clinvar_tm = clinvar_tm.filter_entries((clinvar_tm.proband_entry.GT.is_non_ref()
                                    (clinvar_tm.father_entry.GT.is_non_ref()))
 clinvar_tm = clinvar_tm.annotate_rows(variant_category='ClinVar_P/LP')
 clinvar_tm = clinvar_tm.explode_rows(clinvar_tm.vep.transcript_consequences)
-clinvar_tm = filter_mt(clinvar_tm, filter_csq=False, filter_impact=False)  # filter to CANONICAL and/or MANE_PLUS_CLINICAL
+clinvar_tm = filter_mt(clinvar_tm, filter_csq=False, filter_impact=False, filter_by_in_gene_list=False)  # filter to CANONICAL and/or MANE_PLUS_CLINICAL
 
 # NEW 1/15/2025: liberal set of maternal carrier variants
 # Output 2: grab all GenCC_OMIM variants

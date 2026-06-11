@@ -10,19 +10,36 @@ parser = argparse.ArgumentParser(description='Parse arguments')
 parser.add_argument('-i', dest='input_uris', help='Comma-separated list of all input TSVs')
 parser.add_argument('-p', dest='prefix', help='Prefix for output filename')
 parser.add_argument('-g', dest='gene_phenotype_map', help='TSV with gene_symbol, disease_title_recessive, disease_title_dominant columns')
-parser.add_argument('--exclude-cols', dest='exclude_cols', help='Columns to exclude when calculating duplicate rows to drop')
+parser.add_argument('-s', dest='sample_id', help='Sample ID')
+parser.add_argument('--exclude-cols', dest='exclude_cols', help='[DEPRECATED AS OF 4/1/2025, TODO: REMOVE] Columns to exclude when calculating duplicate rows to drop')
 parser.add_argument('--cols-for-varkey', dest='cols_for_varkey', help='Columns to use to create unique string for each row')
-parser.add_argument('--float-cols', dest='float_cols', help='Columns to convert from float to int to str for uniform formatting across inputs')
+parser.add_argument('--float-cols', dest='float_cols', help='[DEPRECATED AS OF 4/1/2025, TODO: REMOVE] Columns to convert from float to int to str for uniform formatting across inputs')
 parser.add_argument('--priority-cols', dest='priority_cols', help='Columns to prioritize/put at front of output')
+parser.add_argument('--cols-to-rename', dest='cols_to_rename', help='TSV with columns to rename after removing vep.transcript_consequences. and info. prefixes')
+parser.add_argument('--ff-estimate', dest='xgenotyping_nomat_fetal_fraction_estimate', help='Fetal fraction estimate')
+parser.add_argument('--sample-hpo-uri', dest='sample_hpo_uri', help='Path to file with HPO terms for each sample')
+parser.add_argument('--gene-hpo-uri', dest='gene_hpo_uri', help='Path to file mapping genes to HPO IDs to intersect with sample HPO IDs')
+parser.add_argument('--hpo-id-to-name-uri', dest='hpo_id_to_name_uri', help='Path to file mapping HPO IDs to HPO names')
+parser.add_argument('--hpo-id-col', dest='hpo_id_col', help='Column in sample HPO file with HPO IDs to intersect with gene HPO IDs')
+parser.add_argument('--phenotype-col', dest='phenotype_col', help='Column in sample HPO file to annotate with for Dx at screening')
 
 args = parser.parse_args()
 input_uris = args.input_uris.split(',')
 exclude_cols = args.exclude_cols.split(',')    
 cols_for_varkey = args.cols_for_varkey.split(',')
 float_cols = args.float_cols.split(',')
-priority_cols = args.priority_cols.split(',')
+priority_cols = args.priority_cols.split(';')
 prefix = args.prefix
 pheno_uri = args.gene_phenotype_map
+cols_to_rename = pd.read_csv(args.cols_to_rename, sep='\t', header=None, names=['old_name', 'new_name'])\
+    .set_index('old_name').new_name.to_dict()  # dict mapping old name to new name
+xgenotyping_nomat_fetal_fraction_estimate = float(args.xgenotyping_nomat_fetal_fraction_estimate)
+sample_id = args.sample_id
+sample_hpo_uri = args.sample_hpo_uri
+gene_hpo_uri = args.gene_hpo_uri
+hpo_id_to_name_uri = args.hpo_id_to_name_uri
+hpo_id_col = args.hpo_id_col
+phenotype_col = args.phenotype_col
 
 # Fix float formatting before merging variant_category column
 def convert_to_uniform_format(num):
@@ -32,9 +49,15 @@ def convert_to_uniform_format(num):
     if pd.isna(num):
         return num
     try:
-        return str(int(float(num)))
+        as_float = float(num)
+        as_int = int(as_float)
+        # only convert to int and then to str if it matches the original float
+        if as_int==as_float:
+            return str(as_int)  
+        else:
+            return as_float
     except Exception as e:
-        return str(num)
+        return num
 
 merged_df = pd.DataFrame()
 all_cols = []
@@ -58,7 +81,9 @@ for i, uri in enumerate(input_uris):
     df['VarKey'] = df[cols_for_varkey].astype(str).apply(':'.join, axis=1)
     # NEW 3/31/2025: run across all columns, not just select float_cols
     for col in df.columns:
-        df[col] = df[col].apply(convert_to_uniform_format)
+        # NEW 4/2/2025: skip boolean columns
+        if df[col].dtype!='bool':
+            df[col] = df[col].apply(convert_to_uniform_format)
     # NEW 3/12/2025: output_category for getting unique tiers below
     df['output_category'] = df.variant_category
     # Check if variant_category already has multiple values (e.g. CompHet/XLR/hom_var/mat_carrier output)
@@ -122,6 +147,8 @@ merged_df = merged_df.drop(['output_category','output_category_list', 'Tier_List
 col_counts = pd.Series(all_cols).value_counts()
 extra_cols = col_counts[col_counts<n_inputs_to_merge].index.tolist()
 cols_for_duplicate = list(np.setdiff1d(merged_df.columns, extra_cols+exclude_cols))
+# NEW 4/1/2025: Simplify dropping duplicates by just using select columns
+cols_for_duplicate = ['Tier', 'inheritance_mode', 'VarKey']
 merged_df = merged_df.drop_duplicates(cols_for_duplicate)
 
 # Drop duplicate columns from tiering script
@@ -135,6 +162,18 @@ merged_df = merged_df.loc[:,~merged_df.columns.duplicated()]
 
 # NEW 3/12/2025: Drop columns where all values are empty
 merged_df = merged_df.dropna(axis=1, how='all').copy()
+
+# NEW 4/2/2025: Remove all mother_entry columns that are identical to proband_entry
+mother_entry_cols = merged_df.columns[merged_df.columns.str.contains('mother_entry')]
+original_format_cols = mother_entry_cols.str.split('.').str[1]
+redundant_mother_entry_cols = []
+for format_col in original_format_cols:
+    if (merged_df[f"mother_entry.{format_col}"]==merged_df[f"proband_entry.{format_col}"]).all():
+        redundant_mother_entry_cols.append(f"mother_entry.{format_col}")
+merged_df = merged_df.drop(redundant_mother_entry_cols, axis=1)
+
+# NEW 4/2/2025: Rename columns based on cols_to_rename input
+merged_df = merged_df.rename(cols_to_rename, axis=1)
 
 # NEW 3/12/2025: Split HGVSc and HGVSp
 merged_df[['HGVSc_ENST', 'HGVSc']] = merged_df['HGVSc'].str.split(':', expand=True)
@@ -154,8 +193,30 @@ pheno_df = pd.read_csv(pheno_uri, sep='\t')
 merged_df['disease_title_recessive'] = merged_df.SYMBOL.map(pheno_df.set_index('gene_symbol').disease_title_recessive.to_dict())
 merged_df['disease_title_dominant'] = merged_df.SYMBOL.map(pheno_df.set_index('gene_symbol').disease_title_dominant.to_dict())
 
-# Add new phenotype columns to priority columns, before HGVSc_symbol
-priority_cols = priority_cols[:priority_cols.index('HGVSc_symbol')] + ['disease_title_recessive', 'disease_title_dominant'] + priority_cols[priority_cols.index('HGVSc_symbol'):]
+# NEW 4/2/2025: Add sample fetal fraction
+merged_df['Fetal_Fraction'] = xgenotyping_nomat_fetal_fraction_estimate
+
+# NEW 4/2/2025: Add sample HPO terms
+sample_hpo_df = pd.read_csv(sample_hpo_uri, sep='\t', dtype='str').set_index('Participant')
+# Check that sample is in HPO file
+if sample_id in sample_hpo_df.index:
+    merged_df['Case_Pheno'] = sample_hpo_df.loc[sample_id, phenotype_col]    
+    # NEW 4/11/2025: Add overlap between sample HPO terms and Gene HPO terms as Pheno_Overlapping_HPO_IDs column
+    gene_hpo_df = pd.read_csv(gene_hpo_uri, sep='\t')
+    hpo_id_to_name_dict = pd.read_csv(hpo_id_to_name_uri, sep='\t').set_index('hpo_id').hpo_name.to_dict()
+    # Convert hpo_ids column to list
+    gene_hpo_df['hpo_ids'] = gene_hpo_df.hpo_ids.str.split(', ')
+    sample_hpo_ids = sample_hpo_df.loc[sample_id, hpo_id_col].split(', ')
+    merged_df['Pheno_Overlapping_HPO_IDs'] = (
+        merged_df['SYMBOL']
+        .map(gene_hpo_df.set_index('gene_symbol').hpo_ids.to_dict())
+        .apply(lambda gene_hpo_ids: np.intersect1d(gene_hpo_ids, sample_hpo_ids))
+        .apply(lambda hpo_id_list: [hpo_id_to_name_dict[hpo_id] for hpo_id in hpo_id_list])
+        .apply(', '.join)
+    )
+else:
+    merged_df['Case_Pheno'] = np.nan
+    merged_df['Pheno_Overlapping_HPO_IDs'] = np.nan
 
 # Add 2 empty columns as spacers after priority columns
 merged_df = merged_df[priority_cols + remaining_cols].copy()

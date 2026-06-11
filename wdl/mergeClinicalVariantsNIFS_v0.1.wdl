@@ -111,7 +111,7 @@ workflow mergeClinicalVariants {
             excel_files=final_merged_clinical_excel,
             hail_docker=hail_docker,
             input_size=size(final_merged_clinical_excel, 'GB'),
-            merged_filename="~{cohort_prefix}merged_clinical_variants.tsv.gz",
+            merged_filename="~{cohort_prefix}_merged_clinical_variants.tsv.gz",
             runtime_attr_override=runtime_attr_merge_excels
     }
 

@@ -38,9 +38,13 @@ def convert_to_uniform_format(num):
 
 merged_df = pd.DataFrame()
 all_cols = []
+n_inputs_to_merge = 0
 
 for i, uri in enumerate(input_uris):
     df = pd.concat(pd.read_csv(uri, sep='\t', chunksize=100_000))
+    # Skip empty df
+    if df.empty:
+        continue
     # Strip quotes etc. from every column
     for col in df.columns:
         if df[col].dtype=='object':
@@ -52,7 +56,8 @@ for i, uri in enumerate(input_uris):
     
     # Make unique VarKey
     df['VarKey'] = df[cols_for_varkey].astype(str).apply(':'.join, axis=1)
-    for col in float_cols:
+    # NEW 3/31/2025: run across all columns, not just select float_cols
+    for col in df.columns:
         df[col] = df[col].apply(convert_to_uniform_format)
     # NEW 3/12/2025: output_category for getting unique tiers below
     df['output_category'] = df.variant_category
@@ -65,7 +70,11 @@ for i, uri in enumerate(input_uris):
         all_cols_minus_variant_source = [col for col in df.columns if col!='variant_source'] 
         df = df.drop_duplicates(all_cols_minus_variant_source)
 
+    # NEW 3/31/2025: convert Tier to string
+    df['Tier'] = df.Tier.astype(str)
+
     all_cols += df.columns.tolist()
+    n_inputs_to_merge += 1
     merged_df = pd.concat([merged_df, df])
 
 # Merge variant_category as comma separated string for various outputs
@@ -77,8 +86,9 @@ merged_df['Tier_List'] = merged_df.VarKey.map(merged_df.groupby('VarKey').Tier.a
 
 recessive_substrings = ['recessive', 'XLR', 'maternal_carrier', 'hom_var']
 
+# NEW 3/31/2025: add 'other' category
 def condense_output_category_and_tier(row):
-    tier_dict = {'comphet': [], 'recessive': [], 'dominant': []}
+    tier_dict = {'comphet': [], 'recessive': [], 'dominant': [], 'other': []}
     
     # Iterate through the output categories and their corresponding tiers
     for output_category, tier in zip(row.output_category_list, row.Tier_List):
@@ -88,7 +98,9 @@ def condense_output_category_and_tier(row):
             tier_dict['recessive'].append(tier)
         if 'dominant' in output_category:
             tier_dict['dominant'].append(tier)
-    
+        if 'other' in output_category:
+            tier_dict['other'].append(tier)
+
     output_categories_to_return, tiers_to_return = [], []
 
     # Sanity check that there is only one unique tier (for recessives and dominants)
@@ -106,8 +118,9 @@ merged_df[['inheritance_mode', 'Tier']] = merged_df.apply(condense_output_catego
 merged_df = merged_df.drop(['output_category','output_category_list', 'Tier_List'], axis=1).copy()
 
 # Prioritize CompHet/XLR/hom_var/mat_carrier output because extra columns
+# NEW 3/28/2025: Use n_inputs_to_merge to account for empty inputs
 col_counts = pd.Series(all_cols).value_counts()
-extra_cols = col_counts[col_counts<len(input_uris)].index.tolist()
+extra_cols = col_counts[col_counts<n_inputs_to_merge].index.tolist()
 cols_for_duplicate = list(np.setdiff1d(merged_df.columns, extra_cols+exclude_cols))
 merged_df = merged_df.drop_duplicates(cols_for_duplicate)
 

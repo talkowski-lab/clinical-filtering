@@ -21,9 +21,9 @@ workflow filterClinicalVariants {
 
         String cohort_prefix
 
-        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_clinical_helper_functions.py"       
-        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_v0.1.py"
-        String filter_clinical_variants_snv_indel_inheritance_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/ECS_MD/scripts/hail_filter_clinical_variants_inheritance_v0.1.py"
+        String helper_functions_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_clinical_helper_functions.py"       
+        String filter_clinical_variants_snv_indel_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_v0.1.py"
+        String filter_clinical_variants_snv_indel_omim_script = "https://raw.githubusercontent.com/talkowski-lab/clinical-filtering/refs/heads/main/scripts/hail_filter_clinical_variants_omim_v0.1.py"
 
         String hail_docker
         String sv_base_mini_docker
@@ -32,7 +32,10 @@ workflow filterClinicalVariants {
         Float spliceAI_threshold=0.8
         Float af_threshold=0.1
         Int ac_threshold=10
+        Int ac_rec_threshold=10  # TODO
         Int ac_dom_threshold=10
+        Float af_rec_threshold=0.001
+        Float af_dom_threshold=0.001
         Float gnomad_af_threshold=0.05
         Float am_rec_threshold=0.56
         Float am_dom_threshold=0.56
@@ -59,6 +62,7 @@ workflow filterClinicalVariants {
         RuntimeAttr? runtime_attr_merge_clinvar
         RuntimeAttr? runtime_attr_merge_inheritance_dom
         RuntimeAttr? runtime_attr_merge_inheritance_rec
+        RuntimeAttr? runtime_attr_merge_inheritance_other
         RuntimeAttr? runtime_attr_merge_mat_carriers
         # merge VCFs
         RuntimeAttr? runtime_attr_merge_inheritance_rec_vcfs
@@ -94,7 +98,10 @@ workflow filterClinicalVariants {
             filter_clinical_variants_snv_indel_inheritance_script=filter_clinical_variants_snv_indel_inheritance_script,
             hail_docker=hail_docker,
             spliceAI_threshold=spliceAI_threshold,
+            ac_rec_threshold=ac_rec_threshold,
             ac_dom_threshold=ac_dom_threshold,
+            af_rec_threshold=af_rec_threshold,
+            af_dom_threshold=af_dom_threshold,
             ad_alt_threshold=ad_alt_threshold,
             am_rec_threshold=am_rec_threshold,
             am_dom_threshold=am_dom_threshold,
@@ -121,15 +128,6 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_merge_clinvar
     }
 
-    call helpers.mergeResultsPython as mergeInheritanceDominant {
-        input:
-            tsvs=runClinicalFilteringInheritance.dominant_tsv,
-            hail_docker=hail_docker,
-            input_size=size(runClinicalFilteringInheritance.dominant_tsv, 'GB'),
-            merged_filename=cohort_prefix+'_dominant.tsv.gz',
-            runtime_attr_override=runtime_attr_merge_inheritance_dom
-    }
-
     if (include_all_maternal_carrier_variants) {
         call helpers.mergeResultsPython as mergeMaternalCarriers {
             input:
@@ -141,6 +139,16 @@ workflow filterClinicalVariants {
         }
     }
 
+    # Merge TSVs
+    call helpers.mergeResultsPython as mergeInheritanceDominant {
+        input:
+            tsvs=runClinicalFilteringInheritance.dominant_tsv,
+            hail_docker=hail_docker,
+            input_size=size(runClinicalFilteringInheritance.dominant_tsv, 'GB'),
+            merged_filename=cohort_prefix+'_dominant.tsv.gz',
+            runtime_attr_override=runtime_attr_merge_inheritance_dom
+    }
+
     call helpers.mergeResultsPython as mergeInheritanceRecessive {
         input:
             tsvs=runClinicalFilteringInheritance.recessive_tsv,
@@ -150,6 +158,16 @@ workflow filterClinicalVariants {
             runtime_attr_override=runtime_attr_merge_inheritance_rec
     }
 
+    call helpers.mergeResultsPython as mergeInheritanceOther {
+        input:
+            tsvs=runClinicalFilteringInheritance.inheritance_other_tsv,
+            hail_docker=hail_docker,
+            input_size=size(runClinicalFilteringInheritance.inheritance_other_tsv, 'GB'),
+            merged_filename=cohort_prefix+'_inheritance_other_variants.tsv.gz',
+            runtime_attr_override=runtime_attr_merge_inheritance_other
+    }
+
+    # Merge VCFs
     call mergeVCFs.mergeVCFs as mergeInheritanceRecessiveVCFs {
         input:  
             vcf_files=runClinicalFilteringInheritance.recessive_vcf,
@@ -177,5 +195,6 @@ workflow filterClinicalVariants {
         File recessive_vcf_idx = mergeInheritanceRecessiveVCFs.merged_vcf_idx
         File recessive_tsv = mergeInheritanceRecessive.merged_tsv
         File dominant_tsv = mergeInheritanceDominant.merged_tsv
+        File inheritance_other_tsv = mergeInheritanceOther.merged_tsv
     }
 }

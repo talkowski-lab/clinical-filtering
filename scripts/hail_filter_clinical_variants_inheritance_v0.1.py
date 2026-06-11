@@ -11,6 +11,9 @@
 - added remove_parent_probands_trio_matrix function --> removes redundant "trios"
 3/4/2025:
 - change OMIM_recessive/OMIM_dominant to just recessive/dominant
+4/1/2025: update to match NIFS scripts
+    3/10/2025: 
+        - cohort_AC OR cohort_AF filter
 '''
 ###
 
@@ -149,6 +152,8 @@ not_in_omim = (gene_phased_tm.vep.transcript_consequences.inheritance_code=='')
 omim_rec_code = (gene_phased_tm.vep.transcript_consequences.inheritance_code.matches('2'))
 # OMIM XLR code
 omim_xlr_code = (gene_phased_tm.vep.transcript_consequences.inheritance_code.matches('4'))
+# NEW 3/10/2025: cohort_AC OR cohort_AF filter
+passes_ac_af_rec = ((gene_phased_tm.info.cohort_AC<=ac_rec_threshold) | (gene_phased_tm.info.cohort_AF<=af_rec_threshold))
 # gnomAD AF popmax filter
 passes_gnomad_af_rec = ((gene_phased_tm.info.gnomad_popmax_af<=gnomad_af_rec_threshold) | (hl.is_missing(gene_phased_tm.info.gnomad_popmax_af)))
 # MPC filter

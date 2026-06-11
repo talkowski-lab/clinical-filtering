@@ -53,7 +53,9 @@ workflow filterClinicalVariantsSV {
         Int rec_n_cohort_hom_var_threshold=10
         Int dom_ac_threshold=3
         Int dom_ac_unaffected_threshold=5
-        String gnomad_af_field='gnomad_v4.1_sv_AF'
+        String external_af_ref_prefix='gnomad_v4.1_sv'
+
+        Array[String] external_af_populations=["ALL","AFR","AMR","EAS","EUR","MID","FIN","ASJ","RMI","SAS","AMI"]
 
         Boolean output_excel=true
 
@@ -137,7 +139,8 @@ workflow filterClinicalVariantsSV {
         gnomad_af_dom_threshold=gnomad_af_dom_threshold,
         gnomad_af_rec_threshold=gnomad_af_rec_threshold,
         gnomad_popmax_af_threshold=gnomad_popmax_af_threshold,
-        gnomad_af_field=gnomad_af_field,
+        external_af_ref_prefix=external_af_ref_prefix,
+        external_af_populations=external_af_populations,
         rec_n_cohort_hom_var_threshold=rec_n_cohort_hom_var_threshold,
         dom_ac_threshold=dom_ac_threshold,
         dom_ac_unaffected_threshold=dom_ac_unaffected_threshold,
@@ -437,6 +440,7 @@ task annotateGeneLevelVCF {
 
         Array[String] permissive_csq_fields
         Array[String] restrictive_csq_fields
+        Array[String] external_af_populations
         
         Int size_threshold
         Float dom_af_threshold
@@ -448,10 +452,11 @@ task annotateGeneLevelVCF {
         Int dom_ac_threshold
         Int dom_ac_unaffected_threshold
 
-        String gnomad_af_field
+        String external_af_ref_prefix
         String genome_build
         String hail_docker
         String annotate_sv_gene_level_script
+
         RuntimeAttr? runtime_attr_override
     }
 
@@ -495,7 +500,9 @@ task annotateGeneLevelVCF {
         --constrained-uri ~{constrained_uri} --prec-uri ~{prec_uri} --hi-uri ~{hi_uri} --ts-uri ~{ts_uri} --ped ~{ped_uri} \
         --dom-af ~{dom_af_threshold} --rec-af ~{rec_af_threshold} \
         --gnomad-dom-af ~{gnomad_af_dom_threshold} --gnomad-rec-af ~{gnomad_af_rec_threshold} \
-        --gnomad-af-field ~{gnomad_af_field} --gnomad-popmax-af ~{gnomad_popmax_af_threshold} \
+        --external-af-ref-prefix ~{external_af_ref_prefix} \
+        --external-af-populations ~{sep=' ' external_af_populations} \
+        --gnomad-popmax-af ~{gnomad_popmax_af_threshold} \
         --rec-n-hom-var ~{rec_n_cohort_hom_var_threshold} --dom-ac ~{dom_ac_threshold} --dom-ac-unaffected ~{dom_ac_unaffected_threshold}
     >>>
 

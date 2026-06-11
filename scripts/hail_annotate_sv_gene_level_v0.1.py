@@ -49,7 +49,8 @@ parser.add_argument('--dom-af', dest='dom_af_threshold', help='Cohort AF thresho
 parser.add_argument('--rec-af', dest='rec_af_threshold', help='Cohort AF threshold for recessives')
 parser.add_argument('--gnomad-dom-af', dest='gnomad_af_dom_threshold', help='gnomAD AF threshold for dominants')
 parser.add_argument('--gnomad-rec-af', dest='gnomad_af_rec_threshold', help='gnomAD AF threshold for recessives')
-parser.add_argument('--gnomad-af-field', dest='gnomad_af_field', help='Field for gnomAD AFs in INFO')
+parser.add_argument('--external-af-ref-prefix', dest='external_af_ref_prefix', help='Field for gnomAD AFs in INFO')
+parser.add_argument('--external-af-populations', nargs='+', dest='external_af_populations', help='Populations to get gnomAD popmax AF')
 parser.add_argument('--gnomad-popmax-af', dest='gnomad_popmax_af_threshold', help='gnomAD popmax AF threshold')
 parser.add_argument('--rec-n-hom-var', dest='rec_n_cohort_hom_var_threshold', help='Number of hom var individuals threshold for recessives')
 parser.add_argument('--dom-ac', dest='dom_ac_threshold', help='Cohort AC threshold for dominants')
@@ -76,7 +77,8 @@ dom_af_threshold = float(args.dom_af_threshold)
 rec_af_threshold = float(args.rec_af_threshold)
 gnomad_af_dom_threshold = float(args.gnomad_af_dom_threshold)
 gnomad_af_rec_threshold = float(args.gnomad_af_rec_threshold)
-gnomad_af_field = args.gnomad_af_field
+external_af_ref_prefix = args.external_af_ref_prefix
+external_af_populations = args.external_af_populations
 gnomad_popmax_af_threshold = float(args.gnomad_popmax_af_threshold)
 # NEW 5/29/2025: More AC and AF cutoffs, PED inputs
 rec_n_cohort_hom_var_threshold = int(args.rec_n_cohort_hom_var_threshold)
@@ -85,6 +87,9 @@ dom_ac_unaffected_threshold =int(args.dom_ac_unaffected_threshold)
 
 # NEW 2/19/2025: Remove sv_gene_fields input and change Python variable to be a union of restrictive_csq_fields and permissive_csq_fields
 sv_gene_fields = list(np.union1d(permissive_csq_fields, restrictive_csq_fields))
+
+gnomad_af_field = f"{external_af_ref_prefix}_AF"
+gnomad_popmax_fields = [f"{external_af_ref_prefix}_{pop}_AF" for pop in external_af_populations]
 
 hl.init(min_block_size=128, 
         local=f"local[*]", 
@@ -306,10 +311,7 @@ sv_mt = sv_mt.annotate_rows(
 )
 
 # Annotate gnomAD_popmax_AF and gnomad_popmax_freq flag
-gnomad_fields = [x for x in list(sv_mt.info) if 'gnomad' in x.lower() 
-                and 'ac' not in x.lower() and 'an' not in x.lower() 
-                and 'af' in x.lower()]
-sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(gnomAD_popmax_AF=hl.max([sv_mt.info[field] for field in gnomad_fields])))
+sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(gnomAD_popmax_AF=hl.max([sv_mt.info[field] for field in gnomad_popmax_fields])))
 sv_mt = sv_mt.annotate_rows(info=sv_mt.info.annotate(gnomad_popmax_freq=(sv_mt.info.gnomAD_popmax_AF<=gnomad_popmax_af_threshold) |
                                                                         (hl.is_missing(sv_mt.info.gnomAD_popmax_AF))))
 
@@ -345,7 +347,7 @@ header['info']['constrained_genes'] = {'Description': f"All genes in genes field
 header['info']['prec_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(prec_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['hi_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(hi_uri)}.", 'Number': '.', 'Type': 'String'}
 header['info']['ts_genes'] = {'Description': f"All genes in genes field that are in {os.path.basename(ts_uri)}.", 'Number': '.', 'Type': 'String'}
-header['info']['gnomAD_popmax_AF'] = {'Description': f"gnomAD popmax AF taken from fields: {', '.join(gnomad_fields)}.", 'Number': '1', 'Type': 'Float'}
+header['info']['gnomAD_popmax_AF'] = {'Description': f"gnomAD popmax AF taken from fields: {', '.join(gnomad_popmax_fields)}.", 'Number': '1', 'Type': 'Float'}
 # NEW 5/29/2025: Cohort affected/unaffected annotations
 header['info']['n_cohort_het_unaffected'] = {'Description': f"Number of het unaffected individuals (out of {n_tot_samples} total individuals).", 'Number': '1', 'Type': 'Int'}
 header['info']['n_cohort_hom_var_unaffected'] = {'Description': f"Number of hom var unaffected individuals (out of {n_tot_samples} total individuals).", 'Number': '1', 'Type': 'Int'}

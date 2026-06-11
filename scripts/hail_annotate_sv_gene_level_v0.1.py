@@ -89,7 +89,8 @@ dom_ac_unaffected_threshold =int(args.dom_ac_unaffected_threshold)
 sv_gene_fields = list(np.union1d(permissive_csq_fields, restrictive_csq_fields))
 
 gnomad_af_field = f"{external_af_ref_prefix}_AF"
-gnomad_popmax_fields = [f"{external_af_ref_prefix}_{pop}_AF" for pop in external_af_populations]
+gnomad_popmax_fields = [f"{external_af_ref_prefix}_{pop}_AF" for pop in external_af_populations
+                        if pop!='ALL']
 
 hl.init(min_block_size=128, 
         local=f"local[*]", 

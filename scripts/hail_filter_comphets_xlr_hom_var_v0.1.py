@@ -458,6 +458,7 @@ if (len(trio_samples)>0) and (len(non_trio_samples)>0):
 
 if len(trio_samples)==0:
     trio_samples = ['']
+    raise ValueError("No trio samples found in PED/VCF.")
 
 # Trio matrix
 merged_tm = hl.trio_matrix(merged_mt, pedigree, complete_trios=False)

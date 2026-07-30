@@ -363,8 +363,8 @@ header['info']['any_hi'] = {'Description': f"Any gene in genes field is in {os.p
 header['info']['any_ts'] = {'Description': f"Any gene in genes field is in {os.path.basename(ts_uri)}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['any_genelist'] = {'Description': f"Any gene in genes field is in gene lists from {os.path.basename(gene_list_tsv)}.", 'Number': '0', 'Type': 'Flag'}
 header['info']['any_inheritance'] = {'Description': f"Any gene in genes field is in {os.path.basename(inheritance_uri)}.", 'Number': '0', 'Type': 'Flag'}
-header['info']['dominant_freq'] = {'Description': f"Passes cohort AF <= {dom_af_threshold} AND gnomAD AF <= {gnomad_af_dom_threshold}.", 'Number': '0', 'Type': 'Flag'}
-header['info']['recessive_freq'] = {'Description': f"Passes cohort AF <= {rec_af_threshold} AND gnomAD AF <= {gnomad_af_rec_threshold}.", 'Number': '0', 'Type': 'Flag'}
+header['info']['dominant_freq'] = {'Description': f"Passes (cohort AC <= {dom_ac_threshold} OR cohort AF <= {dom_af_threshold}) AND (gnomAD AF <= {gnomad_af_dom_threshold} OR missing) AND cohort AC in unaffected individuals <= {dom_ac_unaffected_threshold}.", 'Number': '0', 'Type': 'Flag'}
+header['info']['recessive_freq'] = {'Description': f"Passes (number of hom-var individuals, unaffected plus affected, <= {rec_n_cohort_hom_var_threshold} OR cohort AF <= {rec_af_threshold}) AND (gnomAD AF <= {gnomad_af_rec_threshold} OR missing).", 'Number': '0', 'Type': 'Flag'}
 header['info']['gnomad_popmax_freq'] = {'Description': f"Passes gnomAD popmax AF <= {gnomad_popmax_af_threshold}.", 'Number': '0', 'Type': 'Flag'}
 header['info'][size_threshold_field] = {'Description': f"Passes SVLEN size filter of {humansize(size_threshold).replace('_', ' ')}.", 'Number': '0', 'Type': 'Flag'}
 

@@ -247,7 +247,9 @@ workflow filterClinicalVariants {
             hail_docker=hail_docker,
             carrier_gene_list=carrier_gene_list,
             ad_alt_threshold=ad_alt_threshold,
-            filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script
+            families_per_chunk=families_per_chunk,
+            filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
+            helper_functions_script=helper_functions_script
     }
 
     call filterClinicalVariants.splitByInheritance as splitClinVarByInheritance {

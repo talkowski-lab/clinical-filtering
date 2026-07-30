@@ -24,6 +24,9 @@ workflow filterClinicalVariants {
         File ped_uri
         File empty_file  # to output if only SVs or SNV/Indels input
         File carrier_gene_list
+        File gene_phenotype_map
+        File omim_uri
+        File pli_uri
 
         # for SVs
         File annot_beds_with_header_tsv
@@ -59,7 +62,12 @@ workflow filterClinicalVariants {
             ad_alt_threshold=ad_alt_threshold,
             genome_build=genome_build,
             rec_gene_list_tsv=rec_gene_list_tsv,
-            dom_gene_list_tsv=dom_gene_list_tsv
+            dom_gene_list_tsv=dom_gene_list_tsv,
+            carrier_gene_list=carrier_gene_list,
+            empty_file=empty_file,
+            gene_phenotype_map=gene_phenotype_map,
+            omim_uri=omim_uri,
+            pli_uri=pli_uri
         }
     }
 
@@ -94,7 +102,9 @@ workflow filterClinicalVariants {
             genome_build=genome_build,
             hail_docker=hail_docker,
             carrier_gene_list=carrier_gene_list,
-            ad_alt_threshold=ad_alt_threshold
+            ad_alt_threshold=ad_alt_threshold,
+            cohort_prefix=cohort_prefix,
+            sv_base_mini_docker=sv_base_mini_docker
             # filter_comphets_xlr_hom_var_script=filter_comphets_xlr_hom_var_script,
     }
 
